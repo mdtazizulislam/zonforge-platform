@@ -106,7 +106,7 @@ export class EvaluationEngine {
       evaluationStatus,
       detectionRatePct,
       gapRules,
-      detectionGapMs:    avgGapMs,
+      ...(avgGapMs !== undefined ? { detectionGapMs: avgGapMs } : {}),
       summary:           this.buildSummary(scenario.name, detectionRatePct, evaluationStatus, detections, gapRules),
       gaps,
       recommendations,

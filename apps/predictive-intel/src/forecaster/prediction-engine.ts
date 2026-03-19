@@ -88,21 +88,22 @@ export class PredictiveEngine {
       }
 
       // ── Signal 3: IOC match spike ───────────────
-      const iocMatches = await db.select({ cnt: count() }).from(schema.iocCache)
-        .where(gte(schema.iocCache.lastSeenAt, d7))
-
-      const iocCount = Number(iocMatches[0]?.cnt ?? 0)
-      if (iocCount >= 50) {
-        signals.push({
-          type:        'ioc_spike',
-          category:    'phishing_campaign',
-          strength:    Math.min(1, iocCount / 200),
-          description: `${iocCount} active IOCs in threat intelligence cache`,
-          source:      'ioc_cache',
-          detectedAt:  now,
-          data:        { iocCount },
-        })
-      }
+      // TODO: Implement iocCache table in db-client schema (threat-intel/ioc tracking)
+      // const iocMatches = await db.select({ cnt: count() }).from(schema.iocCache)
+      //   .where(gte(schema.iocCache.lastSeenAt, d7))
+      //
+      // const iocCount = Number(iocMatches[0]?.cnt ?? 0)
+      // if (iocCount >= 50) {
+      //   signals.push({
+      //     type:        'ioc_spike',
+      //     category:    'phishing_campaign',
+      //     strength:    Math.min(1, iocCount / 200),
+      //     description: `${iocCount} active IOCs in threat intelligence cache`,
+      //     source:      'ioc_cache',
+      //     detectedAt:  now,
+      //     data:        { iocCount },
+      //   })
+      // }
 
       // ── Signal 4: Risk score escalation ─────────
       const highRiskUsers = await db.select({ cnt: count() }).from(schema.riskScores)
