@@ -1,0 +1,15 @@
+{
+  "name": "@zonforge/landing-web",
+  "version": "4.6.0",
+  "private": true,
+  "description": "ZonForge Sentinel — Public landing page + interactive demo",
+  "scripts": {
+    "dev":     "vite --port 4000",
+    "build":   "vite build",
+    "preview": "vite preview --port 4000",
+    "clean":   "rm -rf dist"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

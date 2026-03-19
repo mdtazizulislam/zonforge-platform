@@ -1,0 +1,53 @@
+{
+  "name": "zonforge-platform",
+  "version": "4.6.0",
+  "private": true,
+  "description": "ZonForge Sentinel — AI-Native Cybersecurity Platform (Backend + Web Dashboard + Landing + Mobile)",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "collectors/*"
+  ],
+  "scripts": {
+    "build":             "turbo run build",
+    "dev":               "turbo run dev --parallel",
+    "test":              "turbo run test",
+    "lint":              "turbo run lint",
+    "typecheck":         "turbo run typecheck",
+    "clean":             "turbo run clean && rm -rf node_modules",
+
+    "dev:backend":       "turbo run dev --filter=./apps/api-gateway... --parallel",
+    "dev:dashboard":     "turbo run dev --filter=@zonforge/web-dashboard",
+    "dev:landing":       "turbo run dev --filter=@zonforge/landing-web",
+    "dev:mobile":        "turbo run dev --filter=@zonforge/mobile-app",
+
+    "build:backend":     "turbo run build --filter=./apps/api-gateway...",
+    "build:dashboard":   "turbo run build --filter=@zonforge/web-dashboard",
+    "build:landing":     "turbo run build --filter=@zonforge/landing-web",
+    "build:packages":    "turbo run build --filter=./packages/*",
+
+    "build:required":    "turbo run build --filter=@zonforge/shared-types --filter=@zonforge/logger --filter=@zonforge/config --filter=@zonforge/auth-utils --filter=@zonforge/event-schema --filter=@zonforge/db-client --filter=@zonforge/ingestion-service --filter=@zonforge/normalization-worker --filter=@zonforge/detection-engine --filter=@zonforge/threat-intel-service --filter=@zonforge/correlation-engine --filter=@zonforge/risk-scoring-engine --filter=@zonforge/alert-service --filter=@zonforge/api-gateway --filter=@zonforge/behavioral-ai --filter=@zonforge/alert-triage-ai --filter=@zonforge/ai-soc-analyst --filter=@zonforge/security-assistant --filter=@zonforge/web-dashboard",
+    "dev:required":      "npm run build:required && turbo run dev --parallel --filter=@zonforge/ingestion-service --filter=@zonforge/normalization-worker --filter=@zonforge/detection-engine --filter=@zonforge/threat-intel-service --filter=@zonforge/correlation-engine --filter=@zonforge/risk-scoring-engine --filter=@zonforge/alert-service --filter=@zonforge/api-gateway --filter=@zonforge/behavioral-ai --filter=@zonforge/alert-triage-ai --filter=@zonforge/ai-soc-analyst --filter=@zonforge/security-assistant --filter=@zonforge/web-dashboard",
+
+    "db:migrate":        "turbo run db:migrate --filter=@zonforge/db-client",
+    "db:generate":       "turbo run db:generate --filter=@zonforge/db-client",
+    "db:studio":         "cd packages/db-client && npx drizzle-kit studio",
+
+    "infra:up":          "docker-compose up -d postgres redis clickhouse",
+    "infra:down":        "docker-compose down",
+    "infra:logs":        "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "turbo":       "^2.0.0",
+    "typescript":  "^5.4.0",
+    "prettier":    "^3.2.0",
+    "@types/node": "^20.12.0",
+    "eslint":      "^9.0.0",
+    "vitest":      "^1.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm":  ">=10.0.0"
+  },
+  "packageManager": "npm@10.5.0"
+}

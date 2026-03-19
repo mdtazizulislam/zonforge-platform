@@ -1,0 +1,113 @@
+=== STEP 0 BASELINE 2026-03-19T11:40:42.4005563-04:00 ===
+PWD:
+C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform
+
+GIT BRANCH:
+fatal: not a git repository (or any of the parent directories): .git
+
+GIT STATUS:
+fatal: not a git repository (or any of the parent directories): .git
+
+NPM RUN:
+Lifecycle scripts included in zonforge-platform@4.6.0:
+  test
+    turbo run test
+available via `npm run`:
+  build
+    turbo run build
+  dev
+    turbo run dev --parallel
+  lint
+    turbo run lint
+  typecheck
+    turbo run typecheck
+  clean
+    turbo run clean && rm -rf node_modules
+  dev:backend
+    turbo run dev --filter=./apps/api-gateway... --parallel
+  dev:dashboard
+    turbo run dev --filter=@zonforge/web-dashboard
+  dev:landing
+    turbo run dev --filter=@zonforge/landing-web
+  dev:mobile
+    turbo run dev --filter=@zonforge/mobile-app
+  build:backend
+    turbo run build --filter=./apps/api-gateway...
+  build:dashboard
+    turbo run build --filter=@zonforge/web-dashboard
+  build:landing
+    turbo run build --filter=@zonforge/landing-web
+  build:packages
+    turbo run build --filter=./packages/*
+  db:migrate
+    turbo run db:migrate --filter=@zonforge/db-client
+  db:generate
+    turbo run db:generate --filter=@zonforge/db-client
+  db:studio
+    cd packages/db-client && npx drizzle-kit studio
+  infra:up
+    docker-compose up -d postgres redis clickhouse
+  infra:down
+    docker-compose down
+  infra:logs
+    docker-compose logs -f
+
+PNPM -R LIST:
+This project is configured to use npm because C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform\package.json has a "packageManager" field
+
+APPS:
+{auth-service,tenant-service}
+{correlation-engine,risk-scoring-engine}
+{ingestion-service,normalization-worker}
+ai-soc-analyst
+alert-service
+alert-triage-ai
+anomaly-service
+api-gateway
+auth-service
+behavioral-ai
+billing-service
+board-reports
+compliance-reports
+correlation-engine
+deception-grid
+deception-tech
+detection-engine
+digital-twin
+ingestion-service
+landing-web
+mobile-app
+mssp-console
+normalization-worker
+playbook-engine
+poc-management
+poc-manager
+predictive-intel
+predictive-threat
+redteam-simulation
+regulatory-ai
+risk-scoring-engine
+security-assistant
+security-benchmarks
+sso-service
+supply-chain-intel
+tenant-service
+threat-hunting
+threat-intel-service
+web-dashboard
+
+PACKAGES:
+{shared-types,event-schema,db-client,auth-utils,logger,config}
+auth-utils
+config
+db-client
+event-schema
+logger
+shared-types
+
+COLLECTORS:
+{m365-collector,aws-cloudtrail-collector,google-workspace-collector}
+aws-cloudtrail-collector
+collector-base
+google-workspace-collector
+m365-collector

@@ -1,0 +1,64 @@
+scenario: privilege_escalation
+version: "1.0"
+name: "Privilege Escalation via Role Assignment"
+description: >
+  Simulates an attacker who has gained initial access and now
+  attempts to escalate privileges by assigning themselves or
+  a controlled account to an admin role.
+mitre_tactics:
+  - TA0004   # Privilege Escalation
+  - TA0003   # Persistence
+mitre_techniques:
+  - T1098    # Account Manipulation
+  - T1136    # Create Account
+severity: critical
+expected_detections:
+  - ZF-PRIVESC-001   # privilege escalation rule
+category: privilege_escalation
+
+steps:
+  - step: 1
+    name: normal_login
+    event_type: user_login_success
+    count: 1
+    delay_ms: 100
+    params:
+      source_type: "m365_entra"
+    description: "Attacker logs in with compromised standard account"
+
+  - step: 2
+    name: role_enumeration
+    event_type: iam_role_list
+    count: 8
+    delay_ms: 300
+    params:
+      source_type: "aws_cloudtrail"
+      event_action: "ListRoles"
+    description: "Enumerates existing IAM roles"
+
+  - step: 3
+    name: admin_role_assignment
+    event_type: iam_role_change
+    count: 1
+    delay_ms: 200
+    params:
+      source_type:    "m365_entra"
+      event_action:   "Add member to role"
+      target_role:    "Global Administrator"
+    description: "Assigns attacker account to Global Admin role"
+
+  - step: 4
+    name: verify_privilege
+    event_type: admin_action
+    count: 3
+    delay_ms: 200
+    params:
+      source_type:  "m365_entra"
+      event_action: "Update organization settings"
+    description: "Exercises newly gained admin privileges"
+
+evaluation:
+  require_alert:       true
+  require_severity:    ["critical"]
+  detection_window_ms: 30000
+  pass_threshold_pct:  90
