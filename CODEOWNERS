@@ -1,0 +1,22 @@
+# ZonForge Sentinel CODEOWNERS
+#
+# Ownership is repository-level and path-based.
+# If GitHub teams are introduced later, replace owner entries accordingly.
+
+* @mdtazizulislam
+
+# Core docs and governance
+/README.md @mdtazizulislam
+/CHANGELOG.md @mdtazizulislam
+/CONTRIBUTING.md @mdtazizulislam
+/SECURITY.md @mdtazizulislam
+/docs/ @mdtazizulislam
+/.github/ @mdtazizulislam
+
+# Runtime and infrastructure paths
+/apps/ @mdtazizulislam
+/packages/ @mdtazizulislam
+/collectors/ @mdtazizulislam
+/infra/ @mdtazizulislam
+/security/ @mdtazizulislam
+/scripts/ @mdtazizulislam
