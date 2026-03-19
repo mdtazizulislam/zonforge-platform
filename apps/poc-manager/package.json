@@ -1,0 +1,19 @@
+{
+  "name": "@zonforge/poc-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "node --watch --env-file=../../.env.local dist/index.js",
+    "build": "tsc", "start": "node dist/index.js", "typecheck": "tsc --noEmit", "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@zonforge/shared-types": "*", "@zonforge/db-client": "*",
+    "@zonforge/logger": "*", "@zonforge/config": "*",
+    "hono": "^4.3.0", "@hono/node-server": "^1.11.0",
+    "@hono/zod-validator": "^0.2.2",
+    "ioredis": "^5.3.0", "uuid": "^9.0.0", "zod": "^3.22.0"
+  },
+  "devDependencies": { "typescript": "^5.4.0", "@types/node": "^20.12.0" }
+}

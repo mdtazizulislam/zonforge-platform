@@ -1,0 +1,93 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel Detection Rule
+# ID: ZF-AUTH-001
+# ─────────────────────────────────────────────────────────────────
+
+id: ZF-AUTH-001
+name: Brute Force to Successful Login
+description: >
+  Detects a pattern of multiple failed logins followed by a
+  successful login for the same user within a short time window.
+  This pattern indicates a successful brute-force or credential
+  stuffing attack.
+severity: high
+enabled: true
+
+# MITRE ATT&CK
+mitre:
+  tactics:
+    - id: TA0006
+      name: Credential Access
+  techniques:
+    - id: T1110
+      name: Brute Force
+      sub_techniques:
+        - id: T1110.001
+          name: Password Guessing
+        - id: T1110.003
+          name: Password Spraying
+  coverage_level: full
+
+# Data sources required
+source_types:
+  - m365_entra
+  - google_workspace
+  - aws_cloudtrail
+  - generic_webhook
+
+event_categories:
+  - authentication
+
+# Detection logic
+detection:
+  type: sequence
+  window_minutes: 30
+  group_by:
+    - actor_user_id
+    - actor_ip
+
+  steps:
+    - name: failed_logins
+      conditions:
+        - field: event_action
+          operator: in
+          value: [login_failed, login_failure, ConsoleLogin]
+        - field: outcome
+          operator: eq
+          value: failure
+      aggregate:
+        count_min: 5
+      within_minutes: 15
+
+    - name: successful_login
+      conditions:
+        - field: event_action
+          operator: in
+          value: [login_success, ConsoleLogin]
+        - field: outcome
+          operator: eq
+          value: success
+      must_follow: failed_logins
+      within_minutes: 15
+
+# Alert configuration
+alert:
+  title: "Brute Force Attack Succeeded — {{actor_user_id}}"
+  description: >
+    User {{actor_user_id}} experienced {{failed_logins.count}} failed
+    login attempts from IP {{actor_ip}} followed by a successful
+    login within {{window_minutes}} minutes. This pattern is
+    consistent with a successful brute-force or credential stuffing attack.
+  priority: P2
+  recommended_actions:
+    - "Immediately verify with the user if they attempted to login"
+    - "Review all activity from IP {{actor_ip}} in the last 24 hours"
+    - "Check for any sensitive data access or privilege changes after the successful login"
+    - "Consider blocking IP {{actor_ip}} if confirmed malicious"
+    - "Reset user password and revoke active sessions if confirmed compromise"
+
+confidence_score: 0.85
+false_positive_notes: >
+  May trigger for users who frequently mistype passwords.
+  Tune threshold higher (10+ failures) if false positives occur
+  for specific users.

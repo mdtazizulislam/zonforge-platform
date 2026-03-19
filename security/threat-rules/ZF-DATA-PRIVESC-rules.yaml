@@ -1,0 +1,317 @@
+# ZF-DATA-001: Unusual Mass Data Download
+id: ZF-DATA-001
+name: Unusual Mass File Download
+description: >
+  A user downloads an abnormally large volume of files or data
+  in a short time window, significantly exceeding their historical
+  baseline. A key early indicator of data exfiltration.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0010
+      name: Exfiltration
+  techniques:
+    - id: T1530
+      name: Data from Cloud Storage Object
+    - id: T1213
+      name: Data from Information Repositories
+  coverage_level: full
+
+source_types: [google_workspace, m365_entra]
+event_categories: [file_access]
+
+detection:
+  type: anomaly_threshold
+  window_minutes: 60
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [file_download, download, GetObject]
+    - field: outcome
+      operator: eq
+      value: success
+
+  aggregate:
+    count_min: 50
+    or_volume_mb_min: 500
+
+  anomaly_check:
+    metric: download_count_per_hour
+    std_dev_threshold: 3.0
+
+alert:
+  title: "Mass Data Download — {{actor_user_id}}"
+  description: >
+    User {{actor_user_id}} downloaded {{event_count}} files
+    ({{data_volume_mb}}MB) in {{window_minutes}} minutes —
+    significantly above their baseline behavior.
+  priority: P2
+  recommended_actions:
+    - "Determine if this download was authorized (backup, legitimate project)"
+    - "Review which files/folders were downloaded"
+    - "Check if data was moved to external storage or sent externally"
+    - "Consider whether the user has submitted resignation or is under investigation"
+
+confidence_score: 0.78
+false_positive_notes: "Legitimate bulk exports for backup, migration, or reporting tasks."
+
+---
+
+# ZF-PRIVESC-001: Cloud Privilege Escalation
+id: ZF-PRIVESC-001
+name: Cloud Privilege Escalation Detected
+description: >
+  A user or service assigns elevated permissions to themselves
+  or another entity, particularly attaching administrative policies
+  or creating new admin accounts. A core indicator of privilege
+  escalation in cloud environments.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0004
+      name: Privilege Escalation
+    - id: TA0003
+      name: Persistence
+  techniques:
+    - id: T1098
+      name: Account Manipulation
+      sub_techniques:
+        - id: T1098.001
+          name: Additional Cloud Credentials
+    - id: T1078
+      name: Valid Accounts
+  coverage_level: full
+
+source_types: [aws_cloudtrail, m365_entra, google_workspace]
+event_categories: [account_management]
+
+detection:
+  type: threshold
+  window_minutes: 60
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [AttachRolePolicy, PutRolePolicy, AttachUserPolicy,
+              GRANT_ADMIN_PRIVILEGE, privilege_escalation,
+              Add_member_to_role, AddUserToGroup]
+    - field: outcome
+      operator: eq
+      value: success
+  count_min: 1
+
+  filters:
+    - field: target_resource
+      operator: contains_any
+      value: [Admin, Administrator, PowerUser, SecurityAdmin,
+              GlobalAdministrator, CompanyAdministrator]
+
+alert:
+  title: "Privilege Escalation — {{actor_user_id}} → {{target_resource}}"
+  description: >
+    User {{actor_user_id}} granted elevated permissions
+    ({{target_resource}}) to {{target_entity}}.
+  priority: P2
+  recommended_actions:
+    - "Verify this was an authorized change via your change management process"
+    - "Review the full IAM/RBAC change history for this user"
+    - "If unauthorized, immediately revoke the elevated permissions"
+    - "Review what the escalated account did after receiving elevated access"
+
+confidence_score: 0.85
+false_positive_notes: "Authorized IT operations — use change management tickets to correlate."
+
+---
+
+# ZF-AWS-001: AWS Root Account Login
+id: ZF-AWS-001
+name: AWS Root Account Console Login
+description: >
+  The AWS account root user logged into the management console.
+  AWS best practice requires that the root account is never used
+  for routine operations. Any root login should be treated as a
+  security incident until proven otherwise.
+severity: critical
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0001
+      name: Initial Access
+    - id: TA0004
+      name: Privilege Escalation
+  techniques:
+    - id: T1078
+      name: Valid Accounts
+      sub_techniques:
+        - id: T1078.004
+          name: Cloud Accounts
+  coverage_level: full
+
+source_types: [aws_cloudtrail]
+event_categories: [authentication]
+
+detection:
+  type: threshold
+  window_minutes: 5
+  group_by: [tenant_id]
+
+  conditions:
+    - field: event_action
+      operator: eq
+      value: ConsoleLogin
+    - field: actor_user_type
+      operator: eq
+      value: admin
+    - field: metadata.awsUserIdentityType
+      operator: eq
+      value: Root
+  count_min: 1
+
+alert:
+  title: "CRITICAL: AWS Root Account Login Detected"
+  description: >
+    The AWS root account for this environment logged into the
+    management console from IP {{actor_ip}} at {{event_time}}.
+    This is a critical security event.
+  priority: P1
+  recommended_actions:
+    - "Immediately verify with your AWS account owner if this was authorized"
+    - "If not authorized, assume account compromise — activate AWS incident response"
+    - "Rotate root account credentials immediately"
+    - "Enable MFA on root account if not already enabled"
+    - "Review all AWS API calls made in the 30 minutes following this login"
+
+confidence_score: 0.98
+false_positive_notes: "Very rare — root logins should essentially never occur. Treat every trigger as P1."
+
+---
+
+# ZF-API-001: Unusual API Token Usage Pattern
+id: ZF-API-001
+name: Unusual API Token Usage Pattern
+description: >
+  An API token is used from a new IP address with anomalously high
+  request volume or from an unusual endpoint pattern. May indicate
+  a stolen API token being used by an adversary.
+severity: medium
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0006
+      name: Credential Access
+  techniques:
+    - id: T1550
+      name: Use Alternate Authentication Material
+      sub_techniques:
+        - id: T1550.001
+          name: Application Access Token
+  coverage_level: full
+
+source_types: [api_gateway_aws, api_gateway_kong, generic_webhook]
+event_categories: [api_call]
+
+detection:
+  type: anomaly_correlation
+  window_minutes: 60
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_category
+      operator: eq
+      value: api_call
+    - field: outcome
+      operator: eq
+      value: success
+
+  anomaly_checks:
+    - metric: api_calls_per_hour
+      std_dev_threshold: 3.0
+    - metric: new_ip_for_token
+      is_new: true
+    - metric: unique_endpoints_per_hour
+      threshold_min: 20
+
+  require_anomaly_count: 2
+
+alert:
+  title: "Unusual API Token Activity — {{actor_user_id}}"
+  description: >
+    API token for {{actor_user_id}} shows anomalous usage:
+    {{anomaly_details}}. This may indicate a stolen token.
+  priority: P2
+  recommended_actions:
+    - "Verify if the token owner is responsible for this activity"
+    - "Check if the token was recently shared or may have been exposed"
+    - "Revoke and reissue the token if origin cannot be confirmed"
+    - "Review what API endpoints were accessed with this token"
+
+confidence_score: 0.75
+false_positive_notes: "Automated jobs running from new infrastructure, legitimate load testing."
+
+---
+
+# ZF-AUTH-006: Login from New Country
+id: ZF-AUTH-006
+name: Successful Login from Never-Before-Seen Country
+description: >
+  A user successfully logs in from a country they have never
+  previously accessed from. This is a moderate-confidence indicator
+  of account compromise, especially when combined with other signals.
+severity: medium
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0001
+      name: Initial Access
+  techniques:
+    - id: T1078
+      name: Valid Accounts
+      sub_techniques:
+        - id: T1078.004
+          name: Cloud Accounts
+  coverage_level: partial
+
+source_types: [m365_entra, google_workspace, aws_cloudtrail]
+event_categories: [authentication]
+
+detection:
+  type: baseline_deviation
+  window_minutes: 30
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [login_success]
+    - field: outcome
+      operator: eq
+      value: success
+    - field: actor_ip_country
+      operator: not_in_baseline
+      baseline_metric: login_countries
+      baseline_days: 30
+  count_min: 1
+
+alert:
+  title: "Login from New Country — {{actor_user_id}} from {{actor_ip_country}}"
+  description: >
+    User {{actor_user_id}} logged in from {{actor_ip_country}},
+    a country not seen in their 30-day login history.
+  priority: P3
+  recommended_actions:
+    - "Verify with the user if they are traveling or using a VPN"
+    - "If unexpected, consider this a potential account compromise"
+    - "Review all activity in this session"
+
+confidence_score: 0.65
+false_positive_notes: "Travel, VPN, and remote work are common causes. This rule is most valuable as a contributing signal rather than standalone alert."

@@ -1,0 +1,202 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — TLS Certificate Management
+#
+# Uses cert-manager with Let's Encrypt (ACME) for external TLS
+# and Istio's built-in CA for internal mTLS (auto-managed).
+#
+# External TLS:
+#   - api.zonforge.com        → ALB → Istio Ingress Gateway
+#   - app.zonforge.com        → ALB → Istio Ingress Gateway
+#   - *.zonforge.com          → wildcard (for tenant subdomains)
+#
+# Internal mTLS:
+#   - Fully managed by Istio Citadel
+#   - Certificates rotated every 24 hours automatically
+# ─────────────────────────────────────────────────────────────────
+
+# ── ClusterIssuer — Let's Encrypt Production ──────────────────────
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: security@zonforge.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      # DNS-01 challenge via Route53 (for wildcard certs)
+      - dns01:
+          route53:
+            region: us-east-1
+            hostedZoneID: XXXX  # set to your Route53 hosted zone ID
+            role: arn:aws:iam::ACCOUNT_ID:role/zonforge-cert-manager-role
+
+---
+
+# ── ClusterIssuer — Let's Encrypt Staging (testing) ─────────────
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: security@zonforge.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-key
+    solvers:
+      - dns01:
+          route53:
+            region: us-east-1
+            hostedZoneID: XXXX
+            role: arn:aws:iam::ACCOUNT_ID:role/zonforge-cert-manager-role
+
+---
+
+# ── Certificate — API endpoint wildcard ──────────────────────────
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zonforge-api-tls
+  namespace: istio-system
+spec:
+  secretName: zonforge-api-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - api.zonforge.com
+    - app.zonforge.com
+    - "*.zonforge.com"
+  duration: 2160h        # 90 days
+  renewBefore: 720h      # Renew 30 days before expiry
+
+---
+
+# ── Istio Gateway — TLS termination ──────────────────────────────
+
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: zonforge-gateway
+  namespace: zonforge
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    # HTTPS — external traffic
+    - port:
+        number: 443
+        name:   https
+        protocol: HTTPS
+      tls:
+        mode:           SIMPLE
+        credentialName: zonforge-api-tls
+      hosts:
+        - api.zonforge.com
+        - app.zonforge.com
+
+    # HTTP → HTTPS redirect
+    - port:
+        number: 80
+        name:   http
+        protocol: HTTP
+      tls:
+        httpsRedirect: true
+      hosts:
+        - api.zonforge.com
+        - app.zonforge.com
+
+---
+
+# ── VirtualService — route to API gateway ────────────────────────
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway-vs
+  namespace: zonforge
+spec:
+  hosts:
+    - api.zonforge.com
+  gateways:
+    - zonforge-gateway
+  http:
+    # Security headers
+    - match:
+        - uri:
+            prefix: /
+      headers:
+        request:
+          set:
+            x-forwarded-proto: https
+        response:
+          set:
+            strict-transport-security: "max-age=31536000; includeSubDomains; preload"
+            x-frame-options: DENY
+            x-content-type-options: nosniff
+            referrer-policy: strict-origin-when-cross-origin
+            permissions-policy: "geolocation=(), microphone=(), camera=()"
+            content-security-policy: >
+              default-src 'self';
+              script-src 'self' 'nonce-{NONCE}';
+              style-src 'self' 'unsafe-inline';
+              img-src 'self' data: https:;
+              connect-src 'self' https://api.zonforge.com;
+              font-src 'self';
+              frame-ancestors 'none';
+              base-uri 'self';
+              form-action 'self'
+      route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 3000
+
+---
+
+# ── DestinationRule — enforce mTLS to API gateway ────────────────
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-gateway-dr
+  namespace: zonforge
+spec:
+  host: api-gateway
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL   # Use Istio-issued mTLS certs
+    connectionPool:
+      tcp:
+        maxConnections: 1000
+      http:
+        h2UpgradePolicy:     UPGRADE
+        idleTimeout:         60s
+        http2MaxRequests:    1000
+        maxRequestsPerConnection: 100
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval:             30s
+      baseEjectionTime:     30s
+      maxEjectionPercent:   50
+
+---
+
+# ── DestinationRule — all services in namespace use mTLS ─────────
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: all-services-mtls
+  namespace: zonforge
+spec:
+  host: "*.zonforge.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

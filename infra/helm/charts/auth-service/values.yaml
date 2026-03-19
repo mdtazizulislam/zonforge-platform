@@ -1,0 +1,142 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — auth-service Helm Values
+# ─────────────────────────────────────────────────────────────────
+
+replicaCount: 2
+
+image:
+  repository: ""   # Filled by CI/CD: <account>.dkr.ecr.<region>.amazonaws.com/zonforge/auth-service
+  pullPolicy: IfNotPresent
+  tag: ""          # Filled by CI/CD: sha-<git-sha>
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 3100
+
+# ── Ingress (via AWS ALB Ingress Controller) ──────────────────────
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: ""   # Set in overlay
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+  hosts:
+    - host: api.zonforge.com
+      paths:
+        - path: /v1/auth
+          pathType: Prefix
+  tls: []
+
+# ── Resources ─────────────────────────────────────────────────────
+
+resources:
+  requests:
+    cpu:    100m
+    memory: 256Mi
+  limits:
+    cpu:    500m
+    memory: 512Mi
+
+# ── Autoscaling ───────────────────────────────────────────────────
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# ── Pod settings ──────────────────────────────────────────────────
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port:   "3100"
+  prometheus.io/path:   "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser:    1001
+  fsGroup:      1001
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem:   true
+  capabilities:
+    drop: ["ALL"]
+
+# ── Health checks ─────────────────────────────────────────────────
+
+livenessProbe:
+  httpGet:
+    path: /v1/auth/health
+    port: 3100
+  initialDelaySeconds: 10
+  periodSeconds:       15
+  failureThreshold:    3
+
+readinessProbe:
+  httpGet:
+    path: /v1/auth/health
+    port: 3100
+  initialDelaySeconds: 5
+  periodSeconds:       10
+  failureThreshold:    3
+
+# ── Environment variables (non-secret) ───────────────────────────
+
+env:
+  ZONFORGE_ENV:       production
+  ZONFORGE_LOG_LEVEL: info
+  PORT:               "3100"
+
+# ── Secret environment variables (from AWS Secrets Manager → ESO) ─
+
+envFromSecrets:
+  - secretName: zonforge-auth-secrets
+    keys:
+      - ZONFORGE_JWT_SECRET
+      - ZONFORGE_JWT_ACCESS_EXPIRY
+      - ZONFORGE_JWT_REFRESH_EXPIRY
+      - ZONFORGE_API_KEY_SALT
+      - ZONFORGE_ENCRYPTION_KEY
+      - ZONFORGE_HMAC_SECRET
+      - ZONFORGE_POSTGRES_URL
+      - ZONFORGE_REDIS_HOST
+      - ZONFORGE_REDIS_PORT
+      - ZONFORGE_REDIS_PASSWORD
+
+# ── Pod topology ──────────────────────────────────────────────────
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [auth-service]
+          topologyKey: kubernetes.io/hostname
+
+# ── Service Account ───────────────────────────────────────────────
+
+serviceAccount:
+  create: true
+  name:   "auth-service"
+  annotations:
+    eks.amazonaws.com/role-arn: ""   # Set to IAM role ARN for IRSA
+
+# ── Istio ─────────────────────────────────────────────────────────
+
+istio:
+  enabled: true
+  mtls:    STRICT

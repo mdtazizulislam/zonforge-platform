@@ -1,0 +1,43 @@
+{
+  "name": "@zonforge/db-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./postgres": {
+      "import": "./dist/postgres/index.js",
+      "types": "./dist/postgres/index.d.ts"
+    },
+    "./clickhouse": {
+      "import": "./dist/clickhouse/index.js",
+      "types": "./dist/clickhouse/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node dist/postgres/migrate.js",
+    "db:studio": "drizzle-kit studio",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@zonforge/shared-types": "*",
+    "drizzle-orm": "^0.30.0",
+    "postgres": "^3.4.0",
+    "@clickhouse/client": "^0.2.9",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "drizzle-kit": "^0.20.0",
+    "@types/uuid": "^9.0.0"
+  }
+}

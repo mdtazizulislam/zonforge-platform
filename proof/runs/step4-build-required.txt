@@ -1,0 +1,195 @@
+
+> zonforge-platform@4.6.0 build:required
+> turbo run build --filter=@zonforge/shared-types --filter=@zonforge/logger --filter=@zonforge/config --filter=@zonforge/auth-utils --filter=@zonforge/event-schema --filter=@zonforge/db-client --filter=@zonforge/ingestion-service --filter=@zonforge/normalization-worker --filter=@zonforge/detection-engine --filter=@zonforge/threat-intel-service --filter=@zonforge/correlation-engine --filter=@zonforge/risk-scoring-engine --filter=@zonforge/alert-service --filter=@zonforge/api-gateway --filter=@zonforge/behavioral-ai --filter=@zonforge/alert-triage-ai --filter=@zonforge/ai-soc-analyst --filter=@zonforge/security-assistant --filter=@zonforge/web-dashboard
+
+ΓÇó turbo 2.8.19
+
+   ΓÇó Packages in scope: @zonforge/ai-soc-analyst, @zonforge/alert-service, @zonforge/alert-triage-ai, @zonforge/api-gateway, @zonforge/auth-utils, @zonforge/behavioral-ai, @zonforge/config, @zonforge/correlation-engine, @zonforge/db-client, @zonforge/detection-engine, @zonforge/event-schema, @zonforge/ingestion-service, @zonforge/logger, @zonforge/normalization-worker, @zonforge/risk-scoring-engine, @zonforge/security-assistant, @zonforge/shared-types, @zonforge/threat-intel-service, @zonforge/web-dashboard
+   ΓÇó Running build in 19 packages
+   ΓÇó Remote caching disabled
+
+@zonforge/logger:build: cache hit, replaying logs 65a83f34f34d0a24
+@zonforge/logger:build: 
+@zonforge/logger:build: > @zonforge/logger@0.1.0 build
+@zonforge/logger:build: > tsc
+@zonforge/logger:build: 
+@zonforge/config:build: cache hit, replaying logs 53e763b2fd570bb0
+@zonforge/config:build: 
+@zonforge/config:build: > @zonforge/config@0.1.0 build
+@zonforge/config:build: > tsc
+@zonforge/config:build: 
+@zonforge/shared-types:build: cache hit, replaying logs d22893d32e88eca8
+@zonforge/shared-types:build: 
+@zonforge/shared-types:build: > @zonforge/shared-types@0.1.0 build
+@zonforge/shared-types:build: > tsc
+@zonforge/shared-types:build: 
+@zonforge/collector-base:build: cache hit, replaying logs 6d03a371c5248952
+@zonforge/collector-base:build: 
+@zonforge/collector-base:build: > @zonforge/collector-base@0.1.0 build
+@zonforge/collector-base:build: > tsc
+@zonforge/collector-base:build: 
+@zonforge/event-schema:build: cache hit, replaying logs ed9e8b55f472747e
+@zonforge/event-schema:build: 
+@zonforge/event-schema:build: > @zonforge/event-schema@0.1.0 build
+@zonforge/event-schema:build: > tsc
+@zonforge/event-schema:build: 
+@zonforge/db-client:build: cache hit, replaying logs 52fa73e3319f3398
+@zonforge/db-client:build: 
+@zonforge/db-client:build: > @zonforge/db-client@0.1.0 build
+@zonforge/db-client:build: > tsc
+@zonforge/db-client:build: 
+@zonforge/web-dashboard:build: cache hit, replaying logs 1d8c3a36e78554fa
+@zonforge/behavioral-ai:build: cache hit, replaying logs 50f4f267a85eec56
+@zonforge/web-dashboard:build: 
+@zonforge/web-dashboard:build: > @zonforge/web-dashboard@0.1.0 build
+@zonforge/web-dashboard:build: > vite build
+@zonforge/web-dashboard:build: 
+@zonforge/web-dashboard:build: vite v5.4.21 building for production...
+@zonforge/web-dashboard:build: transforming...
+@zonforge/web-dashboard:build: Γ£ô 2781 modules transformed.
+@zonforge/web-dashboard:build: rendering chunks...
+@zonforge/web-dashboard:build: computing gzip size...
+@zonforge/web-dashboard:build: dist/index.html                                       1.06 kB Γöé gzip:   0.55 kB
+@zonforge/web-dashboard:build: dist/assets/index-B50mEL7a.css                        2.11 kB Γöé gzip:   0.69 kB
+@zonforge/web-dashboard:build: dist/assets/check-BU_DXOHM.js                         0.33 kB Γöé gzip:   0.28 kB Γöé map:     0.74 kB
+@zonforge/web-dashboard:build: dist/assets/play-Cw-mqZc7.js                          0.35 kB Γöé gzip:   0.28 kB Γöé map:     0.75 kB
+@zonforge/web-dashboard:build: dist/assets/chevron-right-B4PMob3E.js                 0.35 kB Γöé gzip:   0.28 kB Γöé map:     0.80 kB
+@zonforge/web-dashboard:build: dist/assets/loader-circle-HIJi2Jnw.js                 0.37 kB Γöé gzip:   0.29 kB Γöé map:     0.81 kB
+@zonforge/web-dashboard:build: dist/assets/plus-BoXhX0A1.js                          0.37 kB Γöé gzip:   0.29 kB Γöé map:     0.83 kB
+@zonforge/web-dashboard:build: dist/assets/arrow-right-CLDol1Ra.js                   0.39 kB Γöé gzip:   0.30 kB Γöé map:     0.88 kB
+@zonforge/web-dashboard:build: dist/assets/clock-BzXdkR8Z.js                         0.39 kB Γöé gzip:   0.31 kB Γöé map:     0.89 kB
+@zonforge/web-dashboard:build: dist/assets/circle-check-BqqF7ZeA.js                  0.39 kB Γöé gzip:   0.31 kB Γöé map:     0.92 kB
+@zonforge/security-assistant:build: cache hit, replaying logs ec56ac9583fdb360
+@zonforge/web-dashboard:build: dist/assets/message-square-B2T9FL5Q.js                0.40 kB Γöé gzip:   0.31 kB Γöé map:     0.86 kB
+@zonforge/web-dashboard:build: dist/assets/user-avBY0u9z.js                          0.41 kB Γöé gzip:   0.32 kB Γöé map:     0.90 kB
+@zonforge/web-dashboard:build: dist/assets/circle-x-DqEIeSia.js                      0.42 kB Γöé gzip:   0.31 kB Γöé map:     0.99 kB
+@zonforge/web-dashboard:build: dist/assets/lock-FhHU5_4g.js                          0.42 kB Γöé gzip:   0.33 kB Γöé map:     0.95 kB
+@zonforge/web-dashboard:build: dist/assets/trending-up-gOhY8u7c.js                   0.43 kB Γöé gzip:   0.32 kB Γöé map:     0.92 kB
+@zonforge/web-dashboard:build: dist/assets/target-CC0nwOOj.js                        0.44 kB Γöé gzip:   0.30 kB Γöé map:     1.05 kB
+@zonforge/web-dashboard:build: dist/assets/copy-CVO9wUsr.js                          0.45 kB Γöé gzip:   0.34 kB Γöé map:     0.98 kB
+@zonforge/web-dashboard:build: dist/assets/activity-pBX5Wf33.js                      0.45 kB Γöé gzip:   0.34 kB Γöé map:     0.91 kB
+@zonforge/web-dashboard:build: dist/assets/globe-DKNnsOIn.js                         0.46 kB Γöé gzip:   0.33 kB Γöé map:     1.01 kB
+@zonforge/web-dashboard:build: dist/assets/database-LL8NGOP6.js                      0.46 kB Γöé gzip:   0.34 kB Γöé map:     1.05 kB
+@zonforge/web-dashboard:build: dist/assets/eye-CAczM9s5.js                           0.46 kB Γöé gzip:   0.34 kB Γöé map:     0.99 kB
+@zonforge/web-dashboard:build: dist/assets/upload-vjpRKgCJ.js                        0.47 kB Γöé gzip:   0.35 kB Γöé map:     1.05 kB
+@zonforge/web-dashboard:build: dist/assets/external-link-Dl44yQur.js                 0.47 kB Γöé gzip:   0.34 kB Γöé map:     1.04 kB
+@zonforge/web-dashboard:build: dist/assets/zap-DvXnutNS.js                           0.48 kB Γöé gzip:   0.35 kB Γöé map:     0.91 kB
+@zonforge/web-dashboard:build: dist/assets/download-x_ZtVVqS.js                      0.48 kB Γöé gzip:   0.36 kB Γöé map:     1.07 kB
+@zonforge/web-dashboard:build: dist/assets/triangle-alert-CrGqLo2s.js                0.49 kB Γöé gzip:   0.35 kB Γöé map:     1.10 kB
+@zonforge/web-dashboard:build: dist/assets/send-BHufyw0O.js                          0.50 kB Γöé gzip:   0.37 kB Γöé map:     1.00 kB
+@zonforge/web-dashboard:build: dist/assets/users-D62FpRqN.js                         0.52 kB Γöé gzip:   0.36 kB Γöé map:     1.14 kB
+@zonforge/web-dashboard:build: dist/assets/refresh-cw-DZDR4WPU.js                    0.54 kB Γöé gzip:   0.37 kB Γöé map:     1.16 kB
+@zonforge/web-dashboard:build: dist/assets/save-CUo1ECpZ.js                          0.54 kB Γöé gzip:   0.36 kB Γöé map:     1.10 kB
+@zonforge/web-dashboard:build: dist/assets/file-text-CWBrN5TF.js                     0.55 kB Γöé gzip:   0.36 kB Γöé map:     1.23 kB
+@zonforge/web-dashboard:build: dist/assets/server-CxQyCSbc.js                        0.55 kB Γöé gzip:   0.35 kB Γöé map:     1.37 kB
+@zonforge/web-dashboard:build: dist/assets/chevron-up-B8H3pOMk.js                    0.59 kB Γöé gzip:   0.31 kB Γöé map:     1.41 kB
+@zonforge/web-dashboard:build: dist/assets/trending-down-Cg6Le6jP.js                 0.67 kB Γöé gzip:   0.36 kB Γöé map:     1.53 kB
+@zonforge/web-dashboard:build: dist/assets/star-C7a67AI5.js                          0.69 kB Γöé gzip:   0.44 kB Γöé map:     1.12 kB
+@zonforge/web-dashboard:build: dist/assets/cpu-Bj_nRRp1.js                           0.71 kB Γöé gzip:   0.40 kB Γöé map:     1.78 kB
+@zonforge/web-dashboard:build: dist/assets/AuditLogPage-B_J-v6pZ.js                  1.32 kB Γöé gzip:   0.74 kB Γöé map:     2.65 kB
+@zonforge/web-dashboard:build: dist/assets/thumbs-up-BGAJbnJS.js                     1.39 kB Γöé gzip:   0.60 kB Γöé map:     2.89 kB
+@zonforge/web-dashboard:build: dist/assets/PostureGauge-6Y7JiG8y.js                  2.14 kB Γöé gzip:   1.08 kB Γöé map:     6.91 kB
+@zonforge/web-dashboard:build: dist/assets/queries-DPhkJ3De.js                       2.35 kB Γöé gzip:   0.82 kB Γöé map:     8.85 kB
+@zonforge/web-dashboard:build: dist/assets/vendor-CsM61ymy.js                        2.56 kB Γöé gzip:   1.43 kB Γöé map:    25.63 kB
+@zonforge/web-dashboard:build: dist/assets/sparkles-DEEuJkHo.js                      2.97 kB Γöé gzip:   1.09 kB Γöé map:     7.83 kB
+@zonforge/web-dashboard:build: dist/assets/zustand-_1r1RET1.js                       3.63 kB Γöé gzip:   1.61 kB Γöé map:    14.52 kB
+@zonforge/web-dashboard:build: dist/assets/LoginPage-CjTqfQov.js                     3.73 kB Γöé gzip:   1.57 kB Γöé map:    14.89 kB
+@zonforge/web-dashboard:build: dist/assets/ui-5Ux2rGWC.js                            4.05 kB Γöé gzip:   1.51 kB Γöé map:    12.90 kB
+@zonforge/web-dashboard:build: dist/assets/RiskPage-CE93eMMl.js                     10.01 kB Γöé gzip:   3.24 kB Γöé map:    23.10 kB
+@zonforge/web-dashboard:build: dist/assets/AppShell-BG3mSgXR.js                     11.07 kB Γöé gzip:   3.19 kB Γöé map:    26.13 kB
+@zonforge/web-dashboard:build: dist/assets/CompliancePage-BrURkrsi.js               11.27 kB Γöé gzip:   3.40 kB Γöé map:    27.41 kB
+@zonforge/web-dashboard:build: dist/assets/ConnectorsPage-D7EvhsbW.js               12.04 kB Γöé gzip:   3.71 kB Γöé map:    27.51 kB
+@zonforge/web-dashboard:build: dist/assets/SettingsPage-Cl6yOJGo.js                 12.31 kB Γöé gzip:   3.70 kB Γöé map:    28.76 kB
+@zonforge/web-dashboard:build: dist/assets/BillingPage-5fxuG9C_.js                  12.48 kB Γöé gzip:   4.06 kB Γöé map:    29.36 kB
+@zonforge/web-dashboard:build: dist/assets/AlertDetailPage-BBtMSOvG.js              13.24 kB Γöé gzip:   3.69 kB Γöé map:    30.92 kB
+@zonforge/web-dashboard:build: dist/assets/PlaybooksPage-BYLuWf3M.js                13.34 kB Γöé gzip:   4.42 kB Γöé map:    28.46 kB
+@zonforge/web-dashboard:build: dist/assets/AiSocAnalystPage-w__qosr5.js             16.68 kB Γöé gzip:   5.01 kB Γöé map:    35.55 kB
+@zonforge/web-dashboard:build: dist/assets/MsspPage-CRNz8w3j.js                     16.76 kB Γöé gzip:   4.64 kB Γöé map:    40.15 kB
+@zonforge/web-dashboard:build: dist/assets/SupplyChainPage-CA4vGEqg.js              17.15 kB Γöé gzip:   5.62 kB Γöé map:    37.94 kB
+@zonforge/web-dashboard:build: dist/assets/SecurityValidationPage-CRrZlh7o.js       17.55 kB Γöé gzip:   5.19 kB Γöé map:    41.23 kB
+@zonforge/web-dashboard:build: dist/assets/EnterpriseCapabilitiesPage-DJI6kTl6.js   17.85 kB Γöé gzip:   5.42 kB Γöé map:    40.20 kB
+@zonforge/web-dashboard:build: dist/assets/AiIntelligencePage-BjFqENVy.js           18.66 kB Γöé gzip:   5.73 kB Γöé map:    42.64 kB
+@zonforge/web-dashboard:build: dist/assets/AiCapabilitiesPage-BGz_1aap.js           19.50 kB Γöé gzip:   6.20 kB Γöé map:    43.57 kB
+@zonforge/web-dashboard:build: dist/assets/ThreatHuntingPage-CH5FFTjU.js            19.72 kB Γöé gzip:   5.75 kB Γöé map:    46.04 kB
+@zonforge/web-dashboard:build: dist/assets/EnterpriseSalesPage-xCDlkFX7.js          20.70 kB Γöé gzip:   6.11 kB Γöé map:    46.70 kB
+@zonforge/web-dashboard:build: dist/assets/ComplianceReportsPage-CT6CGR4c.js        22.91 kB Γöé gzip:   6.38 kB Γöé map:    51.51 kB
+@zonforge/web-dashboard:build: dist/assets/EnterpriseSetupPage-BIMAaaLu.js          25.03 kB Γöé gzip:   6.78 kB Γöé map:    57.90 kB
+@zonforge/web-dashboard:build: dist/assets/AlertsPage-4WNo9yOk.js                   33.59 kB Γöé gzip:   8.18 kB Γöé map:    84.26 kB
+@zonforge/web-dashboard:build: dist/assets/DashboardPage-OpdCyRS9.js                40.90 kB Γöé gzip:  10.87 kB Γöé map:   184.94 kB
+@zonforge/web-dashboard:build: dist/assets/query-DAPcji76.js                        49.50 kB Γöé gzip:  15.13 kB Γöé map:   173.75 kB
+@zonforge/web-dashboard:build: dist/assets/index-y0Goenev.js                        82.51 kB Γöé gzip:  28.07 kB Γöé map:   491.94 kB
+@zonforge/web-dashboard:build: dist/assets/charts-BTHNqpks.js                      517.94 kB Γöé gzip: 149.03 kB Γöé map: 2,024.17 kB
+@zonforge/web-dashboard:build: 
+@zonforge/web-dashboard:build: (!) Some chunks are larger than 500 kB after minification. Consider:
+@zonforge/web-dashboard:build: - Using dynamic import() to code-split the application
+@zonforge/web-dashboard:build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+@zonforge/web-dashboard:build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+@zonforge/web-dashboard:build: Γ£ô built in 1m 27s
+@zonforge/behavioral-ai:build: 
+@zonforge/behavioral-ai:build: > @zonforge/behavioral-ai@0.1.0 build
+@zonforge/behavioral-ai:build: > tsc
+@zonforge/behavioral-ai:build: 
+@zonforge/security-assistant:build: 
+@zonforge/security-assistant:build: > @zonforge/security-assistant@0.1.0 build
+@zonforge/security-assistant:build: > tsc
+@zonforge/security-assistant:build: 
+@zonforge/auth-utils:build: cache hit, replaying logs 2541f9a28a001044
+@zonforge/auth-utils:build: 
+@zonforge/auth-utils:build: > @zonforge/auth-utils@0.1.0 build
+@zonforge/auth-utils:build: > tsc
+@zonforge/auth-utils:build: 
+@zonforge/threat-intel-service:build: cache hit, replaying logs c202e2704043d6e3
+@zonforge/alert-triage-ai:build: cache hit, replaying logs ac331fcc8b53b68f
+@zonforge/ingestion-service:build: cache miss, executing 5c7b258b516393a8
+@zonforge/threat-intel-service:build: 
+@zonforge/threat-intel-service:build: > @zonforge/threat-intel-service@0.1.0 build
+@zonforge/threat-intel-service:build: > tsc
+@zonforge/threat-intel-service:build: 
+@zonforge/alert-triage-ai:build: 
+@zonforge/alert-triage-ai:build: > @zonforge/alert-triage-ai@0.1.0 build
+@zonforge/alert-triage-ai:build: > tsc
+@zonforge/alert-triage-ai:build: 
+@zonforge/ai-soc-analyst:build: cache hit, replaying logs eebfe2cca99b2958
+@zonforge/ai-soc-analyst:build: 
+@zonforge/ai-soc-analyst:build: > @zonforge/ai-soc-analyst@0.1.0 build
+@zonforge/ai-soc-analyst:build: > tsc
+@zonforge/ai-soc-analyst:build: 
+@zonforge/api-gateway:build: cache hit, replaying logs b2b81accd5ade1ef
+@zonforge/api-gateway:build: 
+@zonforge/api-gateway:build: > @zonforge/api-gateway@0.1.0 build
+@zonforge/api-gateway:build: > tsc
+@zonforge/api-gateway:build: 
+@zonforge/ingestion-service:build: 
+@zonforge/ingestion-service:build: > @zonforge/ingestion-service@0.1.0 build
+@zonforge/ingestion-service:build: > tsc
+@zonforge/ingestion-service:build: 
+@zonforge/normalization-worker:build: cache miss, executing e5d901271d2a40c3
+@zonforge/risk-scoring-engine:build: cache miss, executing 7f83406877d8d29e
+@zonforge/alert-service:build: cache miss, executing 5a4c27ad2da9b943
+@zonforge/correlation-engine:build: cache miss, executing dc963ec9f3672fd9
+@zonforge/detection-engine:build: cache miss, executing 1a721ef355e42c86
+@zonforge/detection-engine:build: 
+@zonforge/detection-engine:build: > @zonforge/detection-engine@0.1.0 build
+@zonforge/detection-engine:build: > tsc
+@zonforge/detection-engine:build: 
+@zonforge/normalization-worker:build: 
+@zonforge/normalization-worker:build: > @zonforge/normalization-worker@0.1.0 build
+@zonforge/normalization-worker:build: > tsc
+@zonforge/normalization-worker:build: 
+@zonforge/risk-scoring-engine:build: 
+@zonforge/risk-scoring-engine:build: > @zonforge/risk-scoring-engine@0.1.0 build
+@zonforge/risk-scoring-engine:build: > tsc
+@zonforge/risk-scoring-engine:build: 
+@zonforge/correlation-engine:build: 
+@zonforge/correlation-engine:build: > @zonforge/correlation-engine@0.1.0 build
+@zonforge/correlation-engine:build: > tsc
+@zonforge/correlation-engine:build: 
+@zonforge/alert-service:build: 
+@zonforge/alert-service:build: > @zonforge/alert-service@0.1.0 build
+@zonforge/alert-service:build: > tsc
+@zonforge/alert-service:build: 
+
+ Tasks:    20 successful, 20 total
+Cached:    14 cached, 20 total
+  Time:    1m46.932s 
+

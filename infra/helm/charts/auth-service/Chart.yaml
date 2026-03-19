@@ -1,0 +1,14 @@
+apiVersion: v2
+name: auth-service
+description: ZonForge Sentinel — Authentication Service
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - zonforge
+  - security
+  - authentication
+home: https://zonforge.com
+maintainers:
+  - name: ZonForge Platform Team
+    email: platform@zonforge.com

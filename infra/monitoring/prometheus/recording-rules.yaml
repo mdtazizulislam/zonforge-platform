@@ -1,0 +1,147 @@
+groups:
+
+  # ─────────────────────────────────────────────────────────────────
+  # RECORDING RULES — Pre-computed metrics for Grafana dashboards
+  # Evaluated every 15 seconds; results stored as new time-series
+  # ─────────────────────────────────────────────────────────────────
+
+  - name: zonforge.recording
+    interval: 15s
+    rules:
+
+    # ── API Gateway ───────────────────────────────────────────────
+
+    # Request rate per service
+    - record: zonforge:http_request_rate5m
+      expr: rate(http_requests_total{job=~".*-service|api-gateway"}[5m])
+
+    # Error rate per service
+    - record: zonforge:http_error_rate5m
+      expr: |
+        rate(http_requests_total{status_code=~"5.."}[5m])
+        / rate(http_requests_total[5m])
+
+    # p50 latency per service
+    - record: zonforge:http_latency_p50
+      expr: |
+        histogram_quantile(0.50,
+          rate(http_request_duration_seconds_bucket[5m])
+        )
+
+    # p95 latency per service
+    - record: zonforge:http_latency_p95
+      expr: |
+        histogram_quantile(0.95,
+          rate(http_request_duration_seconds_bucket[5m])
+        )
+
+    # p99 latency per service
+    - record: zonforge:http_latency_p99
+      expr: |
+        histogram_quantile(0.99,
+          rate(http_request_duration_seconds_bucket[5m])
+        )
+
+    # ── Pipeline Throughput ───────────────────────────────────────
+
+    # Events ingested per second (60s window)
+    - record: zonforge:events_ingested_rate1m
+      expr: rate(zonforge_ingestion_events_total[1m])
+
+    # Events normalized per second
+    - record: zonforge:events_normalized_rate1m
+      expr: rate(zonforge_normalization_events_total[1m])
+
+    # Detection signals emitted per minute
+    - record: zonforge:detection_signals_rate5m
+      expr: rate(zonforge_detection_signals_total[5m])
+
+    # Alerts created per hour
+    - record: zonforge:alerts_created_rate1h
+      expr: rate(zonforge_alerts_created_total[1h])
+
+    # ── Queue Health ──────────────────────────────────────────────
+
+    # Total queue depth (all queues)
+    - record: zonforge:total_queue_depth
+      expr: sum(zonforge_queue_waiting)
+
+    # Queue lag as fraction of SLO (1.0 = at SLO, >1.0 = breached)
+    - record: zonforge:pipeline_lag_slo_fraction
+      expr: |
+        max(zonforge_queue_lag_ms{queue="zf:raw-events"}) / 120000
+
+    # ── Business KPIs ─────────────────────────────────────────────
+
+    # Connector health ratio
+    - record: zonforge:connector_health_ratio
+      expr: |
+        sum(zonforge_connectors_healthy_total) /
+        sum(zonforge_connectors_total)
+
+    # Active tenant count
+    - record: zonforge:active_tenants_total
+      expr: zonforge_tenants_active_total
+
+    # Threat intel IOC count
+    - record: zonforge:threat_intel_ioc_total
+      expr: zonforge_threat_intel_iocs_total
+
+    # ── Resource Efficiency ────────────────────────────────────────
+
+    # CPU utilization per pod
+    - record: zonforge:pod_cpu_utilization
+      expr: |
+        rate(container_cpu_usage_seconds_total{
+          namespace="zonforge",
+          container!=""
+        }[5m])
+
+    # Memory utilization per pod
+    - record: zonforge:pod_memory_utilization
+      expr: |
+        container_memory_working_set_bytes{
+          namespace="zonforge",
+          container!=""
+        }
+
+    # ── MTTD Tracking ─────────────────────────────────────────────
+
+    # MTTD p50 (30-day rolling)
+    - record: zonforge:mttd_p50_minutes
+      expr: |
+        histogram_quantile(0.50,
+          rate(zonforge_alert_detection_gap_minutes_bucket[30d])
+        )
+
+    # MTTD p90 (30-day rolling)
+    - record: zonforge:mttd_p90_minutes
+      expr: |
+        histogram_quantile(0.90,
+          rate(zonforge_alert_detection_gap_minutes_bucket[30d])
+        )
+
+    # MTTD p99 (30-day rolling)
+    - record: zonforge:mttd_p99_minutes
+      expr: |
+        histogram_quantile(0.99,
+          rate(zonforge_alert_detection_gap_minutes_bucket[30d])
+        )
+
+    # ── SLO Burn Rate ─────────────────────────────────────────────
+
+    # 1-hour error budget burn rate
+    - record: zonforge:slo_error_budget_burn_rate_1h
+      expr: |
+        (
+          rate(http_requests_total{job="api-gateway", status_code=~"5.."}[1h])
+          / rate(http_requests_total{job="api-gateway"}[1h])
+        ) / 0.005   # 0.5% error budget
+
+    # 6-hour error budget burn rate
+    - record: zonforge:slo_error_budget_burn_rate_6h
+      expr: |
+        (
+          rate(http_requests_total{job="api-gateway", status_code=~"5.."}[6h])
+          / rate(http_requests_total{job="api-gateway"}[6h])
+        ) / 0.005

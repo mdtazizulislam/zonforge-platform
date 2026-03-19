@@ -1,0 +1,215 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — Local Development Environment
+# Run: docker-compose up -d
+# All services start on localhost with default dev credentials
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: zf-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       zonforge
+      POSTGRES_USER:     zonforge
+      POSTGRES_PASSWORD: changeme_local
+      PGDATA:            /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - zf_postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U zonforge -d zonforge"]
+      interval: 5s
+      timeout:  5s
+      retries:  10
+    networks:
+      - zf-net
+
+  # ── ClickHouse ──────────────────────────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: zf-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB:       zonforge_events
+      CLICKHOUSE_USER:     default
+      CLICKHOUSE_PASSWORD: changeme_local
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native TCP interface
+    volumes:
+      - zf_clickhouse_data:/var/lib/clickhouse
+      - ./packages/db-client/src/clickhouse/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test:     ["CMD-SHELL", "clickhouse-client --query='SELECT 1'"]
+      interval: 10s
+      timeout:  5s
+      retries:  10
+    networks:
+      - zf-net
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  # ── Redis ───────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: zf-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass changeme_local
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - "6379:6379"
+    volumes:
+      - zf_redis_data:/data
+    healthcheck:
+      test:     ["CMD", "redis-cli", "-a", "changeme_local", "ping"]
+      interval: 5s
+      timeout:  3s
+      retries:  10
+    networks:
+      - zf-net
+
+  # ── Redis Commander (UI) ────────────────────────────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: zf-redis-ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS:     "local:redis:6379:0:changeme_local"
+      HTTP_USER:       admin
+      HTTP_PASSWORD:   admin
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - zf-net
+    profiles:
+      - tools
+
+  # ── MinIO (S3-compatible local storage) ─────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: zf-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     minioadmin
+      MINIO_ROOT_PASSWORD: changeme_local
+    ports:
+      - "9002:9000"   # S3 API (offset to avoid ClickHouse collision)
+      - "9001:9001"   # MinIO Console UI
+    volumes:
+      - zf_minio_data:/data
+    healthcheck:
+      test:     ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+    networks:
+      - zf-net
+
+  # ── MinIO bucket setup (runs once) ──────────────────────────────
+  minio-setup:
+    image: minio/mc:latest
+    container_name: zf-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minioadmin changeme_local;
+        mc mb --ignore-existing local/zonforge-events-dev;
+        mc mb --ignore-existing local/zonforge-exports-dev;
+        mc mb --ignore-existing local/zonforge-audit-dev;
+        echo 'MinIO buckets created.';
+      "
+    networks:
+      - zf-net
+
+  # ── MailHog (SMTP trap for local email testing) ──────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: zf-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - zf-net
+    profiles:
+      - tools
+
+  # ── Grafana ─────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: zf-grafana
+    restart: unless-stopped
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3001:3000"
+    volumes:
+      - zf_grafana_data:/var/lib/grafana
+    networks:
+      - zf-net
+    profiles:
+      - observability
+
+  # ── Prometheus ──────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: zf-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/etc/prometheus/console_libraries
+      - --web.console.templates=/etc/prometheus/consoles
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - zf_prometheus_data:/prometheus
+    networks:
+      - zf-net
+    profiles:
+      - observability
+
+# ─────────────────────────────────────────────
+# VOLUMES
+# ─────────────────────────────────────────────
+
+volumes:
+  zf_postgres_data:
+  zf_clickhouse_data:
+  zf_redis_data:
+  zf_minio_data:
+  zf_grafana_data:
+  zf_prometheus_data:
+
+# ─────────────────────────────────────────────
+# NETWORKS
+# ─────────────────────────────────────────────
+
+networks:
+  zf-net:
+    driver: bridge
+    name: zonforge-network

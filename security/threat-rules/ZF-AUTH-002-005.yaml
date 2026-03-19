@@ -1,0 +1,260 @@
+# ─────────────────────────────────────────────────────────────────
+# ZF-AUTH-002: Impossible Travel Login
+# ─────────────────────────────────────────────────────────────────
+id: ZF-AUTH-002
+name: Impossible Travel Login
+description: >
+  Two successful logins from the same user from geographically
+  impossible locations — the distance and time gap makes physical
+  travel impossible, indicating credential compromise.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0001
+      name: Initial Access
+  techniques:
+    - id: T1078
+      name: Valid Accounts
+      sub_techniques:
+        - id: T1078.004
+          name: Cloud Accounts
+  coverage_level: full
+
+source_types: [m365_entra, google_workspace, aws_cloudtrail]
+event_categories: [authentication]
+
+detection:
+  type: correlation
+  window_minutes: 120
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [login_success]
+    - field: outcome
+      operator: eq
+      value: success
+
+  correlation_check:
+    type: geo_impossible_travel
+    min_distance_km: 500
+    require_distinct_countries: true
+    min_events: 2
+
+alert:
+  title: "Impossible Travel Detected — {{actor_user_id}}"
+  description: >
+    User {{actor_user_id}} logged in from {{country_1}} and
+    {{country_2}} within {{time_gap_minutes}} minutes.
+    Physical travel between these locations is impossible in this time.
+  priority: P1
+  recommended_actions:
+    - "Immediately contact the user through an out-of-band channel"
+    - "Suspend user session pending verification"
+    - "Review all actions performed in both sessions"
+    - "If confirmed compromise, reset credentials and revoke all sessions"
+
+confidence_score: 0.95
+false_positive_notes: "VPN or proxy usage can trigger this. Check if user commonly uses VPN."
+
+---
+
+# ─────────────────────────────────────────────────────────────────
+# ZF-AUTH-003: Dormant Admin Account Suddenly Active
+# ─────────────────────────────────────────────────────────────────
+id: ZF-AUTH-003
+name: Dormant Admin Account Suddenly Active
+description: >
+  A privileged account that has been inactive for 90+ days
+  suddenly becomes active, especially during off-hours.
+  This pattern may indicate account takeover of a forgotten
+  admin account or insider threat activity.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0003
+      name: Persistence
+    - id: TA0004
+      name: Privilege Escalation
+  techniques:
+    - id: T1078
+      name: Valid Accounts
+      sub_techniques:
+        - id: T1078.004
+          name: Cloud Accounts
+  coverage_level: full
+
+source_types: [m365_entra, google_workspace, aws_cloudtrail]
+event_categories: [authentication, account_management]
+
+detection:
+  type: threshold
+  window_minutes: 60
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [login_success, AssumeRole, GRANT_ADMIN_PRIVILEGE]
+    - field: actor_user_type
+      operator: in
+      value: [admin]
+    - field: days_since_last_activity
+      operator: gte
+      value: 90
+
+alert:
+  title: "Dormant Admin Account Active — {{actor_user_id}}"
+  description: >
+    Admin account {{actor_user_id}} became active after
+    {{days_since_last_activity}} days of inactivity.
+  priority: P2
+  recommended_actions:
+    - "Verify account ownership — contact the account owner directly"
+    - "Review all actions taken since account activation"
+    - "Check if account was recently added to privileged groups"
+    - "Consider disabling dormant privileged accounts not in use"
+
+confidence_score: 0.82
+false_positive_notes: "Returning employees or accounts activated for specific projects."
+
+---
+
+# ─────────────────────────────────────────────────────────────────
+# ZF-AUTH-004: Off-Hours Admin Action
+# ─────────────────────────────────────────────────────────────────
+id: ZF-AUTH-004
+name: Privileged Action Outside Business Hours
+description: >
+  A privileged user performs sensitive administrative actions
+  outside declared business hours (default: outside 07:00-19:00
+  local time on weekdays). Insider threats and attackers using
+  compromised admin accounts often operate at night to avoid detection.
+severity: medium
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0003
+      name: Persistence
+    - id: TA0006
+      name: Credential Access
+  techniques:
+    - id: T1078
+      name: Valid Accounts
+  coverage_level: partial
+
+source_types: [m365_entra, aws_cloudtrail, google_workspace]
+event_categories: [account_management, authentication]
+
+detection:
+  type: threshold
+  window_minutes: 60
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: actor_user_type
+      operator: in
+      value: [admin]
+    - field: event_action
+      operator: in
+      value: [GRANT_ADMIN_PRIVILEGE, AttachRolePolicy, CreateUser,
+              DeleteUser, PutRolePolicy, CreateAccessKey,
+              admin_created_new_admin, privilege_escalation]
+    - field: is_outside_business_hours
+      operator: eq
+      value: true
+  count_min: 1
+
+alert:
+  title: "Off-Hours Privileged Action — {{actor_user_id}}"
+  description: >
+    Admin {{actor_user_id}} performed {{event_action}} at
+    {{event_time}} (outside business hours).
+  priority: P3
+  recommended_actions:
+    - "Verify this action was authorized and expected"
+    - "Review the full session activity around this event"
+    - "If unauthorized, reverse the action and investigate"
+
+confidence_score: 0.70
+false_positive_notes: "On-call engineers and operations in different time zones will trigger this frequently. Tune business hours per tenant."
+
+---
+
+# ─────────────────────────────────────────────────────────────────
+# ZF-AUTH-005: MFA Bypass / Challenge Not Satisfied
+# ─────────────────────────────────────────────────────────────────
+id: ZF-AUTH-005
+name: MFA Bypass Detected
+description: >
+  A successful login occurs without MFA being satisfied, or an
+  MFA challenge is repeatedly denied and then bypassed.
+  This may indicate a push-bombing (MFA fatigue) attack or
+  conditional access policy misconfiguration.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0006
+      name: Credential Access
+  techniques:
+    - id: T1621
+      name: Multi-Factor Authentication Request Generation
+    - id: T1556
+      name: Modify Authentication Process
+      sub_techniques:
+        - id: T1556.006
+          name: Multi-Factor Authentication
+  coverage_level: full
+
+source_types: [m365_entra, google_workspace]
+event_categories: [authentication]
+
+detection:
+  type: sequence
+  window_minutes: 30
+  group_by: [actor_user_id]
+
+  steps:
+    - name: mfa_challenges
+      conditions:
+        - field: event_action
+          operator: in
+          value: [mfa_challenge, login_challenge, 2SV_DISABLE,
+                  multiple_failed_mfa, FAILED_MFA]
+      aggregate:
+        count_min: 3
+      within_minutes: 20
+
+    - name: successful_login
+      conditions:
+        - field: event_action
+          operator: in
+          value: [login_success]
+        - field: outcome
+          operator: eq
+          value: success
+      must_follow: mfa_challenges
+
+alert:
+  title: "MFA Bypass — Possible Push Bombing — {{actor_user_id}}"
+  description: >
+    User {{actor_user_id}} had {{mfa_challenges.count}} MFA challenges
+    followed by a successful login. This pattern is consistent with
+    an MFA fatigue (push bombing) attack.
+  priority: P1
+  recommended_actions:
+    - "Contact user immediately — did they approve the final MFA request?"
+    - "If user did not approve, treat as active compromise"
+    - "Revoke all sessions and reset credentials immediately"
+    - "Review conditional access policies for MFA bypass vectors"
+
+confidence_score: 0.88
+false_positive_notes: "Users who accidentally approve after multiple denials. Low frequency expected."
