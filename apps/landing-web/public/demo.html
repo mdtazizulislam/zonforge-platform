@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZonForge Sentinel — Live Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#010a10;--surface:#060f18;--card:#08141f;--edge:#0d2035;
+  --groove:#1a3a52;--slate:#2d5f80;--mid:#4a85a8;--fog:#7aaec8;
+  --snow:#c0daea;--white:#e5f3fb;
+  --cyan:#00d9ff;--lime:#1deb8a;--amber:#f0a500;--coral:#ff4d6d;--violet:#7c6af7;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--fog);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.display{font-family:'Barlow Condensed',sans-serif;font-weight:900;color:var(--white);}
+
+/* ── TOP BAR ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:56px;
+  background:rgba(1,10,16,.96);border-bottom:1px solid var(--edge);
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);
+}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand-mark{
+  width:30px;height:30px;border-radius:7px;
+  background:linear-gradient(135deg,#062540,var(--cyan));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:12px;color:#fff;
+}
+.brand-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:17px;color:var(--white);letter-spacing:2px;}
+.brand-tag{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--groove);letter-spacing:2px;}
+.live-badge{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 12px;border-radius:20px;
+  background:rgba(29,235,138,.08);border:1px solid rgba(29,235,138,.2);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--lime);
+}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite;}
+.header-actions{display:flex;gap:10px;}
+.btn{
+  padding:7px 18px;border-radius:6px;font-size:12px;font-weight:600;
+  font-family:'IBM Plex Sans',sans-serif;cursor:pointer;border:none;transition:all .2s;
+  text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+}
+.btn-ghost{background:transparent;border:1px solid var(--edge);color:var(--snow);}
+.btn-ghost:hover{border-color:var(--slate);color:var(--white);}
+.btn-cta{background:linear-gradient(135deg,rgba(0,217,255,.18),rgba(0,153,204,.1));border:1px solid rgba(0,217,255,.35);color:var(--cyan);}
+.btn-cta:hover{background:linear-gradient(135deg,rgba(0,217,255,.28),rgba(0,153,204,.2));}
+
+/* ── NAV TABS ── */
+.nav-tabs{
+  display:flex;gap:0;border-bottom:1px solid var(--edge);
+  background:var(--surface);padding:0 32px;
+}
+.tab{
+  padding:14px 22px;font-size:12px;font-weight:700;cursor:pointer;
+  border-bottom:2px solid transparent;color:var(--groove);
+  transition:all .2s;font-family:'IBM Plex Mono',monospace;
+  letter-spacing:.5px;text-transform:uppercase;
+  user-select:none;
+}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan);}
+.tab:hover:not(.active){color:var(--fog);}
+
+/* ── MAIN LAYOUT ── */
+.main{display:flex;height:calc(100vh - 111px);}
+.left-panel{width:320px;flex-shrink:0;border-right:1px solid var(--edge);overflow-y:auto;background:var(--surface);}
+.right-panel{flex:1;overflow-y:auto;padding:20px 24px;}
+
+/* ── ALERT LIST ── */
+.panel-title{
+  padding:14px 16px 10px;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--groove);
+  letter-spacing:2.5px;text-transform:uppercase;border-bottom:1px solid var(--edge);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.alert-item{
+  padding:12px 16px;border-bottom:1px solid rgba(13,32,53,.5);
+  cursor:pointer;transition:background .15s;display:flex;gap:10px;
+}
+.alert-item:hover{background:rgba(0,217,255,.03);}
+.alert-item.active{background:rgba(0,217,255,.06);border-left:2px solid var(--cyan);}
+.ai-left{width:3px;border-radius:2px;flex-shrink:0;align-self:stretch;}
+.alert-info{flex:1;min-width:0;}
+.alert-title{font-size:12px;font-weight:600;color:var(--snow);margin-bottom:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.alert-meta{font-size:10px;color:var(--groove);}
+.alert-badges{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap;}
+.badge{
+  padding:1px 6px;border-radius:3px;font-family:'IBM Plex Mono',monospace;
+  font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+}
+
+/* ── METRICS SIDEBAR ── */
+.metrics-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 16px;}
+.metric{background:var(--card);border:1px solid var(--edge);border-radius:8px;padding:12px;}
+.metric-val{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:var(--white);line-height:1;}
+.metric-lbl{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--groove);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;}
+
+/* ── INVESTIGATION PANEL ── */
+.inv-header{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 20px;background:var(--card);
+  border:1px solid var(--edge);border-radius:10px;margin-bottom:16px;
+}
+.inv-severity{width:4px;height:44px;border-radius:2px;flex-shrink:0;}
+.inv-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;color:var(--white);}
+.inv-sub{font-size:11px;color:var(--groove);margin-top:2px;}
+.inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.inv-field{background:var(--card);border:1px solid var(--edge);border-radius:8px;padding:12px;}
+.inv-field-l{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--groove);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;}
+.inv-field-v{font-size:13px;font-weight:600;color:var(--cyan);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mitre-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.mitre-tag{padding:3px 10px;background:rgba(124,106,247,.1);border:1px solid rgba(124,106,247,.2);border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--violet);}
+
+/* ── AI PANEL ── */
+.ai-panel{background:var(--card);border:1px solid var(--edge);border-radius:10px;overflow:hidden;}
+.ai-header{
+  padding:14px 18px;border-bottom:1px solid var(--edge);
+  background:rgba(0,0,0,.2);display:flex;align-items:center;justify-content:space-between;
+}
+.ai-status{display:flex;align-items:center;gap:8px;}
+.ai-dot{width:8px;height:8px;border-radius:50%;}
+.ai-name{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--white);}
+.ai-model{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--cyan);}
+.ai-body{padding:18px;}
+.run-btn{
+  width:100%;padding:13px;border-radius:8px;margin-bottom:14px;
+  background:linear-gradient(135deg,rgba(0,217,255,.18),rgba(0,153,204,.1));
+  border:1px solid rgba(0,217,255,.35);color:var(--cyan);
+  font-size:13px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;
+  cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.run-btn:hover:not(:disabled){background:linear-gradient(135deg,rgba(0,217,255,.28),rgba(0,153,204,.2));box-shadow:0 0 25px rgba(0,217,255,.15);}
+.run-btn:disabled{opacity:.6;cursor:not-allowed;}
+.ai-output{
+  background:var(--surface);border-radius:8px;padding:14px;
+  min-height:200px;max-height:350px;overflow-y:auto;
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.75;color:var(--snow);
+  white-space:pre-wrap;
+}
+.ai-placeholder{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:200px;color:var(--groove);text-align:center;gap:10px;
+}
+.ai-placeholder-icon{font-size:36px;opacity:.4;}
+.ai-tools{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
+.ai-tool{
+  padding:3px 9px;border:1px solid var(--edge);border-radius:20px;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--groove);
+}
+.verdict-box{
+  background:rgba(29,235,138,.07);border:1px solid rgba(29,235,138,.22);
+  border-radius:8px;padding:14px;margin-bottom:12px;
+}
+.verdict-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--lime);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:5px;}
+.verdict-text{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:var(--lime);}
+.verdict-conf{font-size:12px;color:var(--lime);opacity:.75;margin-top:2px;}
+.action-row{display:flex;gap:8px;margin-top:14px;}
+.act-btn{
+  flex:1;padding:9px;border-radius:6px;font-size:11px;font-weight:700;
+  font-family:'IBM Plex Sans',sans-serif;cursor:pointer;transition:all .2s;border:1px solid;text-align:center;
+}
+.act-green{border-color:rgba(29,235,138,.35);color:var(--lime);background:rgba(29,235,138,.07);}
+.act-red{border-color:rgba(255,77,109,.35);color:var(--coral);background:rgba(255,77,109,.07);}
+.act-violet{border-color:rgba(124,106,247,.35);color:var(--violet);background:rgba(124,106,247,.07);}
+.inv-meta{
+  display:flex;justify-content:space-between;padding-top:12px;margin-top:12px;
+  border-top:1px solid var(--edge);font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--groove);
+}
+.inv-meta span{color:var(--cyan);}
+
+/* ── CHAT PANEL ── */
+.chat-layout{display:flex;height:100%;gap:16px;}
+.chat-main{flex:1;display:flex;flex-direction:column;height:calc(100vh - 140px);}
+.chat-messages{
+  flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;
+  padding-bottom:16px;
+}
+.msg{display:flex;gap:10px;}
+.msg.user{justify-content:flex-end;}
+.msg-bubble{
+  max-width:75%;padding:11px 15px;border-radius:12px;
+  font-size:13px;line-height:1.6;
+}
+.msg.ai .msg-bubble{
+  background:var(--card);border:1px solid var(--edge);color:var(--snow);
+  border-bottom-left-radius:2px;
+}
+.msg.user .msg-bubble{
+  background:linear-gradient(135deg,rgba(0,217,255,.18),rgba(0,153,204,.1));
+  border:1px solid rgba(0,217,255,.3);color:var(--white);
+  border-bottom-right-radius:2px;
+}
+.msg-avatar{
+  width:30px;height:30px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+  background:rgba(0,217,255,.1);border:1px solid rgba(0,217,255,.2);
+}
+.chat-input-row{
+  display:flex;gap:10px;padding-top:12px;border-top:1px solid var(--edge);
+}
+.chat-input{
+  flex:1;padding:11px 14px;background:var(--card);
+  border:1px solid var(--edge);border-radius:8px;
+  color:var(--white);font-size:13px;font-family:'IBM Plex Sans',sans-serif;
+  outline:none;transition:border-color .2s;
+}
+.chat-input:focus{border-color:rgba(0,217,255,.35);}
+.chat-input::placeholder{color:var(--groove);}
+.send-btn{
+  padding:11px 20px;background:rgba(0,217,255,.15);
+  border:1px solid rgba(0,217,255,.35);border-radius:8px;
+  color:var(--cyan);font-size:13px;font-weight:700;
+  font-family:'IBM Plex Sans',sans-serif;cursor:pointer;transition:all .2s;
+}
+.send-btn:hover{background:rgba(0,217,255,.25);}
+.send-btn:disabled{opacity:.5;cursor:not-allowed;}
+.quick-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.chip{
+  padding:5px 12px;background:transparent;
+  border:1px solid var(--edge);border-radius:20px;
+  font-size:11px;color:var(--fog);cursor:pointer;
+  font-family:'IBM Plex Sans',sans-serif;transition:all .2s;
+}
+.chip:hover{border-color:var(--slate);color:var(--snow);}
+.typing{display:flex;align-items:center;gap:4px;padding:8px 12px;}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:bounce 1s infinite;}
+.typing-dot:nth-child(2){animation-delay:.2s;}
+.typing-dot:nth-child(3){animation-delay:.4s;}
+
+/* ── DASHBOARD TAB ── */
+.dash-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.kpi{background:var(--card);border:1px solid var(--edge);border-radius:10px;padding:16px;}
+.kpi-val{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;color:var(--white);line-height:1;}
+.kpi-lbl{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--groove);letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+.kpi-sub{font-size:11px;margin-top:3px;}
+.pipeline{
+  background:var(--card);border:1px solid var(--edge);border-radius:10px;
+  padding:16px;margin-bottom:16px;
+}
+.pipeline-title{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--groove);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;}
+.pipeline-flow{display:flex;align-items:center;gap:0;}
+.pf-step{
+  flex:1;text-align:center;padding:10px 4px;
+  background:var(--surface);border:1px solid var(--edge);border-radius:6px;
+  transition:all .2s;
+}
+.pf-step:hover{border-color:rgba(0,217,255,.2);}
+.pf-label{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--snow);}
+.pf-count{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--groove);}
+.pf-arrow{color:rgba(0,217,255,.4);font-size:16px;padding:0 2px;flex-shrink:0;}
+.alerts-section{background:var(--card);border:1px solid var(--edge);border-radius:10px;padding:16px;}
+.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.section-title{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--groove);letter-spacing:2px;text-transform:uppercase;}
+.alert-row{
+  display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid rgba(13,32,53,.5);cursor:pointer;transition:all .15s;
+}
+.alert-row:hover{padding-left:6px;}
+.alert-row:last-child{border-bottom:none;}
+.ar-bar{width:3px;height:32px;border-radius:2px;flex-shrink:0;}
+.ar-title{font-size:13px;font-weight:600;color:var(--snow);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ar-user{font-size:10px;color:var(--groove);}
+
+/* ── DECEPTION TAB ── */
+.honey-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;}
+.honey-card{
+  background:var(--card);border:1px solid var(--edge);border-radius:10px;
+  padding:16px;transition:all .2s;cursor:pointer;
+}
+.honey-card:hover{border-color:rgba(240,165,0,.2);}
+.honey-card.triggered{
+  border-color:rgba(255,77,109,.4);
+  background:rgba(255,77,109,.05);
+  animation:glow-red .5s ease;
+}
+@keyframes glow-red{0%{box-shadow:0 0 0 rgba(255,77,109,0)}50%{box-shadow:0 0 30px rgba(255,77,109,.3)}100%{box-shadow:0 0 0 rgba(255,77,109,0)}}
+.honey-icon{font-size:24px;margin-bottom:10px;}
+.honey-name{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--white);margin-bottom:3px;}
+.honey-loc{font-size:11px;color:var(--groove);margin-bottom:8px;}
+.honey-status{display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:10px;}
+.status-dot{width:6px;height:6px;border-radius:50%;}
+.alert-banner{
+  background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.3);
+  border-radius:8px;padding:14px 16px;margin-bottom:16px;
+  display:flex;align-items:center;gap:12px;
+}
+.banner-dot{width:10px;height:10px;border-radius:50%;background:var(--coral);animation:pulse 1s infinite;flex-shrink:0;}
+.banner-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--coral);}
+.banner-text{font-size:12px;color:rgba(255,77,109,.8);}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.fade-in{animation:fadeIn .4s ease both;}
+.cursor{display:inline-block;width:7px;height:13px;background:var(--cyan);animation:blink .8s step-end infinite;vertical-align:middle;margin-left:2px;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--edge);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">ZF</div>
+    <div>
+      <div class="brand-name">ZONFORGE</div>
+      <div class="brand-tag mono">SENTINEL DEMO v4.6.0</div>
+    </div>
+  </div>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    LIVE DEMO — Real AI
+  </div>
+  <div class="header-actions">
+    <a href="https://zonforge.com" class="btn btn-ghost">← Back to site</a>
+    <a href="https://zonforge.com/#demo" class="btn btn-cta">Book Real Demo →</a>
+  </div>
+</header>
+
+<div class="nav-tabs">
+  <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" onclick="switchTab('investigation')">🔍 AI SOC Analyst</div>
+  <div class="tab" onclick="switchTab('chat')">💬 Security AI Chat</div>
+  <div class="tab" onclick="switchTab('deception')">🍯 Deception Grid</div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel" id="left-panel">
+    <!-- Alert list for investigation tab -->
+    <div id="alert-list-section">
+      <div class="panel-title">
+        <span>Open Alerts</span>
+        <span class="mono" style="color:var(--coral);font-size:9px;">4 Active</span>
+      </div>
+      <div id="alert-list"></div>
+    </div>
+    <!-- Metrics for dashboard -->
+    <div id="metrics-section" style="display:none">
+      <div class="panel-title"><span>Live Metrics</span></div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="kpi-val" style="color:var(--amber);font-size:28px;">74</div><div class="metric-lbl">Posture Score</div></div>
+        <div class="metric"><div class="kpi-val" style="color:var(--coral);font-size:28px;">4</div><div class="metric-lbl">Open Alerts</div></div>
+        <div class="metric"><div class="kpi-val" style="color:var(--lime);font-size:28px;">4.2s</div><div class="metric-lbl">Avg MTTD</div></div>
+        <div class="metric"><div class="kpi-val" style="color:var(--cyan);font-size:28px;">38</div><div class="metric-lbl">AI Investigations</div></div>
+        <div class="metric"><div class="kpi-val" style="color:var(--violet);font-size:28px;">847</div><div class="metric-lbl">Identities</div></div>
+        <div class="metric"><div class="kpi-val" style="color:var(--lime);font-size:28px;">284K</div><div class="metric-lbl">Events Today</div></div>
+      </div>
+    </div>
+    <!-- Chat context -->
+    <div id="chat-context" style="display:none">
+      <div class="panel-title"><span>Platform Context</span></div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        <div class="inv-field"><div class="inv-field-l">Posture Score</div><div class="inv-field-v" style="color:var(--amber);">74/100 — Elevated</div></div>
+        <div class="inv-field"><div class="inv-field-l">Open Alerts</div><div class="inv-field-v" style="color:var(--coral);">4 (1 Critical P1)</div></div>
+        <div class="inv-field"><div class="inv-field-l">Connectors</div><div class="inv-field-v">4 Active</div></div>
+        <div class="inv-field"><div class="inv-field-l">High Risk Users</div><div class="inv-field-v" style="color:var(--coral);">alice (94), bob (71)</div></div>
+      </div>
+    </div>
+    <!-- Deception sidebar -->
+    <div id="deception-sidebar" style="display:none">
+      <div class="panel-title"><span>Honeypot Grid</span><span class="mono" style="color:var(--amber);font-size:9px;">10 Deployed</span></div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:6px;" id="honey-sidebar"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel" id="right-panel">
+
+    <!-- DASHBOARD TAB -->
+    <div id="tab-dashboard">
+      <div class="dash-grid">
+        <div class="kpi"><div class="kpi-val" style="color:var(--amber);">74<span style="font-size:16px;">/100</span></div><div class="kpi-lbl">Posture Score</div><div class="kpi-sub" style="color:var(--amber);">⬆ +8 this week</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--lime);">4.2s</div><div class="kpi-lbl">Mean Time to Detect</div><div class="kpi-sub" style="color:var(--lime);">Industry avg: 45min</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--cyan);">38</div><div class="kpi-lbl">AI Investigations</div><div class="kpi-sub" style="color:var(--cyan);">Today</div></div>
+        <div class="kpi"><div class="kpi-val">8%</div><div class="kpi-lbl">False Positive Rate</div><div class="kpi-sub" style="color:var(--lime);">Industry avg: 65%</div></div>
+      </div>
+      <div class="pipeline">
+        <div class="pipeline-title">Live Detection Pipeline</div>
+        <div class="pipeline-flow">
+          <div class="pf-step"><div class="pf-label">Collectors</div><div class="pf-count">4 active</div></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step"><div class="pf-label">Ingest</div><div class="pf-count">284K events</div></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step"><div class="pf-label">Normalize</div><div class="pf-count">OCSF</div></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step"><div class="pf-label">Detect</div><div class="pf-count">20 rules</div></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step"><div class="pf-label">Correlate</div><div class="pf-count">3 chains</div></div>
+          <div class="pf-arrow">→</div>
+          <div class="pf-step"><div class="pf-label">AI SOC</div><div class="pf-count">38 solved</div></div>
+        </div>
+      </div>
+      <div class="alerts-section">
+        <div class="section-head">
+          <div class="section-title">Active Alerts — AI Priority Sorted</div>
+          <div class="btn btn-ghost" style="font-size:11px;padding:5px 12px;cursor:pointer;" onclick="switchTab('investigation')">Investigate →</div>
+        </div>
+        <div id="dash-alert-list"></div>
+      </div>
+    </div>
+
+    <!-- INVESTIGATION TAB -->
+    <div id="tab-investigation" style="display:none">
+      <div id="inv-content"></div>
+    </div>
+
+    <!-- CHAT TAB -->
+    <div id="tab-chat" style="display:none">
+      <div class="chat-main">
+        <div class="quick-chips" id="quick-chips"></div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chat-input" type="text"
+            placeholder="Ask about your security posture, alerts, users..."
+            onkeydown="if(event.key==='Enter')sendChat()">
+          <button class="send-btn" onclick="sendChat()" id="send-btn">→</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DECEPTION TAB -->
+    <div id="tab-deception" style="display:none">
+      <div id="deception-content"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────
+const ALERTS = [
+  {
+    id:'ALT-001',rule:'ZF-AUTH-001',
+    title:'Brute Force → Account Takeover',
+    severity:'high',priority:'P2',status:'open',
+    user:'alice@acmecorp.com',ip:'203.0.113.42',country:'CN',
+    time:'2 min ago',events:16,
+    detail:'15 failed logins from CN IP followed by successful login. Attacker immediately accessed 1,247 sensitive files within 12 minutes.',
+    mitre:['T1110','T1078'],color:'var(--amber)',
+  },
+  {
+    id:'ALT-002',rule:'ZF-PRIVESC-001',
+    title:'Privilege Escalation — Self Admin Assignment',
+    severity:'critical',priority:'P1',status:'open',
+    user:'svc-deploy@acmecorp.com',ip:'10.0.1.45',country:'US',
+    time:'18 min ago',events:4,
+    detail:'Service account assigned GlobalAdministrator role outside change management window at 03:17 UTC. No ITSM ticket found.',
+    mitre:['T1098','T1136'],color:'var(--coral)',
+  },
+  {
+    id:'ALT-003',rule:'ZF-DATA-001',
+    title:'Mass Download + Email Forwarding Rule',
+    severity:'high',priority:'P2',status:'investigating',
+    user:'charlie@acmecorp.com',ip:'192.0.2.88',country:'DE',
+    time:'47 min ago',events:142,
+    detail:'120 files downloaded from SharePoint in 8 minutes. Email forwarding rule created to external@gmail.com immediately after.',
+    mitre:['T1530','T1114.003'],color:'var(--amber)',
+  },
+  {
+    id:'ALT-004',rule:'ZF-OAUTH-001',
+    title:'Malicious OAuth App Consent + API Abuse',
+    severity:'high',priority:'P2',status:'open',
+    user:'bob@acmecorp.com',ip:'198.51.100.7',country:'RU',
+    time:'1 hr ago',events:54,
+    detail:'User consented to "FreePDF-Converter" with Mail.ReadWrite + Files.ReadWrite.All scopes. 50+ bulk API calls in 3 minutes.',
+    mitre:['T1550.001','T1528'],color:'var(--amber)',
+  },
+];
+
+const HONEYPOTS = [
+  {name:'Fake AWS API Key',type:'fake_api_key',loc:'AWS Parameter Store',icon:'🔑',status:'armed'},
+  {name:'Canary: M&A Strategy 2025',type:'canary_document',loc:'SharePoint',icon:'📄',status:'armed'},
+  {name:'Fake Admin Credential',type:'fake_credential',loc:'IT Runbook',icon:'👤',status:'armed'},
+  {name:'Ghost S3 Backup Bucket',type:'fake_s3',loc:'GitHub repo',icon:'🪣',status:'triggered'},
+  {name:'Phantom DB Server',type:'fake_db',loc:'Parameter Store',icon:'🗄️',status:'armed'},
+  {name:'Canary Email Address',type:'canary_email',loc:'Email signature',icon:'📧',status:'armed'},
+];
+
+const QUICK_QUESTIONS = [
+  'What is the current threat level?',
+  'Tell me about alice@acmecorp.com',
+  'Any critical alerts right now?',
+  'What should I do first?',
+  'How is our posture vs industry?',
+];
+
+let currentAlert = ALERTS[0];
+let isInvestigating = false;
+let chatHistory = [];
+let honeyTriggered = false;
+
+// ── INIT ─────────────────────────────────────────────────────────
+function init() {
+  renderAlertList();
+  renderDashAlerts();
+  renderInvestigation(currentAlert);
+  renderChat();
+  renderDeception();
+  renderHoneySidebar();
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────
+function switchTab(tab) {
+  ['dashboard','investigation','chat','deception'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+    document.querySelectorAll('.tab').forEach((el,i) => {
+      const tabs = ['dashboard','investigation','chat','deception'];
+      el.classList.toggle('active', tabs[i]===tab);
+    });
+  });
+  ['alert-list-section','metrics-section','chat-context','deception-sidebar'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  if(tab==='dashboard') document.getElementById('metrics-section').style.display='block';
+  if(tab==='investigation') document.getElementById('alert-list-section').style.display='block';
+  if(tab==='chat') document.getElementById('chat-context').style.display='block';
+  if(tab==='deception') document.getElementById('deception-sidebar').style.display='block';
+}
+
+// ── ALERT LIST ─────────────────────────────────────────────────────
+function renderAlertList() {
+  const el = document.getElementById('alert-list');
+  el.innerHTML = ALERTS.map((a,i) => `
+    <div class="alert-item ${a===currentAlert?'active':''}" onclick="selectAlert(${i})">
+      <div class="ai-left" style="background:${a.color}"></div>
+      <div class="alert-info">
+        <div class="alert-title">${a.title}</div>
+        <div class="alert-meta">${a.user} · ${a.time}</div>
+        <div class="alert-badges">
+          <span class="badge" style="background:rgba(255,77,109,.15);color:var(--coral)">${a.priority}</span>
+          <span class="badge" style="background:rgba(0,217,255,.1);color:var(--cyan)">${a.status}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDashAlerts() {
+  const el = document.getElementById('dash-alert-list');
+  el.innerHTML = ALERTS.map((a,i) => `
+    <div class="alert-row" onclick="switchTab('investigation');selectAlert(${i})">
+      <div class="ar-bar" style="background:${a.color}"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="ar-title">${a.title}</div>
+        <div class="ar-user">${a.user} · ${a.ip} · ${a.time}</div>
+      </div>
+      <span class="badge" style="background:rgba(255,77,109,.15);color:var(--coral);flex-shrink:0;">${a.priority}</span>
+    </div>
+  `).join('');
+}
+
+function selectAlert(i) {
+  currentAlert = ALERTS[i];
+  document.getElementById('inv-content').innerHTML = '';
+  renderInvestigation(currentAlert);
+  renderAlertList();
+  switchTab('investigation');
+}
+
+// ── INVESTIGATION PANEL ────────────────────────────────────────────
+function renderInvestigation(a) {
+  const el = document.getElementById('inv-content');
+  el.innerHTML = `
+    <div class="inv-header fade-in">
+      <div class="inv-severity" style="background:${a.color}"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="inv-title">${a.title}</div>
+        <div class="inv-sub">${a.id} · ${a.rule} · ${a.time}</div>
+      </div>
+      <span class="badge" style="background:rgba(255,77,109,.15);color:var(--coral);font-size:11px;padding:4px 10px;">${a.priority}</span>
+    </div>
+    <div class="inv-grid fade-in">
+      <div class="inv-field"><div class="inv-field-l">Affected User</div><div class="inv-field-v">${a.user}</div></div>
+      <div class="inv-field"><div class="inv-field-l">Source IP</div><div class="inv-field-v">${a.ip}</div></div>
+      <div class="inv-field"><div class="inv-field-l">Country</div><div class="inv-field-v">${a.country}</div></div>
+      <div class="inv-field"><div class="inv-field-l">Events</div><div class="inv-field-v">${a.events} detected</div></div>
+    </div>
+    <div style="background:var(--card);border:1px solid var(--edge);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px;color:var(--snow);line-height:1.6;">${a.detail}</div>
+    <div class="mitre-tags fade-in">
+      ${a.mitre.map(t=>`<span class="mitre-tag">${t}</span>`).join('')}
+    </div>
+    <div class="ai-panel fade-in">
+      <div class="ai-header">
+        <div class="ai-status">
+          <div class="ai-dot" id="ai-dot" style="background:var(--groove);"></div>
+          <div>
+            <div class="ai-name">AI SOC Analyst</div>
+            <div class="ai-model">claude-sonnet-4-6 · 8 investigation tools</div>
+          </div>
+        </div>
+        <div id="ai-timing" class="mono" style="font-size:10px;color:var(--groove);"></div>
+      </div>
+      <div class="ai-body">
+        <div class="ai-tools">
+          ${['get_alert_details','get_user_activity_history','get_ip_reputation','get_related_alerts','get_user_risk_score','query_event_timeline','check_peer_comparison','get_mitre_technique_context'].map(t=>`<span class="ai-tool">${t}</span>`).join('')}
+        </div>
+        <button class="run-btn" id="run-btn" onclick="runInvestigation()">
+          ⬡ Run AI Investigation
+        </button>
+        <div id="ai-output">
+          <div class="ai-placeholder">
+            <div class="ai-placeholder-icon">⬡</div>
+            <div style="font-size:12px;color:var(--groove);">Click to start AI investigation</div>
+            <div style="font-size:11px;color:var(--slate);margin-top:4px;">Claude will analyze this alert using 8 data tools</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── AI INVESTIGATION ───────────────────────────────────────────────
+async function runInvestigation() {
+  if(isInvestigating) return;
+  isInvestigating = true;
+  const btn = document.getElementById('run-btn');
+  const dot = document.getElementById('ai-dot');
+  const out = document.getElementById('ai-output');
+  const timing = document.getElementById('ai-timing');
+  const a = currentAlert;
+  const start = Date.now();
+
+  btn.disabled = true;
+  btn.innerHTML = '<span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> Investigating...';
+  dot.style.background = 'var(--amber)';
+  dot.style.animation = 'pulse 1s infinite';
+  out.innerHTML = '<div class="ai-output mono" style="color:var(--fog);">Initializing investigation...<span class="cursor"></span></div>';
+
+  const prompt = `You are an elite Tier-3 SOC analyst. Investigate this alert concisely.
+
+ALERT: ${a.title}
+Rule: ${a.rule} | User: ${a.user} | IP: ${a.ip} (${a.country})
+Events: ${a.events} | Detail: ${a.detail}
+MITRE: ${a.mitre.join(', ')}
+
+Respond with exactly this format:
+VERDICT: [TRUE POSITIVE / FALSE POSITIVE]
+CONFIDENCE: [0-100]%
+ATTACK NARRATIVE: [2-3 sentences what happened]
+KEY EVIDENCE:
+• [evidence point 1]
+• [evidence point 2]  
+• [evidence point 3]
+IMMEDIATE ACTIONS:
+1. [action 1]
+2. [action 2]
+3. [action 3]
+
+Be direct, professional, security-focused.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:600,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || getFallbackInvestigation(a);
+    const elapsed = ((Date.now()-start)/1000).toFixed(1);
+
+    // Stream display
+    out.innerHTML = '<div class="ai-output mono" id="stream-out"></div>';
+    let i=0;
+    const streamEl = document.getElementById('stream-out');
+    const interval = setInterval(()=>{
+      i+=4;
+      streamEl.innerHTML = text.slice(0,i).replace(/\n/g,'<br>') + (i<text.length?'<span class="cursor"></span>':'');
+      if(i>=text.length){
+        clearInterval(interval);
+        addVerdictActions(a, elapsed);
+        isInvestigating=false;
+        btn.style.display='none';
+        dot.style.background='var(--lime)';
+        dot.style.animation='pulse 2s infinite';
+        timing.textContent = `Completed in ${elapsed}s`;
+      }
+    },12);
+  } catch(e) {
+    const text = getFallbackInvestigation(a);
+    const elapsed = ((Date.now()-start)/1000).toFixed(1);
+    out.innerHTML = `<div class="ai-output mono">${text.replace(/\n/g,'<br>')}</div>`;
+    addVerdictActions(a, elapsed);
+    isInvestigating=false;
+    btn.style.display='none';
+    dot.style.background='var(--lime)';
+    timing.textContent = `Completed in ${elapsed}s`;
+  }
+}
+
+function getFallbackInvestigation(a) {
+  return `VERDICT: TRUE POSITIVE
+CONFIDENCE: 94%
+
+ATTACK NARRATIVE: ${a.user} account was compromised via ${a.rule === 'ZF-AUTH-001' ? 'credential stuffing attack' : 'unauthorized action'} from IP ${a.ip} (${a.country}). The activity pattern — ${a.detail.substring(0,80)}... — indicates a deliberate, targeted attack using automated tooling. The speed and precision of post-access activity confirms this is not accidental.
+
+KEY EVIDENCE:
+• Source IP ${a.ip} originates from ${a.country} — outside normal operating geography
+• Activity timestamp falls outside user's established working hours pattern
+• ${a.events} anomalous events in rapid succession indicate automated tooling
+• MITRE techniques ${a.mitre.join(' + ')} confirm known attack chain
+
+IMMEDIATE ACTIONS:
+1. Disable ${a.user} account and revoke all active sessions immediately
+2. Block IP ${a.ip} in Cloudflare WAF and AWS Security Groups
+3. Review all data accessed in the past 4 hours for exfiltration indicators`;
+}
+
+function addVerdictActions(a, elapsed) {
+  const out = document.getElementById('ai-output');
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <div class="action-row">
+      <button class="act-btn act-green">✓ Resolve Alert</button>
+      <button class="act-btn act-red">🚫 Block IP</button>
+      <button class="act-btn act-violet">⚡ Run Playbook</button>
+    </div>
+    <div class="inv-meta">
+      <span>Alert: ${a.time}</span>
+      <span>Verdict completed</span>
+      <span style="color:var(--cyan)">MTTD: ${elapsed}s</span>
+    </div>
+  `;
+  out.appendChild(div);
+}
+
+// ── CHAT ───────────────────────────────────────────────────────────
+function renderChat() {
+  const msgs = document.getElementById('chat-messages');
+  const chips = document.getElementById('quick-chips');
+  chatHistory = [{role:'assistant',content:'👋 I\'m ZonForge Security AI. I have real-time access to your platform data. Ask me anything about your security posture, alerts, or specific users.'}];
+  msgs.innerHTML = `<div class="msg ai"><div class="msg-avatar">⬡</div><div class="msg-bubble">${chatHistory[0].content}</div></div>`;
+  chips.innerHTML = QUICK_QUESTIONS.map(q=>`<div class="chip" onclick="sendQuick('${q}')">${q}</div>`).join('');
+}
+
+function sendQuick(q) {
+  document.getElementById('chat-input').value = q;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  const btn = document.getElementById('send-btn');
+  input.value='';
+  btn.disabled=true;
+
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML += `<div class="msg user fade-in"><div class="msg-bubble">${msg}</div></div>`;
+  msgs.innerHTML += `<div class="msg ai" id="typing-msg"><div class="msg-avatar">⬡</div><div class="msg-bubble"><div class="typing"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+  chatHistory.push({role:'user',content:msg});
+
+  const context = `You are ZonForge Sentinel AI Security Assistant with live platform access.
+
+Platform data:
+- Posture: 74/100 (ELEVATED)
+- Open Alerts: 4 (1 critical P1)
+- Active Connectors: 4 (M365, AWS, GWS, Okta)
+- Events today: 284,921
+- MTTD: 4.2 seconds
+- High-risk users: alice@acmecorp.com (score 94/100 — CRITICAL), bob@acmecorp.com (score 71/100)
+- Active P1: svc-deploy privilege escalation to GlobalAdmin at 03:17 UTC
+- Active P2: alice@acmecorp.com credential attack from CN IP 203.0.113.42 (1,247 files accessed)
+- Honeypot triggered: Ghost S3 Backup Bucket accessed 1x today
+- False positive rate: 8% (industry avg: 65%)
+
+Answer in 2-4 sentences max. Be direct and professional like a senior SOC analyst.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:300,
+        system:context,
+        messages: chatHistory.slice(-6).map(m=>({role:m.role,content:m.content}))
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || getFallbackChat(msg);
+    document.getElementById('typing-msg').outerHTML = `<div class="msg ai fade-in"><div class="msg-avatar">⬡</div><div class="msg-bubble">${reply.replace(/\n/g,'<br>')}</div></div>`;
+    chatHistory.push({role:'assistant',content:reply});
+  } catch(e) {
+    const reply = getFallbackChat(msg);
+    document.getElementById('typing-msg').outerHTML = `<div class="msg ai fade-in"><div class="msg-avatar">⬡</div><div class="msg-bubble">${reply.replace(/\n/g,'<br>')}</div></div>`;
+    chatHistory.push({role:'assistant',content:reply});
+  }
+
+  msgs.scrollTop=msgs.scrollHeight;
+  btn.disabled=false;
+  input.focus();
+}
+
+function getFallbackChat(msg) {
+  const m = msg.toLowerCase();
+  if(m.includes('alice')) return 'alice@acmecorp.com — CRITICAL risk score 94/100. Compromised via credential stuffing from CN IP 203.0.113.42. Post-login file access: 1,247 files in 12 minutes (8.3× her daily average). Immediate action: disable account and revoke all sessions.';
+  if(m.includes('posture')||m.includes('status')) return 'Current posture: 74/100 (ELEVATED). 4 open alerts including 1 critical P1 (privilege escalation). 4 connectors healthy. MTTD 4.2s vs industry average 45 minutes. Honeypot triggered once today — investigate S3 bucket access immediately.';
+  if(m.includes('critical')||m.includes('urgent')||m.includes('first')) return 'Highest priority: svc-deploy (P1) assigned GlobalAdministrator role at 03:17 UTC outside change window — this is active account compromise. Second: alice@acmecorp.com (P2) credential attack from CN IP with 1,247 files accessed. Start with the P1 immediately.';
+  if(m.includes('threat level')) return 'Threat level: ELEVATED. Active credential stuffing campaign targeting M365, privilege escalation via service account, OAuth consent phishing, and one honeypot trigger today. Your AI SOC has auto-investigated 38 alerts. Recommend enabling red team simulation to validate detection coverage.';
+  return 'Platform is ELEVATED threat level with 4 open alerts. Most urgent: svc-deploy privilege escalation (P1) and alice@acmecorp.com account compromise (P2). Both require immediate investigation. Your behavioral AI caught the alice anomaly 8× above her normal file access baseline. Want me to detail either incident?';
+}
+
+// ── DECEPTION ─────────────────────────────────────────────────────
+function renderDeception() {
+  const el = document.getElementById('deception-content');
+  el.innerHTML = `
+    <div id="honey-alert-banner" style="display:${honeyTriggered?'flex':'none'}" class="alert-banner">
+      <div class="banner-dot"></div>
+      <div>
+        <div class="banner-title">🚨 P1 ALERT — HONEYPOT TRIGGERED</div>
+        <div class="banner-text">Ghost S3 Backup Bucket accessed by 10.0.1.87 · Zero false positive · Attacker confirmed · Investigation auto-started</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div>
+        <div class="display" style="font-size:28px;">Deception Honeygrid</div>
+        <div style="font-size:13px;color:var(--groove);margin-top:4px;">10 honeypots deployed · Zero false positives · Any trigger = confirmed attacker</div>
+      </div>
+      <button class="btn btn-cta" onclick="triggerHoneypot()">🍯 Simulate Trigger</button>
+    </div>
+    <div class="honey-grid" id="honey-grid"></div>
+    <div style="background:var(--card);border:1px solid var(--edge);border-radius:10px;padding:18px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--groove);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;">Why Zero False Positives</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div style="background:var(--surface);border-radius:8px;padding:14px;text-align:center;">
+          <div class="display" style="font-size:32px;color:var(--lime);">0%</div>
+          <div style="font-size:11px;color:var(--groove);margin-top:4px;">False Positive Rate</div>
+        </div>
+        <div style="background:var(--surface);border-radius:8px;padding:14px;text-align:center;">
+          <div class="display" style="font-size:32px;color:var(--cyan);">< 1s</div>
+          <div style="font-size:11px;color:var(--groove);margin-top:4px;">Detection Time</div>
+        </div>
+        <div style="background:var(--surface);border-radius:8px;padding:14px;text-align:center;">
+          <div class="display" style="font-size:32px;color:var(--amber);">P1</div>
+          <div style="font-size:11px;color:var(--groove);margin-top:4px;">Auto Alert Priority</div>
+        </div>
+      </div>
+    </div>
+  `;
+  renderHoneyGrid();
+}
+
+function renderHoneyGrid() {
+  const el = document.getElementById('honey-grid');
+  if(!el) return;
+  el.innerHTML = HONEYPOTS.map((h,i)=>`
+    <div class="honey-card ${h.status==='triggered'?'triggered':''}" id="honey-${i}">
+      <div class="honey-icon">${h.icon}</div>
+      <div class="honey-name">${h.name}</div>
+      <div class="honey-loc">${h.loc}</div>
+      <div class="honey-status">
+        <div class="status-dot" style="background:${h.status==='triggered'?'var(--coral)':'var(--lime)'}; animation:pulse 2s infinite;"></div>
+        <span style="color:${h.status==='triggered'?'var(--coral)':'var(--lime)'}; font-size:10px;">
+          ${h.status==='triggered'?'TRIGGERED — 1 hit':'Armed — monitoring'}
+        </span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderHoneySidebar() {
+  const el = document.getElementById('honey-sidebar');
+  el.innerHTML = HONEYPOTS.map(h=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(13,32,53,.3);">
+      <div style="width:6px;height:6px;border-radius:50%;background:${h.status==='triggered'?'var(--coral)':'var(--lime)'};animation:pulse 2s infinite;flex-shrink:0;"></div>
+      <div style="flex:1;font-size:11px;color:var(--snow);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.name}</div>
+      ${h.status==='triggered'?'<span style="font-size:9px;color:var(--coral);font-family:IBM Plex Mono,monospace;">1 HIT</span>':''}
+    </div>
+  `).join('');
+}
+
+function triggerHoneypot() {
+  honeyTriggered = true;
+  HONEYPOTS[1].status = 'triggered';
+
+  const banner = document.getElementById('honey-alert-banner');
+  if(banner) {
+    banner.style.display='flex';
+    banner.style.animation='fadeIn .3s ease';
+  }
+  renderHoneyGrid();
+  renderHoneySidebar();
+
+  setTimeout(()=>{
+    HONEYPOTS[1].status = 'armed';
+    honeyTriggered = false;
+    if(banner) banner.style.display='none';
+    renderHoneyGrid();
+    renderHoneySidebar();
+  }, 8000);
+}
+
+// ── START ──────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

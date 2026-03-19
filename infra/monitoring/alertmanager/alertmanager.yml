@@ -1,0 +1,155 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — Alertmanager Configuration
+# Routes alerts to: PagerDuty (critical) + Slack (all)
+# ─────────────────────────────────────────────────────────────────
+
+global:
+  resolve_timeout:     5m
+  slack_api_url:       "${ALERTMANAGER_SLACK_WEBHOOK_URL}"
+  pagerduty_url:       "https://events.pagerduty.com/v2/enqueue"
+
+# ── Templates ─────────────────────────────────────────────────────
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+# ── Routing tree ──────────────────────────────────────────────────
+
+route:
+  group_by:          ['alertname', 'cluster', 'team']
+  group_wait:        30s
+  group_interval:    5m
+  repeat_interval:   4h
+  receiver:          slack-platform
+
+  routes:
+    # ── Critical alerts → PagerDuty + Slack ─────────────────────
+
+    - matchers:
+        - severity = critical
+        - pagerduty = "true"
+      receiver: pagerduty-critical
+      group_wait:      0s
+      repeat_interval: 1h
+      continue: true   # also send to Slack
+
+    # ── Security team alerts ─────────────────────────────────────
+
+    - matchers:
+        - team = security
+      receiver: slack-security
+      group_interval: 2m
+      repeat_interval: 2h
+
+    # ── Platform team alerts ─────────────────────────────────────
+
+    - matchers:
+        - team = platform
+      receiver: slack-platform
+      repeat_interval: 4h
+
+    # ── Warning-level — batch to reduce noise ────────────────────
+
+    - matchers:
+        - severity = warning
+      receiver: slack-platform
+      group_wait:    2m
+      group_interval: 10m
+      repeat_interval: 6h
+
+    # ── Info-level — low-priority channel ────────────────────────
+
+    - matchers:
+        - severity = info
+      receiver: slack-info
+      group_wait: 5m
+      repeat_interval: 24h
+
+# ── Inhibition rules ──────────────────────────────────────────────
+# Suppress warnings when critical alert fires for same component
+
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ['alertname', 'cluster', 'job']
+
+  - source_matchers:
+      - alertname = IngestionServiceDown
+    target_matchers:
+      - alertname = RawEventsQueueDepthHigh
+    equal: ['cluster']
+
+  - source_matchers:
+      - alertname = NormalizationPipelineLag
+    target_matchers:
+      - alertname = DetectionEngineNoSignals
+    equal: ['cluster']
+
+# ── Receivers ─────────────────────────────────────────────────────
+
+receivers:
+
+  # ── PagerDuty — Critical alerts ───────────────────────────────
+
+  - name: pagerduty-critical
+    pagerduty_configs:
+      - routing_key: "${PAGERDUTY_INTEGRATION_KEY}"
+        severity: critical
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          description:   '{{ .CommonAnnotations.description }}'
+          runbook:        '{{ .CommonAnnotations.runbook_url }}'
+          environment:    production
+          cluster:        '{{ .GroupLabels.cluster }}'
+          team:           '{{ .GroupLabels.team }}'
+        links:
+          - href: '{{ .CommonAnnotations.runbook_url }}'
+            text: Runbook
+
+  # ── Slack — Security team ─────────────────────────────────────
+
+  - name: slack-security
+    slack_configs:
+      - channel:    "#security-alerts"
+        send_resolved: true
+        color:      '{{ if eq .Status "firing" }}{{ if eq (index .Alerts 0).Labels.severity "critical" }}danger{{ else }}warning{{ end }}{{ else }}good{{ end }}'
+        title:      '{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ if .Annotations.runbook_url }}*Runbook:* <{{ .Annotations.runbook_url }}|View Runbook>{{ end }}
+          *Starts:* {{ .StartsAt | since | humanizeDuration }} ago
+          {{ end }}
+        actions:
+          - type: button
+            text: Acknowledge
+            url:  "https://alerts.zonforge.com"
+
+  # ── Slack — Platform team ─────────────────────────────────────
+
+  - name: slack-platform
+    slack_configs:
+      - channel:    "#platform-alerts"
+        send_resolved: true
+        color:      '{{ if eq .Status "firing" }}{{ if eq (index .Alerts 0).Labels.severity "critical" }}danger{{ else if eq (index .Alerts 0).Labels.severity "warning" }}warning{{ else }}#36a64f{{ end }}{{ else }}good{{ end }}'
+        title:      '{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }} ({{ .Labels.severity }})
+          *Summary:* {{ .Annotations.summary }}
+          {{ if .Annotations.runbook_url }}<{{ .Annotations.runbook_url }}|View Runbook>{{ end }}
+          {{ end }}
+
+  # ── Slack — Info/low-priority ─────────────────────────────────
+
+  - name: slack-info
+    slack_configs:
+      - channel:    "#platform-info"
+        send_resolved: false
+        title:      'ℹ️ {{ .GroupLabels.alertname }}'
+        text: '{{ (index .Alerts 0).Annotations.summary }}'

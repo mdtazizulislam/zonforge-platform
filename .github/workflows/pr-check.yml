@@ -1,0 +1,189 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # 1. LINT + TYPECHECK
+  # ─────────────────────────────────────────────────────────────────
+  typecheck:
+    name: TypeCheck & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeCheck all packages
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true   # Warn only until lint rules are finalized
+
+  # ─────────────────────────────────────────────────────────────────
+  # 2. UNIT TESTS
+  # ─────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Run unit tests
+        run: npm run test -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # ─────────────────────────────────────────────────────────────────
+  # 3. INTEGRATION TESTS (with real PostgreSQL + Redis)
+  # ─────────────────────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB:       zonforge_test
+          POSTGRES_USER:     zonforge
+          POSTGRES_PASSWORD: test_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      ZONFORGE_ENV:              test
+      ZONFORGE_POSTGRES_HOST:    localhost
+      ZONFORGE_POSTGRES_PORT:    5432
+      ZONFORGE_POSTGRES_DB:      zonforge_test
+      ZONFORGE_POSTGRES_USER:    zonforge
+      ZONFORGE_POSTGRES_PASSWORD: test_password
+      ZONFORGE_POSTGRES_SSL:     false
+      ZONFORGE_REDIS_HOST:       localhost
+      ZONFORGE_REDIS_PORT:       6379
+      ZONFORGE_JWT_SECRET:       test_jwt_secret_min_32_chars_for_ci_only
+      ZONFORGE_API_KEY_SALT:     test_api_key_salt_min_32_chars_for_ci
+      ZONFORGE_ENCRYPTION_KEY:   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      ZONFORGE_HMAC_SECRET:      test_hmac_secret_min_32_chars_for_ci_only
+      ZONFORGE_POSTGRES_POOL_MIN: 1
+      ZONFORGE_POSTGRES_POOL_MAX: 5
+      ZONFORGE_FEATURE_LLM_NARRATIVES: false
+      ZONFORGE_FEATURE_THREAT_INTEL:   false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Run database migrations
+        run: npm run db:migrate --workspace=packages/db-client
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+  # ─────────────────────────────────────────────────────────────────
+  # 4. SECURITY SCAN
+  # ─────────────────────────────────────────────────────────────────
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Snyk dependency scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+        continue-on-error: false
+
+      - name: Run gitleaks (secret detection)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────
+  # 5. BUILD CHECK (Docker build validation — no push)
+  # ─────────────────────────────────────────────────────────────────
+  build-check:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth-service
+          - tenant-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.service }} (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context:   .
+          file:      ./apps/${{ matrix.service }}/Dockerfile
+          push:      false
+          tags:      zonforge/${{ matrix.service }}:pr-${{ github.sha }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max

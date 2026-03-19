@@ -1,0 +1,40 @@
+{{- if .Values.istio.enabled }}
+# ── mTLS STRICT for all service-to-service communication ─────────
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "auth-service.fullname" . }}-mtls
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "auth-service.selectorLabels" . | nindent 6 }}
+  mtls:
+    mode: {{ .Values.istio.mtls }}
+---
+# ── AuthorizationPolicy — only allow traffic from known services ──
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "auth-service.fullname" . }}-authz
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "auth-service.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+    # Allow from API gateway
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/zonforge/sa/api-gateway"
+    # Allow from ingress controller (ALB → Envoy)
+    - from:
+        - source:
+            namespaces: ["kube-system", "istio-system"]
+    # Allow Prometheus scraping
+    - to:
+        - operation:
+            paths: ["/metrics"]
+{{- end }}

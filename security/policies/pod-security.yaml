@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — Pod Security Standards
+#
+# Enforces "restricted" profile:
+#   - No privileged containers
+#   - No host namespaces (network/PID/IPC)
+#   - Non-root user only (UID 1001)
+#   - Read-only root filesystem
+#   - Drop ALL capabilities
+#   - No hostPath volumes
+#   - Seccomp: RuntimeDefault
+# ─────────────────────────────────────────────────────────────────
+
+# ── Namespace-level Pod Security Standards (K8s 1.25+) ───────────
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zonforge
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.29
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.29
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.29
+
+---
+
+# ── OPA Gatekeeper — Require non-root containers ─────────────────
+
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequireNonRootUser
+metadata:
+  name: zonforge-require-non-root
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    namespaces: ["zonforge"]
+
+---
+
+# ── OPA Gatekeeper — Require read-only root filesystem ───────────
+
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sReadOnlyRootFilesystem
+metadata:
+  name: zonforge-readonly-rootfs
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet"]
+    namespaces: ["zonforge"]
+
+---
+
+# ── OPA Gatekeeper — Block privileged containers ─────────────────
+
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPPrivilegedContainer
+metadata:
+  name: zonforge-no-privileged
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps", ""]
+        kinds: ["Deployment", "StatefulSet", "Pod"]
+    namespaces: ["zonforge"]
+
+---
+
+# ── OPA Gatekeeper — Block host namespaces ────────────────────────
+
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPSPHostNamespace
+metadata:
+  name: zonforge-no-host-namespaces
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps", ""]
+        kinds: ["Deployment", "StatefulSet", "Pod"]
+    namespaces: ["zonforge"]
+
+---
+
+# ── OPA Gatekeeper — Require resource limits ─────────────────────
+
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredResources
+metadata:
+  name: zonforge-require-resource-limits
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet"]
+    namespaces: ["zonforge"]
+  parameters:
+    limits:
+      - cpu
+      - memory
+    requests:
+      - cpu
+      - memory
+
+---
+
+# ── OPA Gatekeeper — Block latest image tags ─────────────────────
+
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sDisallowedTags
+metadata:
+  name: zonforge-no-latest-tag
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet"]
+    namespaces: ["zonforge"]
+  parameters:
+    tags:
+      - latest

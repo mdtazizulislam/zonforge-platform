@@ -1,0 +1,32 @@
+# ZonForge Sentinel — Netlify Configuration
+# Landing page + Interactive Demo
+
+[build]
+  publish = "."
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+    Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
+
+# demo.html — no caching (AI content changes)
+[[headers]]
+  for = "/demo.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# SPA fallback
+[[redirects]]
+  from   = "/app/*"
+  to     = "https://app.zonforge.com/:splat"
+  status = 301
+  force  = true
+
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

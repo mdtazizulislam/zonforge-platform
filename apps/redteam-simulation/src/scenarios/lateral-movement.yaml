@@ -1,0 +1,66 @@
+scenario: lateral_movement
+version: "1.0"
+name: "Lateral Movement via Service Account Spread"
+description: >
+  Simulates an attacker using a compromised service account to
+  authenticate across multiple internal systems in rapid succession
+  — a clear lateral movement pattern.
+mitre_tactics:
+  - TA0008   # Lateral Movement
+  - TA0003   # Persistence
+mitre_techniques:
+  - T1021    # Remote Services
+  - T1078.003 # Valid Accounts - Local Accounts
+severity: high
+expected_detections:
+  - ZF-LATERAL-001   # lateral movement rule
+category: lateral_movement
+
+steps:
+  - step: 1
+    name: service_account_login
+    event_type: user_login_success
+    count: 1
+    delay_ms: 100
+    params:
+      source_type:  "aws_cloudtrail"
+      actor_type:   "service_account"
+      actor_prefix: "svc-"
+    description: "Service account authentication"
+
+  - step: 2
+    name: multi_system_auth_spread
+    event_type: user_login_success
+    count: 12
+    delay_ms: 150
+    params:
+      source_type:      "aws_cloudtrail"
+      actor_type:       "service_account"
+      vary_target_asset: true
+    description: "Service account auth to 12 distinct systems in 30 seconds"
+
+  - step: 3
+    name: credential_dump_attempt
+    event_type: iam_credential_report
+    count: 1
+    delay_ms: 400
+    params:
+      source_type:  "aws_cloudtrail"
+      event_action: "GenerateCredentialReport"
+    description: "Credential dump via IAM report generation"
+
+  - step: 4
+    name: new_persistence
+    event_type: iam_access_key_created
+    count: 1
+    delay_ms: 300
+    params:
+      source_type:  "aws_cloudtrail"
+      event_action: "CreateAccessKey"
+    description: "Creates new access key for persistence"
+
+evaluation:
+  require_alert:       true
+  require_severity:    ["high", "critical"]
+  detection_window_ms: 30000
+  pass_threshold_pct:  85

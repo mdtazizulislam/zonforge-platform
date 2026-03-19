@@ -1,0 +1,199 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — Prometheus Configuration
+# ─────────────────────────────────────────────────────────────────
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  scrape_timeout:      10s
+  external_labels:
+    cluster:     zonforge-prod
+    environment: production
+
+# ── Alertmanager ──────────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+      timeout: 10s
+
+# ── Rule files ────────────────────────────────────────────────────
+rule_files:
+  - /etc/prometheus/rules/zonforge-alerts.yaml
+  - /etc/prometheus/rules/zonforge-recording-rules.yaml
+
+# ─────────────────────────────────────────────────────────────────
+# SCRAPE CONFIGS
+# ─────────────────────────────────────────────────────────────────
+
+scrape_configs:
+
+  # ── ZonForge Services ─────────────────────────────────────────
+
+  - job_name: api-gateway
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [zonforge]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: api-gateway
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        target_label: __metrics_path__
+        regex: (.+)
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: auth-service
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: auth-service
+        action: keep
+    metrics_path: /metrics
+
+  - job_name: ingestion-service
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: ingestion-service
+        action: keep
+
+  - job_name: normalization-worker
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: normalization-worker
+        action: keep
+
+  - job_name: detection-engine
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: detection-engine
+        action: keep
+
+  - job_name: anomaly-service
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: anomaly-service
+        action: keep
+
+  - job_name: correlation-engine
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: correlation-engine
+        action: keep
+
+  - job_name: alert-service
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: alert-service
+        action: keep
+
+  - job_name: risk-scoring-engine
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: risk-scoring-engine
+        action: keep
+
+  - job_name: threat-intel-service
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: threat-intel-service
+        action: keep
+
+  - job_name: billing-service
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [zonforge] }
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: billing-service
+        action: keep
+
+  # ── Infrastructure ────────────────────────────────────────────
+
+  - job_name: node-exporter
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets: ["kube-state-metrics.monitoring:8080"]
+
+  - job_name: cadvisor
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - target_label: __metrics_path__
+        replacement: /metrics/cadvisor
+
+  # ── Istio ─────────────────────────────────────────────────────
+
+  - job_name: istio-mesh
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: [istio-system]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: istio-pilot;http-monitoring
+
+  # ── Redis (via redis_exporter) ────────────────────────────────
+
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter.zonforge:9121"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # ── RDS PostgreSQL (via postgres_exporter) ────────────────────
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter.zonforge:9187"]
+
+  # ── ClickHouse ────────────────────────────────────────────────
+
+  - job_name: clickhouse
+    static_configs:
+      - targets: ["clickhouse-exporter.zonforge:9116"]

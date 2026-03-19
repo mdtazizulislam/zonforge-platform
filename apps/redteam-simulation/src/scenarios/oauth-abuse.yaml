@@ -1,0 +1,68 @@
+scenario: oauth_abuse
+version: "1.0"
+name: "OAuth Token Theft and API Abuse"
+description: >
+  Simulates an OAuth consent phishing attack where a malicious app
+  is granted broad permissions, followed by API abuse using the
+  obtained token.
+mitre_tactics:
+  - TA0001   # Initial Access
+  - TA0009   # Collection
+mitre_techniques:
+  - T1550.001  # Use Alternate Authentication Material - App Access Token
+  - T1528     # Steal Application Access Token
+severity: high
+expected_detections:
+  - ZF-OAUTH-001   # oauth scope abuse rule
+category: oauth_abuse
+
+steps:
+  - step: 1
+    name: malicious_app_consent
+    event_type: oauth_consent_granted
+    count: 1
+    delay_ms: 200
+    params:
+      source_type:  "m365_entra"
+      event_action: "Consent to application"
+      app_name:     "FreePDF-Converter"
+      scopes:       ["Mail.ReadWrite", "Files.ReadWrite.All", "offline_access"]
+    description: "User consents to malicious app with broad scopes"
+
+  - step: 2
+    name: token_issued
+    event_type: oauth_token_issued
+    count: 1
+    delay_ms: 300
+    params:
+      source_type:  "m365_entra"
+      event_action: "Add OAuth2PermissionGrant"
+    description: "OAuth token issued with sensitive scopes"
+
+  - step: 3
+    name: mail_enumeration
+    event_type: mail_read_api
+    count: 50
+    delay_ms: 100
+    params:
+      source_type:    "m365_entra"
+      event_action:   "MailItemsAccessed"
+      auth_type:      "oauth_token"
+    description: "Attacker reads 50 emails via OAuth token"
+
+  - step: 4
+    name: file_exfil_via_api
+    event_type: file_download
+    count: 30
+    delay_ms: 120
+    params:
+      source_type:  "m365_entra"
+      event_action: "FileDownloaded"
+      auth_type:    "oauth_token"
+    description: "Downloads files using OAuth app token"
+
+evaluation:
+  require_alert:       true
+  require_severity:    ["high", "critical"]
+  detection_window_ms: 30000
+  pass_threshold_pct:  80

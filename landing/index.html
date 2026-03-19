@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZonForge Sentinel — AI-Native Cybersecurity Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #020b12;
+  --bg2:     #050f18;
+  --surface: #07141f;
+  --card:    #091623;
+  --border:  #0f2236;
+  --muted:   #1a3550;
+  --dim:     #2d5270;
+  --mid:     #4a7a9b;
+  --text:    #8daec4;
+  --light:   #b8d0e0;
+  --bright:  #ddeeff;
+  --accent:  #00d4ff;
+  --accent2: #0099cc;
+  --green:   #22c55e;
+  --amber:   #f59e0b;
+  --red:     #ef4444;
+  --indigo:  #6366f1;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'IBM Plex Sans',sans-serif;
+  font-size:16px;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+
+h1,h2,h3,h4,h5{font-family:'Barlow Condensed',sans-serif;font-weight:800;color:var(--bright);letter-spacing:-0.5px;}
+code,pre,.mono{font-family:'IBM Plex Mono',monospace;}
+
+/* ── NAV ──────────────────────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 60px;height:64px;
+  background:rgba(2,11,18,0.92);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  transition:all .3s;
+}
+.nav-logo{display:flex;align-items:center;gap:12px;text-decoration:none;}
+.nav-logo-mark{
+  width:34px;height:34px;border-radius:8px;
+  background:linear-gradient(135deg,#0a2a45,#00d4ff);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;color:#fff;letter-spacing:-1px;
+}
+.nav-logo-text{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:20px;color:var(--bright);letter-spacing:2px;}
+.nav-logo-version{font-size:9px;color:var(--muted);letter-spacing:3px;font-family:'IBM Plex Mono',monospace;}
+.nav-links{display:flex;gap:6px;}
+.nav-links a{
+  color:var(--mid);font-size:13px;font-weight:500;text-decoration:none;
+  padding:6px 14px;border-radius:6px;transition:all .2s;
+}
+.nav-links a:hover{color:var(--bright);background:rgba(0,212,255,0.06);}
+.nav-cta{display:flex;align-items:center;gap:10px;}
+.btn-ghost{
+  padding:8px 20px;border:1px solid var(--border);border-radius:6px;
+  color:var(--light);font-size:13px;font-weight:600;text-decoration:none;
+  transition:all .2s;background:transparent;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-primary{
+  padding:8px 24px;border-radius:6px;border:1px solid rgba(0,212,255,0.4);
+  background:linear-gradient(135deg,rgba(0,212,255,0.15),rgba(0,212,255,0.08));
+  color:var(--accent);font-size:13px;font-weight:700;text-decoration:none;
+  transition:all .2s;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+}
+.btn-primary:hover{background:linear-gradient(135deg,rgba(0,212,255,0.25),rgba(0,212,255,0.15));box-shadow:0 0 20px rgba(0,212,255,0.2);}
+.btn-hero{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:16px 36px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,153,204,0.1));
+  border:1px solid rgba(0,212,255,0.5);color:var(--accent);
+  font-size:15px;font-weight:700;text-decoration:none;
+  transition:all .3s;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+  font-weight:600;
+}
+.btn-hero:hover{background:linear-gradient(135deg,rgba(0,212,255,0.3),rgba(0,153,204,0.2));box-shadow:0 0 40px rgba(0,212,255,0.25);transform:translateY(-1px);}
+.btn-secondary{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:16px 36px;border-radius:8px;
+  background:transparent;border:1px solid var(--dim);color:var(--light);
+  font-size:15px;font-weight:600;text-decoration:none;
+  transition:all .3s;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+}
+.btn-secondary:hover{border-color:var(--mid);color:var(--bright);}
+
+/* ── SECTIONS ─────────────────────────────────────── */
+section{padding:100px 0;}
+.container{max-width:1180px;margin:0 auto;padding:0 60px;}
+.section-tag{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:5px 14px;border-radius:20px;
+  border:1px solid rgba(0,212,255,0.25);
+  background:rgba(0,212,255,0.06);
+  color:var(--accent);font-size:11px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:20px;font-family:'IBM Plex Mono',monospace;
+}
+.section-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+.section-title{font-size:clamp(36px,4vw,56px);line-height:1.05;margin-bottom:16px;}
+.section-sub{font-size:17px;color:var(--text);max-width:560px;line-height:1.7;}
+
+/* ── HERO ─────────────────────────────────────────── */
+#hero{
+  min-height:100vh;display:flex;align-items:center;
+  position:relative;overflow:hidden;padding-top:64px;
+}
+.hero-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:60px 60px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 30%,transparent 80%);
+  opacity:0.4;
+}
+.hero-glow{
+  position:absolute;top:-20%;left:50%;transform:translateX(-50%);
+  width:900px;height:600px;
+  background:radial-gradient(ellipse,rgba(0,212,255,0.08) 0%,transparent 65%);
+  pointer-events:none;
+}
+.hero-content{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;}
+.hero-label{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);
+  color:#fca5a5;padding:5px 14px;border-radius:20px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:24px;
+}
+.hero-label::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--red);animation:pulse 1.5s infinite;}
+.hero-h1{font-size:clamp(48px,5vw,72px);line-height:1.0;color:var(--bright);margin-bottom:24px;}
+.hero-h1 em{color:var(--accent);font-style:normal;}
+.hero-p{font-size:18px;color:var(--text);line-height:1.7;max-width:480px;margin-bottom:36px;}
+.hero-actions{display:flex;gap:14px;flex-wrap:wrap;}
+.hero-stats{display:flex;gap:32px;margin-top:48px;padding-top:40px;border-top:1px solid var(--border);}
+.stat-item{}
+.stat-val{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;color:var(--bright);}
+.stat-val span{font-size:18px;color:var(--accent);}
+.stat-lbl{font-size:11px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;}
+.hero-visual{position:relative;}
+.hero-terminal{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,0.5),0 0 0 1px var(--border),inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.terminal-bar{
+  display:flex;align-items:center;gap:8px;padding:12px 16px;
+  background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border);
+}
+.tb-dot{width:10px;height:10px;border-radius:50%;}
+.terminal-body{padding:20px;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:2;}
+.t-line{display:flex;gap:10px;animation:fadeIn .3s ease both;}
+.t-time{color:var(--muted);min-width:50px;}
+.t-tag{padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;min-width:50px;text-align:center;}
+.t-tag.crit{background:rgba(239,68,68,0.2);color:var(--red);}
+.t-tag.high{background:rgba(245,158,11,0.2);color:var(--amber);}
+.t-tag.info{background:rgba(99,102,241,0.2);color:var(--indigo);}
+.t-tag.ok  {background:rgba(34,197,94,0.2);color:var(--green);}
+.t-msg{color:var(--light);}
+.t-msg strong{color:var(--bright);}
+.hero-ticker{
+  margin-top:16px;background:rgba(0,0,0,0.3);border:1px solid var(--border);
+  border-radius:8px;padding:10px 16px;
+  display:flex;align-items:center;gap:10px;
+}
+.ticker-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0;}
+.ticker-text{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);overflow:hidden;white-space:nowrap;}
+.ticker-text span{color:var(--accent);}
+
+/* ── SOCIAL PROOF ─────────────────────────────────── */
+#proof{padding:40px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.proof-inner{display:flex;align-items:center;justify-content:space-between;gap:40px;}
+.proof-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;white-space:nowrap;}
+.proof-logos{display:flex;align-items:center;gap:40px;flex:1;justify-content:center;}
+.proof-logo{
+  font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;
+  color:var(--dim);letter-spacing:1px;opacity:0.6;transition:opacity .2s;
+}
+.proof-logo:hover{opacity:1;color:var(--mid);}
+.proof-certs{display:flex;gap:12px;}
+.cert-badge{
+  padding:5px 12px;border:1px solid var(--border);border-radius:20px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);
+  display:flex;align-items:center;gap:6px;
+}
+.cert-badge::before{content:'✓';color:var(--green);font-weight:700;}
+
+/* ── PRODUCT EXPLANATION ───────────────────────────── */
+#product{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);}
+.product-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;margin-top:64px;}
+.product-points{display:flex;flex-direction:column;gap:28px;}
+.product-point{display:flex;gap:16px;align-items:flex-start;}
+.pp-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.pp-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--bright);margin-bottom:4px;}
+.pp-text{font-size:14px;color:var(--text);line-height:1.6;}
+.product-visual{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:28px;position:relative;
+}
+.pv-title{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;}
+.pv-metric{margin-bottom:18px;}
+.pv-label{display:flex;justify-content:space-between;margin-bottom:6px;}
+.pv-bar{height:6px;background:var(--muted);border-radius:3px;overflow:hidden;}
+.pv-fill{height:100%;border-radius:3px;transition:width .8s ease;}
+.pv-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+.pvc-item{background:var(--surface);border-radius:8px;padding:14px;text-align:center;}
+.pvc-val{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:900;color:var(--bright);}
+.pvc-lbl{font-size:10px;color:var(--dim);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;}
+
+/* ── ARCHITECTURE ──────────────────────────────────── */
+#architecture{background:var(--bg2);}
+.arch-diagram{margin-top:60px;position:relative;}
+.arch-row{display:flex;gap:0;position:relative;margin-bottom:0;}
+.arch-layer{
+  display:flex;flex-direction:column;gap:0;flex:1;
+  position:relative;
+}
+.arch-layer-title{
+  text-align:center;padding:8px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;
+  color:var(--muted);letter-spacing:2px;text-transform:uppercase;
+  border-bottom:1px solid var(--border);margin-bottom:12px;
+}
+.arch-boxes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
+.arch-arrow{
+  display:flex;justify-content:center;align-items:center;
+  height:30px;font-size:20px;color:var(--accent);opacity:0.5;
+}
+.arch-box{
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  padding:12px;text-align:center;transition:all .2s;cursor:default;
+}
+.arch-box:hover{border-color:rgba(0,212,255,0.3);background:rgba(0,212,255,0.04);}
+.arch-box-icon{font-size:20px;margin-bottom:6px;}
+.arch-box-name{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--bright);}
+.arch-box-port{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);}
+.arch-flow{
+  display:flex;align-items:center;justify-content:center;
+  gap:0;margin:24px 0;position:relative;
+}
+.af-step{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  flex:1;position:relative;
+}
+.af-dot{
+  width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);
+  background:var(--bg);position:relative;z-index:1;
+}
+.af-dot.active{background:var(--accent);box-shadow:0 0 12px rgba(0,212,255,0.5);}
+.af-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);text-align:center;max-width:80px;line-height:1.3;}
+.af-line{
+  flex:1;height:2px;background:linear-gradient(90deg,var(--accent)40,var(--accent)40);
+  margin-top:-17px;position:relative;
+}
+.af-line::after{
+  content:'▶';position:absolute;right:-6px;top:-9px;
+  color:var(--accent);font-size:10px;opacity:0.6;
+}
+
+/* ── AI SOC ───────────────────────────────────────── */
+#ai-soc{background:var(--bg);}
+.soc-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start;margin-top:60px;}
+.soc-tools{display:flex;flex-direction:column;gap:10px;}
+.soc-tool{
+  display:flex;align-items:center;gap:14px;padding:14px 16px;
+  background:var(--card);border:1px solid var(--border);border-radius:8px;
+  transition:all .2s;
+}
+.soc-tool:hover{border-color:rgba(0,212,255,0.3);transform:translateX(4px);}
+.st-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.st-name{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--light);}
+.st-desc{font-size:12px;color:var(--dim);}
+.soc-verdict{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;position:sticky;top:90px;
+}
+.sv-header{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+  background:rgba(0,0,0,0.2);
+}
+.sv-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+.sv-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--bright);}
+.sv-model{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);}
+.sv-body{padding:20px;}
+.sv-verdict{
+  background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);
+  border-radius:8px;padding:14px;margin-bottom:16px;
+}
+.sv-v-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.sv-v-text{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:var(--green);}
+.sv-v-conf{font-size:12px;color:var(--green);opacity:0.8;}
+.sv-evidence{margin-bottom:14px;}
+.sv-e-title{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;}
+.sv-e-item{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;}
+.sv-e-bullet{color:var(--accent);font-size:12px;flex-shrink:0;margin-top:2px;}
+.sv-e-text{font-size:12px;color:var(--light);line-height:1.5;}
+.sv-actions{display:flex;gap:8px;}
+.sv-action{
+  flex:1;padding:8px;border-radius:6px;font-size:11px;font-weight:700;
+  border:1px solid;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;
+  transition:all .2s;text-align:center;
+}
+.sv-action.block{border-color:rgba(239,68,68,0.4);color:var(--red);background:rgba(239,68,68,0.08);}
+.sv-action.resolve{border-color:rgba(34,197,94,0.4);color:var(--green);background:rgba(34,197,94,0.08);}
+.sv-action.playbook{border-color:rgba(99,102,241,0.4);color:var(--indigo);background:rgba(99,102,241,0.08);}
+.sv-timeline{
+  margin-top:14px;padding-top:14px;border-top:1px solid var(--border);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);
+  display:flex;justify-content:space-between;align-items:center;
+}
+
+/* ── FEATURES ─────────────────────────────────────── */
+#features{background:var(--bg2);}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:60px;}
+.feat-card{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:28px;transition:all .3s;position:relative;overflow:hidden;
+}
+.feat-card::before{
+  content:'';position:absolute;inset:0;border-radius:12px;
+  background:radial-gradient(circle at top left,rgba(0,212,255,0.04) 0%,transparent 60%);
+  opacity:0;transition:opacity .3s;
+}
+.feat-card:hover{border-color:rgba(0,212,255,0.25);transform:translateY(-2px);box-shadow:0 20px 40px rgba(0,0,0,0.3);}
+.feat-card:hover::before{opacity:1;}
+.fc-icon{
+  width:48px;height:48px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  margin-bottom:16px;
+}
+.fc-title{font-size:22px;margin-bottom:8px;}
+.fc-text{font-size:14px;color:var(--text);line-height:1.6;margin-bottom:16px;}
+.fc-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.fc-tag{
+  padding:2px 8px;border-radius:20px;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;font-weight:600;letter-spacing:1px;
+  background:rgba(0,212,255,0.08);color:var(--accent);border:1px solid rgba(0,212,255,0.15);
+}
+
+/* ── COMPLIANCE ───────────────────────────────────── */
+#compliance{background:var(--bg);}
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;margin-top:60px;}
+.frameworks{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.fw-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:20px;text-align:center;transition:all .2s;
+}
+.fw-card:hover{border-color:rgba(0,212,255,0.3);}
+.fw-name{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:var(--bright);margin-bottom:4px;}
+.fw-full{font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.3;}
+.fw-controls{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);}
+.comp-benefits{display:flex;flex-direction:column;gap:20px;}
+.cb-item{display:flex;gap:14px;align-items:flex-start;}
+.cb-check{
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--green);font-size:12px;flex-shrink:0;margin-top:2px;
+}
+.cb-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--bright);margin-bottom:3px;}
+.cb-text{font-size:14px;color:var(--text);}
+
+/* ── PRICING ──────────────────────────────────────── */
+#pricing{background:linear-gradient(180deg,var(--bg2) 0%,var(--bg) 100%);}
+.price-toggle{display:flex;align-items:center;gap:16px;margin:32px 0 48px;}
+.pt-label{font-size:14px;color:var(--text);}
+.pt-switch{
+  width:48px;height:26px;border-radius:13px;background:var(--muted);
+  position:relative;cursor:pointer;transition:background .2s;
+}
+.pt-switch.on{background:var(--accent);}
+.pt-thumb{
+  width:20px;height:20px;border-radius:50%;background:white;
+  position:absolute;top:3px;left:3px;transition:left .2s;box-shadow:0 2px 4px rgba(0,0,0,0.3);
+}
+.pt-switch.on .pt-thumb{left:25px;}
+.pt-badge{
+  padding:3px 10px;border-radius:20px;
+  background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);
+  color:var(--green);font-size:11px;font-weight:700;font-family:'IBM Plex Mono',monospace;
+}
+.price-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.price-card{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:28px;position:relative;display:flex;flex-direction:column;
+}
+.price-card.featured{
+  border-color:rgba(0,212,255,0.4);
+  background:linear-gradient(135deg,rgba(0,212,255,0.06),var(--card));
+  box-shadow:0 0 0 1px rgba(0,212,255,0.15),0 20px 60px rgba(0,0,0,0.4);
+  transform:scale(1.02);
+}
+.pc-tag{
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  padding:3px 14px;border-radius:20px;font-size:10px;font-weight:800;
+  background:var(--accent);color:var(--bg);font-family:'IBM Plex Mono',monospace;
+  letter-spacing:1px;white-space:nowrap;
+}
+.pc-plan{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;}
+.pc-price{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:900;color:var(--bright);line-height:1;}
+.pc-price-mo{font-size:16px;color:var(--dim);font-family:'IBM Plex Sans',sans-serif;font-weight:400;}
+.pc-desc{font-size:13px;color:var(--text);margin:14px 0 20px;line-height:1.5;}
+.pc-btn{
+  padding:10px;border-radius:8px;font-size:13px;font-weight:700;
+  border:1px solid var(--border);background:transparent;color:var(--light);
+  cursor:pointer;transition:all .2s;font-family:'IBM Plex Sans',sans-serif;
+  margin-bottom:20px;
+}
+.pc-btn.featured{
+  background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,153,204,0.1));
+  border-color:rgba(0,212,255,0.4);color:var(--accent);
+}
+.pc-btn:hover{border-color:var(--mid);color:var(--bright);}
+.pc-btn.featured:hover{background:linear-gradient(135deg,rgba(0,212,255,0.3),rgba(0,153,204,0.2));}
+.pc-features{flex:1;display:flex;flex-direction:column;gap:8px;}
+.pc-feature{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--text);}
+.pc-feature::before{content:'✓';color:var(--green);font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px;}
+.pc-feature.no::before{content:'—';color:var(--muted);}
+.pc-feature.no{color:var(--muted);}
+.pc-separator{height:1px;background:var(--border);margin:14px 0;}
+
+/* ── MSSP ─────────────────────────────────────────── */
+#mssp{background:var(--bg2);position:relative;overflow:hidden;}
+.mssp-bg{
+  position:absolute;right:-200px;top:50%;transform:translateY(-50%);
+  width:600px;height:600px;
+  background:radial-gradient(circle,rgba(99,102,241,0.06) 0%,transparent 65%);
+}
+.mssp-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;}
+.mssp-console{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;
+}
+.mc-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;border-bottom:1px solid var(--border);
+  background:rgba(0,0,0,0.2);
+}
+.mc-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--bright);}
+.mc-tenants{display:flex;flex-direction:column;gap:0;}
+.mc-tenant{
+  display:flex;align-items:center;gap:14px;padding:12px 20px;
+  border-bottom:1px solid rgba(15,34,54,0.5);
+  transition:background .15s;
+}
+.mc-tenant:hover{background:rgba(0,212,255,0.03);}
+.mc-tenant-name{flex:1;font-size:13px;font-weight:600;color:var(--light);}
+.mc-tenant-posture{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;}
+.mc-bar{width:60px;height:4px;background:var(--muted);border-radius:2px;overflow:hidden;}
+.mc-fill{height:100%;border-radius:2px;}
+.mc-alert{
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  padding:2px 6px;border-radius:3px;
+}
+.mssp-benefits{display:flex;flex-direction:column;gap:24px;}
+.mssp-b{display:flex;gap:16px;align-items:flex-start;}
+.mssp-b-icon{
+  width:44px;height:44px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+}
+.mssp-b-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--bright);margin-bottom:4px;}
+.mssp-b-text{font-size:14px;color:var(--text);line-height:1.6;}
+.mssp-pricing{
+  margin-top:36px;padding:20px;background:var(--card);border:1px solid var(--border);border-radius:10px;
+}
+.mp-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;}
+.mp-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.mp-desc{font-size:13px;color:var(--text);}
+.mp-price{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:var(--indigo);}
+.mp-note{font-size:11px;color:var(--dim);margin-top:8px;}
+
+/* ── DEMO BOOKING ─────────────────────────────────── */
+#demo{background:var(--bg);position:relative;overflow:hidden;}
+.demo-glow{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:800px;height:400px;
+  background:radial-gradient(ellipse,rgba(0,212,255,0.05) 0%,transparent 65%);
+}
+.demo-inner{
+  position:relative;z-index:1;
+  max-width:780px;margin:0 auto;text-align:center;
+}
+.demo-title{font-size:clamp(40px,5vw,64px);margin-bottom:20px;}
+.demo-sub{font-size:17px;color:var(--text);max-width:520px;margin:0 auto 48px;}
+.demo-form{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:40px;
+}
+.df-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.df-group{display:flex;flex-direction:column;gap:6px;}
+.df-group.full{grid-column:1/-1;}
+.df-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.df-input, .df-select{
+  padding:12px 14px;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;color:var(--bright);font-size:14px;
+  font-family:'IBM Plex Sans',sans-serif;outline:none;
+  transition:border-color .2s;width:100%;
+}
+.df-input:focus, .df-select:focus{border-color:rgba(0,212,255,0.4);}
+.df-input::placeholder{color:var(--muted);}
+.df-select option{background:var(--surface);color:var(--bright);}
+.df-submit{
+  width:100%;padding:14px;border-radius:8px;margin-top:6px;
+  background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,153,204,0.1));
+  border:1px solid rgba(0,212,255,0.4);
+  color:var(--accent);font-size:15px;font-weight:700;
+  font-family:'IBM Plex Sans',sans-serif;cursor:pointer;
+  transition:all .3s;
+}
+.df-submit:hover{background:linear-gradient(135deg,rgba(0,212,255,0.3),rgba(0,153,204,0.2));box-shadow:0 0 30px rgba(0,212,255,0.2);}
+.df-guarantees{display:flex;justify-content:center;gap:24px;margin-top:20px;flex-wrap:wrap;}
+.df-g{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);display:flex;align-items:center;gap:6px;}
+.df-g::before{content:'✓';color:var(--green);font-weight:700;}
+
+/* ── FOOTER ───────────────────────────────────────── */
+footer{border-top:1px solid var(--border);padding:60px 0 40px;}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:60px;margin-bottom:48px;}
+.footer-brand{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;color:var(--bright);letter-spacing:2px;margin-bottom:12px;}
+.footer-tagline{font-size:14px;color:var(--text);line-height:1.6;max-width:240px;margin-bottom:20px;}
+.footer-certs{display:flex;gap:8px;flex-wrap:wrap;}
+.footer-col-title{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;}
+.footer-link{display:block;color:var(--text);text-decoration:none;font-size:13px;margin-bottom:10px;transition:color .2s;}
+.footer-link:hover{color:var(--light);}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:32px;border-top:1px solid var(--border);}
+.footer-copy{font-size:13px;color:var(--muted);}
+.footer-legal{display:flex;gap:20px;}
+.footer-legal a{font-size:12px;color:var(--muted);text-decoration:none;transition:color .2s;}
+.footer-legal a:hover{color:var(--text);}
+
+/* ── ANIMATIONS ───────────────────────────────────── */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes counter{from{opacity:0}to{opacity:1}}
+
+.fade-in{animation:fadeIn .6s ease both;}
+.fade-in-1{animation-delay:.1s;}
+.fade-in-2{animation-delay:.2s;}
+.fade-in-3{animation:fadeIn .6s ease .3s both;}
+.fade-in-4{animation:fadeIn .6s ease .4s both;}
+
+/* ── RESPONSIVE MINIMAL ───────────────────────────── */
+@media(max-width:960px){
+  nav{padding:0 24px;}
+  .nav-links{display:none;}
+  .container{padding:0 24px;}
+  .hero-content,.product-grid,.soc-grid,.comp-grid,.mssp-grid,.footer-grid{grid-template-columns:1fr;}
+  .price-grid{grid-template-columns:1fr 1fr;}
+  .feat-grid{grid-template-columns:1fr 1fr;}
+  .price-card.featured{transform:none;}
+  .df-grid{grid-template-columns:1fr;}
+  .hero-stats{gap:20px;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-mark">ZF</div>
+    <div>
+      <div class="nav-logo-text">ZONFORGE</div>
+      <div class="nav-logo-version">SENTINEL v4.6</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="#product">Platform</a>
+    <a href="#features">Features</a>
+    <a href="#ai-soc">AI SOC</a>
+    <a href="#compliance">Compliance</a>
+    <a href="#mssp">MSSP</a>
+    <a href="#pricing">Pricing</a>
+  </div>
+  <div class="nav-cta">
+    <a href="#" class="btn-ghost">Sign In</a>
+    <a href="#demo" class="btn-primary">Book Demo</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="container">
+    <div class="hero-content">
+      <div>
+        <div class="hero-label">Live Threat Intelligence Active</div>
+        <h1 class="hero-h1 fade-in">AI That Thinks<br>Like A <em>Tier-3<br>SOC Analyst</em></h1>
+        <p class="hero-p fade-in fade-in-1">ZonForge Sentinel autonomously investigates every P1 and P2 security alert — delivering verdicts, evidence chains, and response actions in under 60 seconds. Stop triaging. Start responding.</p>
+        <div class="hero-actions fade-in fade-in-2">
+          <a href="#demo" class="btn-hero">⬡ Book Live Demo</a>
+          <a href="#" class="btn-secondary">▷ Watch 3-min Overview</a>
+        </div>
+        <div class="hero-stats fade-in fade-in-3">
+          <div class="stat-item">
+            <div class="stat-val">60<span>s</span></div>
+            <div class="stat-lbl">AI Investigation Time</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val">80<span>%</span></div>
+            <div class="stat-lbl">False Positive Reduction</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val">24<span>×</span></div>
+            <div class="stat-lbl">Faster MTTD</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-val">20</div>
+            <div class="stat-lbl">MITRE ATT&CK Rules</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual fade-in fade-in-4">
+        <div class="hero-terminal">
+          <div class="terminal-bar">
+            <div class="tb-dot" style="background:#ef4444"></div>
+            <div class="tb-dot" style="background:#f59e0b"></div>
+            <div class="tb-dot" style="background:#22c55e"></div>
+            <span class="mono" style="font-size:11px;color:var(--dim);margin-left:8px">zonforge-sentinel — AI SOC Analyst</span>
+          </div>
+          <div class="terminal-body">
+            <div class="t-line" style="animation-delay:.1s"><span class="t-time">14:02:11</span><span class="t-tag crit">CRIT</span><span class="t-msg">ZF-PRIVESC-001 · <strong>svc-deploy</strong> assigned GlobalAdmin role</span></div>
+            <div class="t-line" style="animation-delay:.4s"><span class="t-time">14:02:12</span><span class="t-tag info">AI</span><span class="t-msg">Investigation started · 8 tools loading...</span></div>
+            <div class="t-line" style="animation-delay:.7s"><span class="t-time">14:02:14</span><span class="t-tag info">→</span><span class="t-msg">get_user_activity_history(svc-deploy, 168h)</span></div>
+            <div class="t-line" style="animation-delay:1.0s"><span class="t-time">14:02:16</span><span class="t-tag info">→</span><span class="t-msg">get_ip_reputation(10.0.1.45) · ASN clean</span></div>
+            <div class="t-line" style="animation-delay:1.3s"><span class="t-time">14:02:18</span><span class="t-tag info">→</span><span class="t-msg">check_peer_comparison · 12 similar svc accounts</span></div>
+            <div class="t-line" style="animation-delay:1.6s"><span class="t-time">14:02:21</span><span class="t-tag high">EVID</span><span class="t-msg">No change mgmt window · Unauthorized escalation</span></div>
+            <div class="t-line" style="animation-delay:2.0s"><span class="t-time">14:02:23</span><span class="t-tag ok">✓</span><span class="t-msg"><strong>TRUE POSITIVE · 94% confidence</strong> · Playbook triggered</span></div>
+          </div>
+        </div>
+        <div class="hero-ticker">
+          <div class="ticker-dot"></div>
+          <div class="ticker-text">
+            Pipeline active · <span>284,921 events processed today</span> · MTTD: <span>4.2s</span> · 38 AI investigations completed · 4 connectors healthy
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOCIAL PROOF -->
+<section id="proof" style="padding:40px 0;">
+  <div class="container">
+    <div class="proof-inner">
+      <div class="proof-label">Trusted by security teams at</div>
+      <div class="proof-logos">
+        <div class="proof-logo">FINEX CAPITAL</div>
+        <div class="proof-logo">TECHFLOW INC</div>
+        <div class="proof-logo">DATACORE LTD</div>
+        <div class="proof-logo">CLOUDSEC GMBH</div>
+        <div class="proof-logo">QUANTUM HEALTH</div>
+      </div>
+      <div class="proof-certs">
+        <div class="cert-badge">SOC2 Type II</div>
+        <div class="cert-badge">ISO 27001</div>
+        <div class="cert-badge">GDPR</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCT EXPLANATION -->
+<section id="product">
+  <div class="container">
+    <div class="section-tag">What is ZonForge Sentinel</div>
+    <h2 class="section-title">One Platform Replaces<br>Your Entire Security Stack</h2>
+    <p class="section-sub">Traditional SIEMs take months to deploy, cost millions, and still miss threats. ZonForge connects in minutes and deploys AI that investigates, prioritizes, and responds automatically.</p>
+
+    <div class="product-grid">
+      <div class="product-points">
+        <div class="product-point">
+          <div class="pp-icon" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);">🔌</div>
+          <div>
+            <div class="pp-title">Connects in 5 Minutes</div>
+            <div class="pp-text">OAuth integration with Microsoft 365, AWS CloudTrail, and Google Workspace. No agents, no professional services, no 6-month deployment timelines.</div>
+          </div>
+        </div>
+        <div class="product-point">
+          <div class="pp-icon" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);">🧠</div>
+          <div>
+            <div class="pp-title">AI Investigates Automatically</div>
+            <div class="pp-text">Every P1/P2 alert is autonomously investigated by Claude claude-sonnet-4-6. Verdict, evidence chain, and response actions delivered in under 60 seconds.</div>
+          </div>
+        </div>
+        <div class="product-point">
+          <div class="pp-icon" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);">⚡</div>
+          <div>
+            <div class="pp-title">Responds Without Waiting</div>
+            <div class="pp-text">11 automated response actions: disable compromised accounts in M365/Google, block IPs in Cloudflare/AWS WAF, create Jira tickets, alert PagerDuty — all without analyst intervention.</div>
+          </div>
+        </div>
+        <div class="product-point">
+          <div class="pp-icon" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);">📊</div>
+          <div>
+            <div class="pp-title">90% Less Analyst Time Per Alert</div>
+            <div class="pp-text">Behavioral AI baselines eliminate 80% of false positives before they reach your team. What remains is real threats with full investigation context already compiled.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="product-visual">
+        <div class="pv-title">ZonForge vs. Traditional SIEM</div>
+        <div class="pv-metric">
+          <div class="pv-label">
+            <span style="font-size:13px;color:var(--light)">Time to first detection</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--accent)">ZF: 4.2s &nbsp; SIEM: 45min</span>
+          </div>
+          <div class="pv-bar"><div class="pv-fill" style="width:5%;background:var(--accent)"></div></div>
+          <div style="height:4px;"></div>
+          <div class="pv-bar"><div class="pv-fill" style="width:100%;background:var(--muted)"></div></div>
+        </div>
+        <div class="pv-metric">
+          <div class="pv-label">
+            <span style="font-size:13px;color:var(--light)">False positive rate</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--green)">ZF: 8% &nbsp; SIEM: 65%</span>
+          </div>
+          <div class="pv-bar"><div class="pv-fill" style="width:8%;background:var(--green)"></div></div>
+          <div style="height:4px;"></div>
+          <div class="pv-bar"><div class="pv-fill" style="width:65%;background:var(--red);opacity:0.6"></div></div>
+        </div>
+        <div class="pv-metric">
+          <div class="pv-label">
+            <span style="font-size:13px;color:var(--light)">Deployment time</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber)">ZF: 5min &nbsp; SIEM: 6mo</span>
+          </div>
+          <div class="pv-bar"><div class="pv-fill" style="width:0.5%;background:var(--amber)"></div></div>
+          <div style="height:4px;"></div>
+          <div class="pv-bar"><div class="pv-fill" style="width:100%;background:var(--muted)"></div></div>
+        </div>
+        <div class="pv-compare">
+          <div class="pvc-item">
+            <div class="pvc-val" style="color:var(--accent)">$999</div>
+            <div class="pvc-lbl">ZonForge Business/mo</div>
+          </div>
+          <div class="pvc-item">
+            <div class="pvc-val" style="color:var(--muted)">$400K</div>
+            <div class="pvc-lbl">Avg. SIEM annual cost</div>
+          </div>
+          <div class="pvc-item">
+            <div class="pvc-val" style="color:var(--green)">5 min</div>
+            <div class="pvc-lbl">Setup time</div>
+          </div>
+          <div class="pvc-item">
+            <div class="pvc-val" style="color:var(--muted)">6 mo</div>
+            <div class="pvc-lbl">SIEM deployment</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-tag">Platform Architecture</div>
+    <h2 class="section-title">26 Microservices.<br>One Unified Detection Pipeline.</h2>
+    <p class="section-sub">A fully event-driven, cloud-native architecture built on BullMQ, ClickHouse, and Anthropic Claude — processing millions of security events in real time.</p>
+
+    <div class="arch-diagram">
+      <!-- Data Flow -->
+      <div class="arch-flow" style="margin:48px 0 36px;">
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">M365 / AWS / GWS</div></div>
+        <div class="af-line"></div>
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">Ingestion :3001</div></div>
+        <div class="af-line"></div>
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">Normalization OCSF :3002</div></div>
+        <div class="af-line"></div>
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">Detection 20 Rules :3003</div></div>
+        <div class="af-line"></div>
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">Correlation Engine :3006</div></div>
+        <div class="af-line"></div>
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">Risk Scoring :3007</div></div>
+        <div class="af-line"></div>
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">Alert + AI SOC :3008 / :3015</div></div>
+        <div class="af-line"></div>
+        <div class="af-step"><div class="af-dot active"></div><div class="af-label">Playbooks + Dashboard</div></div>
+      </div>
+
+      <!-- Service boxes -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px;">
+        <div style="grid-column:span 4;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;text-align:center;padding-bottom:10px;border-bottom:1px solid var(--border);margin-bottom:4px;">AI Intelligence Layer</div>
+
+        <div class="arch-box">
+          <div class="arch-box-icon">🧠</div>
+          <div class="arch-box-name">AI SOC Analyst</div>
+          <div class="arch-box-port">:3015 · 8 tools · Claude claude-sonnet-4-6</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-icon">👁</div>
+          <div class="arch-box-name">Behavioral AI</div>
+          <div class="arch-box-port">:3020 · z-score · 30-day profiles</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-icon">⚡</div>
+          <div class="arch-box-name">Alert Triage AI</div>
+          <div class="arch-box-port">:3021 · 6-factor urgency · P0–P4</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-icon">🔮</div>
+          <div class="arch-box-name">Predictive Threat</div>
+          <div class="arch-box-port">:3023 · 72h forecast · APT tracking</div>
+        </div>
+
+        <div style="grid-column:span 4;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;text-align:center;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:8px 0 4px;">Advanced Defense Layer</div>
+
+        <div class="arch-box">
+          <div class="arch-box-icon">🍯</div>
+          <div class="arch-box-name">Deception Grid</div>
+          <div class="arch-box-port">:3017 · 10 honeypots · zero FP</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-icon">🎯</div>
+          <div class="arch-box-name">Red Team Sim</div>
+          <div class="arch-box-port">:3014 · 5 scenarios · 6h auto</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-icon">🔗</div>
+          <div class="arch-box-name">Supply Chain</div>
+          <div class="arch-box-port">:3016 · OSV.dev · SBOM</div>
+        </div>
+        <div class="arch-box">
+          <div class="arch-box-icon">🌐</div>
+          <div class="arch-box-name">Digital Twin</div>
+          <div class="arch-box-port">:3019 · attack path sim</div>
+        </div>
+
+        <div style="grid-column:span 4;margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 20px;display:flex;justify-content:space-around;align-items:center;gap:20px;">
+          <div style="text-align:center;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">DATA STORES</div>
+            <div style="display:flex;gap:12px;">
+              <span style="font-size:12px;color:var(--light);">🐘 PostgreSQL 16</span>
+              <span style="font-size:12px;color:var(--light);">⚡ ClickHouse 24.3</span>
+              <span style="font-size:12px;color:var(--light);">🔴 Redis 7.2</span>
+              <span style="font-size:12px;color:var(--light);">🪣 AWS S3</span>
+            </div>
+          </div>
+          <div style="height:30px;width:1px;background:var(--border)"></div>
+          <div style="text-align:center;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">EVENT QUEUES</div>
+            <div style="display:flex;gap:12px;">
+              <span style="font-size:12px;color:var(--accent);">8 BullMQ queues</span>
+              <span style="font-size:12px;color:var(--light);">+ 4 Dead Letter Queues</span>
+            </div>
+          </div>
+          <div style="height:30px;width:1px;background:var(--border)"></div>
+          <div style="text-align:center;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;">EVENT SCHEMA</div>
+            <span style="font-size:12px;color:var(--light);">OCSF (Open Cybersecurity Schema Framework)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI SOC ANALYST -->
+<section id="ai-soc">
+  <div class="container">
+    <div class="section-tag">AI SOC Analyst</div>
+    <h2 class="section-title">Your Analyst Never Sleeps,<br>Never Gets Tired, Never Misses.</h2>
+    <p class="section-sub">Powered by Anthropic Claude claude-sonnet-4-6, our AI SOC Analyst uses 8 investigation tools to autonomously investigate every P1/P2 alert — producing verdicts with confidence scores, evidence chains, and recommendations.</p>
+
+    <div class="soc-grid">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;">8 Investigation Tools</div>
+        <div class="soc-tools">
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);">📋</div>
+            <div><div class="st-name">get_alert_details</div><div class="st-desc">Full alert with entities, MITRE techniques, and event timeline</div></div>
+          </div>
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);">👤</div>
+            <div><div class="st-name">get_user_activity_history</div><div class="st-desc">168-hour ClickHouse event stream for the affected user</div></div>
+          </div>
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);">🌐</div>
+            <div><div class="st-name">get_ip_reputation</div><div class="st-desc">IOC cache lookup — known malicious IPs, ASN, country, APT associations</div></div>
+          </div>
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);">🔗</div>
+            <div><div class="st-name">get_related_alerts</div><div class="st-desc">Correlated alerts for same entity in 7-day lookback window</div></div>
+          </div>
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);">📈</div>
+            <div><div class="st-name">get_user_risk_score</div><div class="st-desc">Current risk score and all contributing signals</div></div>
+          </div>
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);">⏱</div>
+            <div><div class="st-name">query_event_timeline</div><div class="st-desc">Raw chronological ClickHouse event stream across all data sources</div></div>
+          </div>
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);">👥</div>
+            <div><div class="st-name">check_peer_comparison</div><div class="st-desc">Statistical outlier analysis vs. same department/role cohort</div></div>
+          </div>
+          <div class="soc-tool">
+            <div class="st-icon" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);">🛡</div>
+            <div><div class="st-name">get_mitre_technique_context</div><div class="st-desc">Local ATT&CK knowledge base for technique context and TTPs</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="soc-verdict">
+        <div class="sv-header">
+          <div class="sv-dot"></div>
+          <div>
+            <div class="sv-title">Investigation Complete</div>
+            <div class="sv-model">claude-sonnet-4-6 · 5 tool calls · 8.2s</div>
+          </div>
+        </div>
+        <div class="sv-body">
+          <div class="sv-verdict">
+            <div class="sv-v-label">AI Verdict</div>
+            <div class="sv-v-text">TRUE POSITIVE</div>
+            <div class="sv-v-conf">94% confidence · Auto-response triggered</div>
+          </div>
+
+          <div class="sv-evidence">
+            <div class="sv-e-title">Evidence Chain</div>
+            <div class="sv-e-item">
+              <span class="sv-e-bullet">▸</span>
+              <span class="sv-e-text"><strong style="color:var(--bright)">15 failed logins</strong> from CN IP 203.0.113.42 within 8 minutes</span>
+            </div>
+            <div class="sv-e-item">
+              <span class="sv-e-bullet">▸</span>
+              <span class="sv-e-text">Successful login at <strong style="color:var(--bright)">02:14 UTC</strong> — 4 hours outside user's normal window</span>
+            </div>
+            <div class="sv-e-item">
+              <span class="sv-e-bullet">▸</span>
+              <span class="sv-e-text">Immediate access to <strong style="color:var(--bright)">1,247 files</strong> — 8.3× daily average (z-score: 5.1)</span>
+            </div>
+            <div class="sv-e-item">
+              <span class="sv-e-bullet">▸</span>
+              <span class="sv-e-text">Source IP matched in <strong style="color:var(--bright)">3 threat feeds</strong> — APT29 infrastructure (94% confidence)</span>
+            </div>
+            <div class="sv-e-item">
+              <span class="sv-e-bullet">▸</span>
+              <span class="sv-e-text"><strong style="color:var(--bright)">No peers</strong> in 847-user cohort show this pattern in last 30 days</span>
+            </div>
+          </div>
+
+          <div class="sv-actions">
+            <button class="sv-action block">🚫 Block IP</button>
+            <button class="sv-action resolve">✓ Disable User</button>
+            <button class="sv-action playbook">⚡ Full Playbook</button>
+          </div>
+          <div class="sv-timeline">
+            <span>Alert created: 14:02:11 UTC</span>
+            <span>Verdict: 14:02:19 UTC</span>
+            <span style="color:var(--accent);">MTTD: 8.2s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="section-tag">Threat Detection Features</div>
+    <h2 class="section-title">Every Attack Vector.<br>One Platform.</h2>
+
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="fc-icon" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);">🔬</div>
+        <h3 class="fc-title">Behavioral AI Baselines</h3>
+        <p class="fc-text">30-day rolling behavioral profiles per user. 8 real-time anomaly checks — login time, location, download volume, API calls, peer comparison — all running in under 5ms per event.</p>
+        <div class="fc-tags"><span class="fc-tag">z-score</span><span class="fc-tag">IQR fence</span><span class="fc-tag">peer comparison</span><span class="fc-tag">temporal</span></div>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);">⚡</div>
+        <h3 class="fc-title">20 MITRE ATT&CK Rules</h3>
+        <p class="fc-text">Detection rules covering credential access (T1110), lateral movement (T1021), privilege escalation (T1098), data exfiltration (T1530), OAuth abuse (T1550), and ransomware (T1486).</p>
+        <div class="fc-tags"><span class="fc-tag">sequence</span><span class="fc-tag">threshold</span><span class="fc-tag">correlation</span><span class="fc-tag">pattern</span></div>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);">🍯</div>
+        <h3 class="fc-title">Deception Technology</h3>
+        <p class="fc-text">10-honeypot grid: fake AWS keys, canary documents, ghost admin accounts, phantom S3 buckets. Zero false positives — any touch is a confirmed attacker. P1 alert guaranteed.</p>
+        <div class="fc-tags"><span class="fc-tag">0 false positives</span><span class="fc-tag">10 honeypot types</span><span class="fc-tag">canary tokens</span></div>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);">🎯</div>
+        <h3 class="fc-title">Red Team Simulation</h3>
+        <p class="fc-text">5 automated attack scenarios run every 6 hours against your detection stack. Credential attack, privilege escalation, data exfiltration, lateral movement, OAuth abuse. Detection gaps reported instantly.</p>
+        <div class="fc-tags"><span class="fc-tag">5 scenarios</span><span class="fc-tag">6h auto-schedule</span><span class="fc-tag">gap reporting</span></div>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);">🔗</div>
+        <h3 class="fc-title">Supply Chain Intelligence</h3>
+        <p class="fc-text">Scan npm, pypi, maven, cargo, and 4 more ecosystems for malicious packages, typosquatting, and CVEs via live OSV.dev API. Generates CycloneDX SBOM for every codebase scan.</p>
+        <div class="fc-tags"><span class="fc-tag">8 ecosystems</span><span class="fc-tag">OSV.dev live</span><span class="fc-tag">SBOM</span><span class="fc-tag">typosquatting</span></div>
+      </div>
+      <div class="feat-card">
+        <div class="fc-icon" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);">🌐</div>
+        <h3 class="fc-title">21 Threat Hunt Templates</h3>
+        <p class="fc-text">Pre-built ClickHouse hunt queries covering credential attacks, lateral movement, exfiltration, persistence, and discovery. Parameterized SQL with millisecond execution across billions of events.</p>
+        <div class="fc-tags"><span class="fc-tag">ClickHouse</span><span class="fc-tag">21 templates</span><span class="fc-tag">custom SQL</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE DEMO -->
+<section id="live-demo" style="padding:100px 0;background:linear-gradient(180deg,#030e18 0%,#020b12 100%);position:relative;overflow:hidden;">
+
+  <!-- Background glow -->
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:900px;height:600px;background:radial-gradient(ellipse,rgba(0,80,110,.1) 0%,transparent 65%);pointer-events:none;"></div>
+
+  <div class="container" style="position:relative;z-index:1;">
+
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:56px;">
+      <div class="section-tag" style="margin:0 auto 18px;">Live Interactive Demo</div>
+      <h2 class="section-title" style="font-size:clamp(40px,5vw,64px);">
+        Watch AI Investigate<br>a Real Attack. <em style="color:var(--accent);font-style:normal;">Right Now.</em>
+      </h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center;">
+        No login required. Click <strong style="color:var(--bright);">"Run AI Investigation"</strong> and watch
+        Claude analyze a live security alert — verdict in under 60 seconds.
+      </p>
+    </div>
+
+    <!-- Demo frame -->
+    <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(0,212,255,.18);box-shadow:0 40px 100px rgba(0,0,0,.7),0 0 0 1px rgba(0,212,255,.06);background:#08141f;">
+
+      <!-- Window chrome bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(0,0,0,.35);border-bottom:1px solid rgba(13,32,53,.9);">
+        <div style="display:flex;align-items:center;gap:7px;">
+          <div style="width:11px;height:11px;border-radius:50%;background:#ff5f57;"></div>
+          <div style="width:11px;height:11px;border-radius:50%;background:#ffbd2e;"></div>
+          <div style="width:11px;height:11px;border-radius:50%;background:#28c840;"></div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#2d5f80;margin-left:10px;">ZonForge Sentinel — Interactive Demo</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:#1deb8a;animation:pulse 2s infinite;"></div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#1deb8a;letter-spacing:1px;">LIVE · REAL AI · NO LOGIN NEEDED</span>
+        </div>
+      </div>
+
+      <!-- The actual demo iframe -->
+      <iframe
+        src="demo.html"
+        style="width:100%;height:720px;border:none;display:block;"
+        title="ZonForge Sentinel Live Demo"
+        loading="lazy"
+        allow="clipboard-write"
+      ></iframe>
+
+    </div>
+
+    <!-- CTA row below demo -->
+    <div style="text-align:center;margin-top:40px;">
+      <p style="font-size:15px;color:#4a7a9b;margin-bottom:22px;">
+        This is the real platform — powered by Anthropic Claude.
+        The full version connects to your Microsoft 365, AWS, and Google Workspace.
+      </p>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+        <a href="#demo" class="btn-hero">⬡ Book a 30-Min Live Demo</a>
+        <a href="#pricing" class="btn-secondary">See Pricing →</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- COMPLIANCE -->
+<section id="compliance">
+  <div class="container">
+    <div class="section-tag">Compliance Automation</div>
+    <h2 class="section-title">Audit-Ready Evidence.<br>Automatically.</h2>
+
+    <div class="comp-grid">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;">6 Frameworks · 17 Automated Controls</div>
+        <div class="frameworks">
+          <div class="fw-card">
+            <div class="fw-name">SOC2</div>
+            <div class="fw-full">Type II Trust Service Criteria</div>
+            <div class="fw-controls">5 controls automated</div>
+          </div>
+          <div class="fw-card">
+            <div class="fw-name">ISO 27001</div>
+            <div class="fw-full">IEC 27001:2022</div>
+            <div class="fw-controls">4 controls automated</div>
+          </div>
+          <div class="fw-card">
+            <div class="fw-name">GDPR</div>
+            <div class="fw-full">EU Data Protection</div>
+            <div class="fw-controls">Art.32 + Art.33</div>
+          </div>
+          <div class="fw-card">
+            <div class="fw-name">HIPAA</div>
+            <div class="fw-full">Health Data Security</div>
+            <div class="fw-controls">§164.312(a,b)</div>
+          </div>
+          <div class="fw-card">
+            <div class="fw-name">PCI-DSS</div>
+            <div class="fw-full">Payment Card v4.0</div>
+            <div class="fw-controls">Req.10 + Req.11</div>
+          </div>
+          <div class="fw-card">
+            <div class="fw-name">NIST CSF</div>
+            <div class="fw-full">Cybersecurity Framework 2.0</div>
+            <div class="fw-controls">DE.AE + RS.RP</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="comp-benefits">
+        <div class="cb-item">
+          <div class="cb-check">✓</div>
+          <div>
+            <div class="cb-title">AI Compliance Advisor</div>
+            <div class="cb-text">Ask auditor-level questions in plain language. Claude analyzes your real-time compliance posture and answers with specific control IDs, evidence citations, and gap recommendations.</div>
+          </div>
+        </div>
+        <div class="cb-item">
+          <div class="cb-check">✓</div>
+          <div>
+            <div class="cb-title">Auto-Generated Evidence Packages</div>
+            <div class="cb-text">SOC2 evidence pack assembled automatically from your audit log, alert history, and detection data. Saves 3 weeks of manual audit preparation.</div>
+          </div>
+        </div>
+        <div class="cb-item">
+          <div class="cb-check">✓</div>
+          <div>
+            <div class="cb-title">Continuous Control Monitoring</div>
+            <div class="cb-text">17 controls checked against your live platform data in real time. Drift detected immediately — not discovered during your next annual audit.</div>
+          </div>
+        </div>
+        <div class="cb-item">
+          <div class="cb-check">✓</div>
+          <div>
+            <div class="cb-title">Executive Board Reports</div>
+            <div class="cb-text">Quarterly board-level security presentations generated by AI — posture trend, incidents prevented, compliance status, industry benchmarking. Ready for the boardroom.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MSSP -->
+<section id="mssp">
+  <div class="mssp-bg"></div>
+  <div class="container">
+    <div class="section-tag" style="border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.06);color:var(--indigo);">MSSP Program</div>
+    <div class="mssp-grid">
+      <div class="mssp-console">
+        <div class="mc-header">
+          <div class="mc-title">MSSP Console — 5 Managed Clients</div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--indigo);">MSSP_OPERATOR</span>
+        </div>
+        <div class="mc-tenants">
+          <div style="display:grid;grid-template-columns:1fr 60px 60px 60px;gap:8px;padding:8px 20px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid var(--border);">
+            <span>Client</span><span>Posture</span><span>Alerts</span><span>MTTD</span>
+          </div>
+          <div class="mc-tenant">
+            <div class="mc-tenant-name">Finex Capital</div>
+            <div style="display:grid;grid-template-columns:60px 60px 60px;gap:8px;align-items:center;">
+              <div class="mc-tenant-posture" style="color:var(--green)">77</div>
+              <div class="mc-alert" style="background:rgba(245,158,11,0.1);color:var(--amber);">34</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--green);">3.8s</div>
+            </div>
+          </div>
+          <div class="mc-tenant">
+            <div class="mc-tenant-name">TechFlow Inc</div>
+            <div style="display:grid;grid-template-columns:60px 60px 60px;gap:8px;align-items:center;">
+              <div class="mc-tenant-posture" style="color:var(--green)">81</div>
+              <div class="mc-alert" style="background:rgba(34,197,94,0.1);color:var(--green);">3</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--green);">4.1s</div>
+            </div>
+          </div>
+          <div class="mc-tenant">
+            <div class="mc-tenant-name">DataCore Ltd</div>
+            <div style="display:grid;grid-template-columns:60px 60px 60px;gap:8px;align-items:center;">
+              <div class="mc-tenant-posture" style="color:var(--amber)">62</div>
+              <div class="mc-alert" style="background:rgba(245,158,11,0.1);color:var(--amber);">8</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber);">5.2s</div>
+            </div>
+          </div>
+          <div class="mc-tenant">
+            <div class="mc-tenant-name">CloudSec GmbH</div>
+            <div style="display:grid;grid-template-columns:60px 60px 60px;gap:8px;align-items:center;">
+              <div class="mc-tenant-posture" style="color:var(--amber)">69</div>
+              <div class="mc-alert" style="background:rgba(239,68,68,0.1);color:var(--red);">21</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);">4.5s</div>
+            </div>
+          </div>
+          <div class="mc-tenant">
+            <div class="mc-tenant-name">Quantum Health</div>
+            <div style="display:grid;grid-template-columns:60px 60px 60px;gap:8px;align-items:center;">
+              <div class="mc-tenant-posture" style="color:var(--red)">55</div>
+              <div class="mc-alert" style="background:rgba(34,197,94,0.1);color:var(--green);">1</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--green);">6.0s</div>
+            </div>
+          </div>
+          <div style="padding:12px 20px;background:rgba(99,102,241,0.05);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);">5 tenants · 2,100 identities · All healthy</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--indigo);">Monthly MRR: $750</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="section-title" style="font-size:44px;">Built for MSPs.<br>Priced to <span style="color:var(--indigo)">Scale.</span></h2>
+        <p class="section-sub" style="margin-bottom:36px;">Manage unlimited client tenants from a single console. Cross-tenant threat correlation, centralized policy deployment, and white-label reporting — all included.</p>
+        <div class="mssp-benefits">
+          <div class="mssp-b">
+            <div class="mssp-b-icon" style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);">🏢</div>
+            <div>
+              <div class="mssp-b-title">Cross-Tenant Intelligence</div>
+              <div class="mssp-b-text">Threats detected in one client tenant automatically enriches detection rules across your entire portfolio.</div>
+            </div>
+          </div>
+          <div class="mssp-b">
+            <div class="mssp-b-icon" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);">⚡</div>
+            <div>
+              <div class="mssp-b-title">Bulk Playbook Deployment</div>
+              <div class="mssp-b-text">Push detection rules, playbooks, and compliance configurations to all managed clients in one click.</div>
+            </div>
+          </div>
+          <div class="mssp-b">
+            <div class="mssp-b-icon" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);">📊</div>
+            <div>
+              <div class="mssp-b-title">White-Label Reporting</div>
+              <div class="mssp-b-text">AI-generated executive security reports delivered under your brand. CISO-ready PDFs for every client, every quarter.</div>
+            </div>
+          </div>
+        </div>
+        <div class="mssp-pricing">
+          <div class="mp-label">MSSP Wholesale Pricing</div>
+          <div class="mp-row">
+            <span class="mp-desc">Per managed client tenant/month</span>
+            <span class="mp-price">$150</span>
+          </div>
+          <div class="mp-row">
+            <span class="mp-desc">Your client charge (suggested)</span>
+            <span style="font-family:'Barlow Condensed',monospace;font-size:18px;font-weight:700;color:var(--green);">$500–2,000</span>
+          </div>
+          <div class="mp-note">100 MSP partners × 20 clients = $300,000 MRR platform-wide. Contact us for volume pricing.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container">
+    <div class="section-tag">Pricing</div>
+    <h2 class="section-title">Simple. Transparent. No Surprises.</h2>
+    <p class="section-sub">Start free. Scale as you grow. Replace your $400K SIEM for under $1,000/month.</p>
+
+    <div class="price-toggle">
+      <span class="pt-label">Monthly</span>
+      <div class="pt-switch" id="billing-toggle" onclick="toggleBilling()">
+        <div class="pt-thumb"></div>
+      </div>
+      <span class="pt-label">Annual</span>
+      <span class="pt-badge" id="savings-badge">Save 20%</span>
+    </div>
+
+    <div class="price-grid">
+      <div class="price-card">
+        <div class="pc-plan">Starter</div>
+        <div class="pc-price">$0<span class="pc-price-mo"> forever</span></div>
+        <p class="pc-desc">Solo analysts and small teams exploring AI-powered detection.</p>
+        <button class="pc-btn" onclick="window.location='#demo'">Start Free</button>
+        <div class="pc-features">
+          <div class="pc-feature">1 Connector (M365 or AWS)</div>
+          <div class="pc-feature">50 identities monitored</div>
+          <div class="pc-feature">500 events/minute</div>
+          <div class="pc-feature">30-day retention</div>
+          <div class="pc-feature">20 MITRE detection rules</div>
+          <div class="pc-feature">Community support</div>
+          <div class="pc-separator"></div>
+          <div class="pc-feature no">AI SOC Analyst</div>
+          <div class="pc-feature no">Behavioral AI</div>
+          <div class="pc-feature no">Threat Hunting</div>
+        </div>
+      </div>
+
+      <div class="price-card">
+        <div class="pc-plan">Growth</div>
+        <div class="pc-price" id="growth-price">$299<span class="pc-price-mo">/mo</span></div>
+        <p class="pc-desc">Growing security teams that need real AI-powered coverage.</p>
+        <button class="pc-btn" onclick="window.location='#demo'">Start 30-Day Trial</button>
+        <div class="pc-features">
+          <div class="pc-feature">3 Connectors</div>
+          <div class="pc-feature">200 identities</div>
+          <div class="pc-feature">2,000 events/minute</div>
+          <div class="pc-feature">90-day retention</div>
+          <div class="pc-feature">Alert Triage AI</div>
+          <div class="pc-feature">Behavioral AI baselines</div>
+          <div class="pc-feature">21 Threat Hunt templates</div>
+          <div class="pc-feature">Security Benchmarking</div>
+          <div class="pc-feature">Email support (2 days)</div>
+          <div class="pc-separator"></div>
+          <div class="pc-feature no">AI SOC Analyst</div>
+          <div class="pc-feature no">Red Team Simulation</div>
+        </div>
+      </div>
+
+      <div class="price-card featured">
+        <div class="pc-tag">MOST POPULAR</div>
+        <div class="pc-plan">Business</div>
+        <div class="pc-price" id="business-price">$999<span class="pc-price-mo">/mo</span></div>
+        <p class="pc-desc">Full AI SOC suite for serious security operations teams.</p>
+        <button class="pc-btn featured" onclick="window.location='#demo'">Start 30-Day Trial</button>
+        <div class="pc-features">
+          <div class="pc-feature">10 Connectors</div>
+          <div class="pc-feature">1,000 identities</div>
+          <div class="pc-feature">10,000 events/minute</div>
+          <div class="pc-feature">180-day retention</div>
+          <div class="pc-feature"><strong style="color:var(--bright)">AI SOC Analyst</strong> (claude-sonnet-4-6)</div>
+          <div class="pc-feature">Security Assistant AI Chat</div>
+          <div class="pc-feature">Predictive Threat Intel</div>
+          <div class="pc-feature">Supply Chain Scanning</div>
+          <div class="pc-feature">Deception Honeygrid</div>
+          <div class="pc-feature">Red Team Simulation</div>
+          <div class="pc-feature">Regulatory AI (6 frameworks)</div>
+          <div class="pc-feature">Priority support (4h)</div>
+        </div>
+      </div>
+
+      <div class="price-card">
+        <div class="pc-plan">Enterprise</div>
+        <div class="pc-price">Custom</div>
+        <p class="pc-desc">Large organizations with strict compliance and scale requirements.</p>
+        <button class="pc-btn" onclick="window.location='#demo'">Talk to Sales</button>
+        <div class="pc-features">
+          <div class="pc-feature">Unlimited everything</div>
+          <div class="pc-feature">365-day retention</div>
+          <div class="pc-feature">SSO/SAML 2.0 + SCIM</div>
+          <div class="pc-feature">EU/US/APAC data residency</div>
+          <div class="pc-feature">AI Board Reports</div>
+          <div class="pc-feature">Custom detection rules</div>
+          <div class="pc-feature">Digital Twin simulation</div>
+          <div class="pc-feature">Dedicated CSM</div>
+          <div class="pc-feature">White-glove onboarding</div>
+          <div class="pc-feature">24/7 emergency line</div>
+          <div class="pc-feature">SLA 99.9% (contractual)</div>
+          <div class="pc-feature">PO/Net-30 billing</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEMO BOOKING -->
+<section id="demo">
+  <div class="demo-glow"></div>
+  <div class="container">
+    <div class="demo-inner">
+      <div class="section-tag" style="margin:0 auto 20px;">Book a Live Demo</div>
+      <h2 class="demo-title">See a Real Threat<br>Investigated Live</h2>
+      <p class="demo-sub">We'll connect ZonForge to a demo M365 tenant, trigger a credential attack, and show you the full AI investigation — from raw event to verdict — in real time. 30 minutes. No slides.</p>
+
+      <div class="demo-form">
+        <div class="df-grid">
+          <div class="df-group">
+            <label class="df-label">First Name</label>
+            <input class="df-input" type="text" placeholder="Jane">
+          </div>
+          <div class="df-group">
+            <label class="df-label">Last Name</label>
+            <input class="df-input" type="text" placeholder="Smith">
+          </div>
+          <div class="df-group">
+            <label class="df-label">Work Email</label>
+            <input class="df-input" type="email" placeholder="jane@company.com">
+          </div>
+          <div class="df-group">
+            <label class="df-label">Company</label>
+            <input class="df-input" type="text" placeholder="Acme Corp">
+          </div>
+          <div class="df-group">
+            <label class="df-label">Company Size</label>
+            <select class="df-select">
+              <option value="">Select size</option>
+              <option>1–50 employees</option>
+              <option>51–200 employees</option>
+              <option>201–1,000 employees</option>
+              <option>1,000–5,000 employees</option>
+              <option>5,000+ employees</option>
+            </select>
+          </div>
+          <div class="df-group">
+            <label class="df-label">Your Role</label>
+            <select class="df-select">
+              <option value="">Select role</option>
+              <option>CISO / Head of Security</option>
+              <option>Security Engineer</option>
+              <option>SOC Analyst</option>
+              <option>IT Director</option>
+              <option>MSSP / Partner</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="df-group full">
+            <label class="df-label">What are you trying to solve?</label>
+            <input class="df-input" type="text" placeholder="Too many false positives, slow investigation, compliance gaps...">
+          </div>
+        </div>
+        <button class="df-submit" onclick="handleSubmit()">Reserve My 30-Min Demo →</button>
+        <div class="df-guarantees">
+          <div class="df-g">No credit card required</div>
+          <div class="df-g">Live — no slides or recordings</div>
+          <div class="df-g">30 minutes, we do all the work</div>
+          <div class="df-g">Response within 2 hours</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">ZONFORGE SENTINEL</div>
+        <div class="footer-tagline">AI-native cybersecurity platform. Detect threats before they become breaches.</div>
+        <div class="footer-certs">
+          <div class="cert-badge">SOC2 Type II</div>
+          <div class="cert-badge">ISO 27001</div>
+          <div class="cert-badge">GDPR</div>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-title">Product</div>
+        <a href="#" class="footer-link">AI SOC Analyst</a>
+        <a href="#" class="footer-link">Behavioral AI</a>
+        <a href="#" class="footer-link">Threat Hunting</a>
+        <a href="#" class="footer-link">Red Team Sim</a>
+        <a href="#" class="footer-link">Compliance</a>
+        <a href="#" class="footer-link">Pricing</a>
+      </div>
+      <div>
+        <div class="footer-col-title">Company</div>
+        <a href="#" class="footer-link">About</a>
+        <a href="#" class="footer-link">Blog</a>
+        <a href="#" class="footer-link">Careers</a>
+        <a href="#" class="footer-link">Security</a>
+        <a href="#" class="footer-link">Contact</a>
+      </div>
+      <div>
+        <div class="footer-col-title">Resources</div>
+        <a href="#" class="footer-link">Documentation</a>
+        <a href="#" class="footer-link">API Reference</a>
+        <a href="#" class="footer-link">Status Page</a>
+        <a href="#" class="footer-link">MSSP Program</a>
+        <a href="#" class="footer-link">support@zonforge.com</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2026 ZonForge Inc. All rights reserved. Built with ♥ for security teams.</div>
+      <div class="footer-legal">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+        <a href="#">Cookie Policy</a>
+        <a href="#">DPA</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ── Billing toggle ──────────────────────────────────────────────
+let isAnnual = false;
+function toggleBilling() {
+  isAnnual = !isAnnual;
+  const sw = document.getElementById('billing-toggle');
+  sw.classList.toggle('on', isAnnual);
+  document.getElementById('growth-price').innerHTML = isAnnual
+    ? '$239<span class="pc-price-mo">/mo</span>'
+    : '$299<span class="pc-price-mo">/mo</span>';
+  document.getElementById('business-price').innerHTML = isAnnual
+    ? '$799<span class="pc-price-mo">/mo</span>'
+    : '$999<span class="pc-price-mo">/mo</span>';
+  document.getElementById('savings-badge').textContent = isAnnual ? '✓ 20% Applied' : 'Save 20%';
+}
+
+// ── Demo form submit ─────────────────────────────────────────────
+function handleSubmit() {
+  const btn = document.querySelector('.df-submit');
+  btn.textContent = '✓ Demo Request Received — We\'ll contact you within 2 hours';
+  btn.style.background = 'linear-gradient(135deg,rgba(34,197,94,0.2),rgba(34,197,94,0.1))';
+  btn.style.borderColor = 'rgba(34,197,94,0.4)';
+  btn.style.color = '#22c55e';
+  btn.disabled = true;
+}
+
+// ── Scroll-based nav highlight ───────────────────────────────────
+window.addEventListener('scroll', () => {
+  const nav = document.querySelector('nav');
+  nav.style.background = window.scrollY > 40
+    ? 'rgba(2,11,18,0.98)'
+    : 'rgba(2,11,18,0.92)';
+});
+
+// ── Animated stat counters ───────────────────────────────────────
+const observerOpts = { threshold: 0.1 };
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.animation = 'fadeIn .6s ease both';
+    }
+  });
+}, observerOpts);
+document.querySelectorAll('.feat-card, .price-card, .arch-box').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — Istio mTLS Mesh-Wide Policy
+#
+# Enforces STRICT mTLS for all service-to-service communication
+# within the zonforge namespace. No plaintext traffic permitted.
+# External traffic enters via ingress gateway (TLS-terminated).
+# ─────────────────────────────────────────────────────────────────
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: zonforge-mtls-strict
+  namespace: zonforge
+spec:
+  # Apply to entire namespace
+  mtls:
+    mode: STRICT
+
+---
+
+# ── Per-service overrides (where needed) ─────────────────────────
+# Normalization worker receives from BullMQ/Redis — not via mesh
+# so we allow PERMISSIVE for that specific port only.
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: normalization-worker-redis-port
+  namespace: zonforge
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: normalization-worker
+  portLevelMtls:
+    "6379":
+      mode: DISABLE   # Redis connection — not Istio-proxied
+    "3002":
+      mode: STRICT    # HTTP metrics endpoint — full mTLS
+
+---
+
+# ── AuthorizationPolicy — deny all by default ─────────────────────
+# Only explicitly allowed traffic is permitted between services.
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all-default
+  namespace: zonforge
+spec:
+  {} # Empty spec = deny everything
+
+---
+
+# ── Allow: API Gateway → all backend services ─────────────────────
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-api-gateway-to-services
+  namespace: zonforge
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/zonforge/sa/api-gateway"
+      to:
+        - operation:
+            methods: ["GET", "POST", "PATCH", "DELETE", "PUT"]
+
+---
+
+# ── Allow: Ingestion → BullMQ queues (normalization) ──────────────
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-ingestion-to-normalization
+  namespace: zonforge
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: normalization-worker
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/zonforge/sa/ingestion-service"
+              - "cluster.local/ns/zonforge/sa/api-gateway"
+
+---
+
+# ── Allow: Detection → Anomaly service ────────────────────────────
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-detection-to-anomaly
+  namespace: zonforge
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anomaly-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/zonforge/sa/detection-engine"
+              - "cluster.local/ns/zonforge/sa/normalization-worker"
+              - "cluster.local/ns/zonforge/sa/api-gateway"
+
+---
+
+# ── Allow: All services → Prometheus scraping ─────────────────────
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: zonforge
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["monitoring", "istio-system"]
+      to:
+        - operation:
+            paths: ["/metrics"]
+            methods: ["GET"]
+
+---
+
+# ── Allow: Internal service-to-service calls ──────────────────────
+# Alert, Correlation, Risk scoring can call each other
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-internal-services
+  namespace: zonforge
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/zonforge/sa/alert-service"
+              - "cluster.local/ns/zonforge/sa/correlation-engine"
+              - "cluster.local/ns/zonforge/sa/risk-scoring-engine"
+              - "cluster.local/ns/zonforge/sa/threat-intel-service"
+              - "cluster.local/ns/zonforge/sa/billing-service"
+      to:
+        - operation:
+            paths: ["/internal/*", "/v1/*", "/health"]

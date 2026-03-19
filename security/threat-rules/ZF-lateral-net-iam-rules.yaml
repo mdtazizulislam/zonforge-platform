@@ -1,0 +1,322 @@
+# ZF-LATERAL-001: Lateral Movement via Authentication Spread
+id: ZF-LATERAL-001
+name: Lateral Movement — Authentication Spread Across Assets
+description: >
+  A single source identity or IP authenticates to multiple distinct
+  internal assets within a short time window. This pattern is
+  consistent with lateral movement reconnaissance or automated
+  credential spraying across internal resources.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0008
+      name: Lateral Movement
+  techniques:
+    - id: T1021
+      name: Remote Services
+      sub_techniques:
+        - id: T1021.001
+          name: Remote Desktop Protocol
+        - id: T1021.004
+          name: SSH
+  coverage_level: partial
+
+source_types: [aws_cloudtrail, generic_syslog, generic_webhook]
+event_categories: [authentication, network]
+
+detection:
+  type: threshold
+  window_minutes: 30
+  group_by: [actor_user_id, actor_ip]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [login_success, AssumeRole, ssh_login, rdp_login,
+              GetObjectAcl, ListBuckets]
+    - field: target_asset_id
+      operator: is_distinct
+
+  aggregate:
+    distinct_target_count_min: 5
+    window_minutes: 30
+
+alert:
+  title: "Lateral Movement — {{actor_ip}} accessed {{distinct_target_count}} assets"
+  description: >
+    {{actor_user_id}} ({{actor_ip}}) authenticated to
+    {{distinct_target_count}} distinct assets within 30 minutes.
+    This pattern is consistent with lateral movement.
+  priority: P2
+  recommended_actions:
+    - "Investigate each asset accessed — check for privilege escalation or data access"
+    - "Determine if this is legitimate automation or an adversary"
+    - "Block the source IP if lateral movement is confirmed"
+    - "Check for credential dumping on the source system"
+
+confidence_score: 0.75
+false_positive_notes: "System management tools, deployment automation, and monitoring agents access multiple systems routinely."
+
+---
+
+# ZF-NET-001: DNS Beaconing Pattern
+id: ZF-NET-001
+name: DNS Beaconing — Regular-Interval DNS Queries
+description: >
+  High-frequency DNS queries to the same domain at suspiciously
+  regular intervals from a single host. This pattern is characteristic
+  of malware Command & Control (C2) communication using DNS
+  as a covert channel.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0011
+      name: Command and Control
+  techniques:
+    - id: T1071
+      name: Application Layer Protocol
+      sub_techniques:
+        - id: T1071.004
+          name: DNS
+    - id: T1568
+      name: Dynamic Resolution
+  coverage_level: full
+
+source_types: [generic_webhook, generic_syslog]
+event_categories: [network]
+
+detection:
+  type: pattern
+  window_minutes: 60
+  group_by: [actor_ip, target_resource]
+
+  conditions:
+    - field: event_category
+      operator: eq
+      value: network
+    - field: event_action
+      operator: in
+      value: [dns_query, dns_lookup]
+    - field: target_resource
+      operator: is_same_domain
+
+  pattern_check:
+    type: regularity
+    min_events: 10
+    max_interval_std_dev_seconds: 30   # very regular = low std dev
+    max_interval_mean_seconds: 300     # every 5 minutes or faster
+
+alert:
+  title: "DNS Beaconing Detected — {{actor_ip}} → {{target_domain}}"
+  description: >
+    Host {{actor_ip}} sent {{event_count}} DNS queries to
+    {{target_domain}} at regular ~{{interval_mean_seconds}}s
+    intervals over 60 minutes. Possible C2 communication.
+  priority: P2
+  recommended_actions:
+    - "Isolate the source host for forensic investigation"
+    - "Block the target domain at the DNS level"
+    - "Check threat intelligence for {{target_domain}}"
+    - "Run endpoint scan on {{actor_ip}} for malware"
+
+confidence_score: 0.72
+false_positive_notes: "Legitimate polling applications (monitoring agents, NTP, update checkers) can exhibit regular DNS patterns."
+
+---
+
+# ZF-IAM-002: New Admin Account Created
+id: ZF-IAM-002
+name: New Administrative Account Created
+description: >
+  A new user account with administrative privileges is created.
+  Attackers who gain initial access often create backdoor admin
+  accounts for persistence. Every new admin account creation
+  should be reviewed.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0003
+      name: Persistence
+  techniques:
+    - id: T1136
+      name: Create Account
+      sub_techniques:
+        - id: T1136.003
+          name: Cloud Account
+  coverage_level: full
+
+source_types: [m365_entra, google_workspace, aws_cloudtrail]
+event_categories: [account_management]
+
+detection:
+  type: threshold
+  window_minutes: 30
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [user_created, CREATE_USER, CreateUser, admin_created_new_admin]
+    - field: outcome
+      operator: eq
+      value: success
+
+  and_conditions:
+    - field: event_action
+      operator: in
+      value: [GRANT_ADMIN_PRIVILEGE, AttachRolePolicy, privilege_escalation,
+              Add_member_to_role]
+      within_minutes: 10
+      for_same_target: true
+  count_min: 1
+
+alert:
+  title: "New Admin Account Created — by {{actor_user_id}}"
+  description: >
+    {{actor_user_id}} created a new account {{target_entity}}
+    with administrative privileges at {{event_time}}.
+  priority: P2
+  recommended_actions:
+    - "Verify this account creation was authorized via your provisioning process"
+    - "Confirm the new account owner and their business need for admin access"
+    - "If unauthorized, disable the account and investigate how it was created"
+
+confidence_score: 0.82
+false_positive_notes: "Authorized IT provisioning. Cross-reference with HR onboarding and IT service desk tickets."
+
+---
+
+# ZF-EMAIL-001: Email Auto-Forward Rule to External Domain
+id: ZF-EMAIL-001
+name: Email Auto-Forwarding Rule Created to External Domain
+description: >
+  A user creates an email auto-forwarding rule that sends mail
+  to an external domain. This is a classic technique used by
+  insider threats and attackers who have compromised an email
+  account to exfiltrate information silently.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0009
+      name: Collection
+    - id: TA0010
+      name: Exfiltration
+  techniques:
+    - id: T1114
+      name: Email Collection
+      sub_techniques:
+        - id: T1114.003
+          name: Email Forwarding Rule
+  coverage_level: full
+
+source_types: [m365_entra, google_workspace]
+event_categories: [account_management]
+
+detection:
+  type: threshold
+  window_minutes: 30
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [email_forward_rule_created, CREATE_FORWARDING_RULE,
+              New-InboxRule, Set-InboxRule, UpdateInboxRules]
+    - field: outcome
+      operator: eq
+      value: success
+    - field: metadata.forwardToExternal
+      operator: eq
+      value: true
+  count_min: 1
+
+alert:
+  title: "External Email Forward Rule — {{actor_user_id}}"
+  description: >
+    {{actor_user_id}} created an email forwarding rule to
+    external domain {{forward_target_domain}} at {{event_time}}.
+  priority: P2
+  recommended_actions:
+    - "Verify if the user authorized this forwarding rule"
+    - "If unauthorized, delete the rule immediately"
+    - "Review what emails may have been forwarded"
+    - "Check if the target email address belongs to the user"
+
+confidence_score: 0.85
+false_positive_notes: "Authorized email forwarding for role coverage during vacation/leave."
+
+---
+
+# ZF-AUTH-007: Known Leaked Credential Login
+id: ZF-AUTH-007
+name: Login with Known Leaked Credential
+description: >
+  Microsoft Entra ID or Google Workspace reports a login attempt
+  using credentials that have been found in known data breach
+  dumps. This is a direct signal from the identity provider's
+  threat intelligence that these credentials are exposed.
+severity: critical
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0006
+      name: Credential Access
+  techniques:
+    - id: T1110
+      name: Brute Force
+      sub_techniques:
+        - id: T1110.004
+          name: Credential Stuffing
+  coverage_level: full
+
+source_types: [m365_entra, google_workspace]
+event_categories: [authentication]
+
+detection:
+  type: threshold
+  window_minutes: 5
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [login_success, login_failed, leaked_credential_login,
+              suspicious_login, LEAKED_PASSWORD_LOGIN,
+              account_disabled_hijacked]
+    - field: metadata.riskLevel
+      operator: in
+      value: [high, atRisk]
+  count_min: 1
+
+  or_conditions:
+    - field: event_action
+      operator: in
+      value: [leaked_credential_login, LEAKED_PASSWORD_LOGIN]
+    - field: metadata.riskEventType
+      operator: in
+      value: [leakedCredentials, passwordSpray]
+
+alert:
+  title: "CRITICAL: Leaked Credential Detected — {{actor_user_id}}"
+  description: >
+    {{actor_user_id}}'s credentials appear in known data breach
+    dumps. Login risk level: {{risk_level}}.
+  priority: P1
+  recommended_actions:
+    - "IMMEDIATE: Force password reset for {{actor_user_id}}"
+    - "Revoke all active sessions for this user"
+    - "Enable additional verification requirements until password is reset"
+    - "Check for any unauthorized activity in the account"
+    - "Educate user on credential hygiene and password manager usage"
+
+confidence_score: 0.96
+false_positive_notes: "Very low — this signal comes directly from Microsoft/Google's threat intelligence. Treat as confirmed until proven otherwise."
