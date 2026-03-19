@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security concern
+    url: https://github.com/mdtazizulislam/zonforge-platform/issues/new
+    about: Open an issue with minimal sensitive detail and mark it as security-related.
