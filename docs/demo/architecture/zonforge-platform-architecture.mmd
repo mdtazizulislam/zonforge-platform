@@ -1,0 +1,67 @@
+flowchart LR
+    C[Collectors and Connectors\nM365 / AWS CloudTrail / Google Workspace] --> ING[ingestion-service\n:3001]
+    ING --> NORM[normalization-worker\n:3002]
+    NORM --> DET[detection-engine\n:3003]
+    DET --> TI[threat-intel-service\n:3005]
+    DET --> CORR[correlation-engine\n:3006]
+    TI --> CORR
+    CORR --> RISK[risk-scoring-engine\n:3007]
+    RISK --> ALERT[alert-service\n:3008]
+
+    ALERT --> TRIAGE[alert-triage-ai\n:3021]
+    ALERT --> SOC[ai-soc-analyst\n:3015]
+    ALERT --> SECASSIST[security-assistant\n:3022]
+    NORM --> BEHAV[behavioral-ai\n:3020]
+
+    APIGW[api-gateway\n:3000] --> ING
+    APIGW --> ALERT
+    APIGW --> RISK
+    APIGW --> TRIAGE
+    APIGW --> SOC
+    APIGW --> SECASSIST
+
+    DASH[web-dashboard\n:5173] --> APIGW
+
+    DB[(PostgreSQL)]
+    REDIS[(Redis)]
+    CH[(ClickHouse)]
+
+    ING --> REDIS
+    NORM --> REDIS
+    DET --> REDIS
+    CORR --> REDIS
+    RISK --> REDIS
+    ALERT --> REDIS
+    TRIAGE --> REDIS
+    SOC --> REDIS
+    BEHAV --> REDIS
+
+    ING --> DB
+    ALERT --> DB
+    RISK --> DB
+    TRIAGE --> DB
+    SOC --> DB
+    SECASSIST --> DB
+
+    NORM --> CH
+    DET --> CH
+    CORR --> CH
+
+    subgraph Required_Local_Path
+      APIGW
+      ING
+      NORM
+      DET
+      TI
+      CORR
+      RISK
+      ALERT
+      TRIAGE
+      SOC
+      BEHAV
+      SECASSIST
+      DASH
+    end
+
+    EXT[Optional and Extended Services\n(auth-service, sso-service, reports, etc.)]
+    APIGW -. optional integration .-> EXT
