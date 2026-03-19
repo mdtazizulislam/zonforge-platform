@@ -1,114 +1,162 @@
 # ZonForge Sentinel v4.6.0
 
-**AI-Native Cybersecurity Platform**
+ZonForge Sentinel is a monorepo-based cybersecurity platform for event ingestion, analytics, risk scoring, alerting, and AI-assisted SOC workflows.
 
-One monorepo — Backend + Web Dashboard + Landing Page + Mobile App.
+## Overview
 
----
+This repository contains the core backend services, AI services, shared platform packages, dashboard applications, collectors, and infrastructure definitions used to run ZonForge Sentinel in local and deployment environments.
 
-## Project Structure
+The current verified local developer path focuses on a required service subset that can be started and validated end-to-end on Windows PowerShell.
 
-```
+## Why ZonForge
+
+- Monorepo consistency for services, shared contracts, and tooling.
+- Explicit service boundaries across ingestion, detection, correlation, risk, and alert pipelines.
+- AI modules integrated as first-class services instead of ad-hoc scripts.
+- Verification-first local workflow with documented health checks and proof artifacts.
+
+## Core Capabilities
+
+- Event ingestion and normalization pipeline.
+- Detection and threat intelligence enrichment.
+- Correlation and risk scoring engines.
+- Alerting and AI-assisted triage/investigation services.
+- API gateway and web dashboard for platform access and operations.
+
+## Architecture
+
+The required local path is composed of:
+
+1. Shared packages (`packages/*`) for config, types, logging, auth, schema, and DB access.
+2. Core runtime services (`apps/*`) for ingestion through alert lifecycle.
+3. AI services (`apps/*`) for behavioral analytics, triage, and SOC assistance.
+4. UI (`apps/web-dashboard`) for operational visibility.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture summary and request/data flow.
+
+## Repository Structure
+
+```text
 zonforge-platform/
-├── apps/
-│   ├── landing-web/        ← Public website + Interactive Demo (Netlify)
-│   ├── web-dashboard/      ← React 18 SaaS Dashboard (Netlify)
-│   ├── mobile-app/         ← React Native iOS + Android (Expo)
-│   ├── api-gateway/        ← :3000  API Gateway (Railway)
-│   ├── ingestion-service/  ← :3001  Event Ingestion
-│   ├── normalization-worker← :3002  OCSF Normalization
-│   ├── detection-engine/   ← :3003  20 MITRE ATT&CK Rules
-│   ├── anomaly-service/    ← :3004  Python ML Anomaly Detection
-│   ├── threat-intel-service← :3005  IOC Enrichment
-│   ├── correlation-engine/ ← :3006  Attack Chain Correlation
-│   ├── risk-scoring-engine ← :3007  User/Asset Risk Scoring
-│   ├── alert-service/      ← :3008  Alert Management
-│   ├── playbook-engine/    ← :3009  11 Automated Response Actions
-│   ├── billing-service/    ← :3010  Stripe Billing
-│   ├── mssp-console/       ← :3011  Multi-Tenant MSSP Console
-│   ├── threat-hunting/     ← :3012  21 ClickHouse Hunt Templates
-│   ├── compliance-reports/ ← :3013  SOC2/ISO Evidence Packages
-│   ├── redteam-simulation/ ← :3014  5 MITRE Attack Scenarios
-│   ├── ai-soc-analyst/     ← :3015  Claude AI Investigation
-│   ├── supply-chain-intel/ ← :3016  Dependency Scanning + SBOM
-│   ├── deception-tech/     ← :3017  10 Honeypot Types
-│   ├── regulatory-ai/      ← :3018  6 Compliance Frameworks
-│   ├── digital-twin/       ← :3019  Attack Path Simulation
-│   ├── behavioral-ai/      ← :3020  User Behavior Baselines
-│   ├── alert-triage-ai/    ← :3021  6-Factor Urgency Scoring
-│   ├── security-assistant/ ← :3022  AI Security Chat
-│   ├── predictive-threat/  ← :3023  72h Threat Forecast
-│   ├── sso-service/        ← :3024  SAML 2.0 + OIDC + SCIM
-│   ├── poc-manager/        ← :3025  Trial Management + AI ROI
-│   └── board-reports/      ← :3026  AI Executive Reports
-│
-├── packages/               ← Shared libraries
-│   ├── shared-types/
-│   ├── db-client/          ← PostgreSQL + ClickHouse ORM
-│   ├── auth-utils/         ← JWT + API Key + RBAC + Middleware
-│   ├── event-schema/       ← OCSF event mappings
-│   ├── logger/             ← Structured logging
-│   └── config/             ← Typed env config
-│
-├── collectors/             ← Data connectors
-│   ├── m365-collector/
-│   ├── aws-cloudtrail-collector/
-│   ├── google-workspace-collector/
-│   └── collector-base/
-│
-├── infra/                  ← Kubernetes, Terraform, Nginx, Prometheus
-├── security/               ← MITRE rules YAML, hardening, TLS
-├── docs/                   ← Platform catalog + readiness report
-├── docker-compose.yml      ← Local dev infrastructure
-└── .env.example            ← 82+ environment variables
+	apps/                 # Microservices and apps
+	collectors/           # External source collectors
+	packages/             # Shared libraries and contracts
+	infra/                # IaC, monitoring, deployment assets
+	security/             # Security hardening, policies, rules
+	docs/                 # Architecture, local dev, demo, troubleshooting
+	scripts/              # Developer helper scripts
+	proof/runs/           # Execution and verification reports
 ```
 
----
+## Services and Ports
+
+Verified required local path:
+
+| Service | Package | Port | Status in verified path |
+|---|---|---:|---|
+| API Gateway | `@zonforge/api-gateway` | 3000 | Required |
+| Ingestion Service | `@zonforge/ingestion-service` | 3001 | Required |
+| Normalization Worker | `@zonforge/normalization-worker` | 3002 | Required |
+| Detection Engine | `@zonforge/detection-engine` | 3003 | Required |
+| Threat Intel Service | `@zonforge/threat-intel-service` | 3005 | Required |
+| Correlation Engine | `@zonforge/correlation-engine` | 3006 | Required |
+| Risk Scoring Engine | `@zonforge/risk-scoring-engine` | 3007 | Required |
+| Alert Service | `@zonforge/alert-service` | 3008 | Required |
+| AI SOC Analyst | `@zonforge/ai-soc-analyst` | 3015 | Required |
+| Behavioral AI | `@zonforge/behavioral-ai` | 3020 | Required |
+| Alert Triage AI | `@zonforge/alert-triage-ai` | 3021 | Required |
+| Security Assistant | `@zonforge/security-assistant` | 3022 | Required |
+| Web Dashboard | `@zonforge/web-dashboard` | 5173 | Required UI |
+
+Full map: [docs/SERVICE_MAP.md](docs/SERVICE_MAP.md)
 
 ## Quick Start
 
-```bash
-cp .env.example .env.local
-# Set ANTHROPIC_API_KEY, STRIPE_SECRET_KEY, JWT_SECRET
+Prerequisites:
 
-npm run infra:up      # Start PostgreSQL, Redis, ClickHouse
-npm run db:migrate    # Create 26 database tables
-npm run dev           # Start all services
-```
-
----
-
-## Run Specific Apps
+- Node.js 20+
+- npm 10+
+- Docker Desktop (for PostgreSQL, Redis, ClickHouse)
 
 ```bash
-npm run dev:backend    # All 24 backend services
-npm run dev:dashboard  # Web dashboard :5173
-npm run dev:landing    # Landing page :4000
-npm run dev:mobile     # Mobile app (Expo)
+npm install
+npm run infra:up
+npm run build:required
+npm run dev:required
 ```
 
----
+Windows helper scripts:
 
-## Deploy
+```powershell
+./scripts/demo-start-required.ps1
+./scripts/demo-health-check.ps1
+```
 
-| App | Platform | Command |
-|-----|----------|---------|
-| Landing + Demo | Netlify | Base: apps/landing-web |
-| Web Dashboard | Netlify | Base: apps/web-dashboard |
-| Backend API | Railway | Root: apps/api-gateway |
-| Mobile iOS | App Store | eas build --platform ios |
-| Mobile Android | Play Store | eas build --platform android |
+Detailed setup: [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md)
 
----
+## Demo
 
-## API Keys Required
+Demo guide and walkthrough: [docs/DEMO.md](docs/DEMO.md)
 
-| Key | Source | Used by |
-|-----|--------|---------|
-| ANTHROPIC_API_KEY | console.anthropic.com | AI SOC, Chat, Reports |
-| STRIPE_SECRET_KEY | dashboard.stripe.com | Billing |
-| TWILIO_ACCOUNT_SID | console.twilio.com | SMS + WhatsApp alerts |
+Demo assets:
 
----
+- API examples: [docs/demo/api](docs/demo/api)
+- Screenshot instructions and status: [docs/demo/screenshots/README.md](docs/demo/screenshots/README.md)
 
-Built in New York. © 2026 ZonForge Inc.
+Note: Screenshot image files are not auto-generated by this repository. Capture steps are documented and the workflow is explicitly marked where manual capture is required.
+
+## Health Verification
+
+Required health endpoints can be validated with:
+
+```powershell
+./scripts/demo-health-check.ps1
+```
+
+Reference verification output and reports:
+
+- [proof/runs/2026-03-19_local-dev-boot-fix.md](proof/runs/2026-03-19_local-dev-boot-fix.md)
+- [docs/VERIFICATION_INDEX.md](docs/VERIFICATION_INDEX.md)
+
+## Example API Flow
+
+Demo payloads and sample responses:
+
+- [docs/demo/api/ingest-event-request.json](docs/demo/api/ingest-event-request.json)
+- [docs/demo/api/ingest-event-response.json](docs/demo/api/ingest-event-response.json)
+- [docs/demo/api/health-check-output.txt](docs/demo/api/health-check-output.txt)
+
+Example ingestion request (demo sample):
+
+```bash
+curl -X POST "http://localhost:3001/v1/events/ingest" \
+	-H "Content-Type: application/json" \
+	-d @docs/demo/api/ingest-event-request.json
+```
+
+## Documentation Index
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md)
+- [docs/DEMO.md](docs/DEMO.md)
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- [docs/SERVICE_MAP.md](docs/SERVICE_MAP.md)
+- [docs/VERIFICATION_INDEX.md](docs/VERIFICATION_INDEX.md)
+- [docs/SECURITY.md](docs/SECURITY.md)
+- [docs/ROADMAP.md](docs/ROADMAP.md)
+
+## Security Notes
+
+- Do not commit `.env.local` or production secrets.
+- Use dedicated local-only credentials for development infrastructure.
+- Treat all demo/sample payloads as synthetic unless explicitly marked as real captures.
+- Review [docs/SECURITY.md](docs/SECURITY.md) before external deployment.
+
+## Roadmap
+
+Near-term and medium-term priorities are tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+Current repository status:
+
+- Required local platform path is verified and documented.
+- Optional services remain intentionally outside minimum local success criteria until individually validated.
