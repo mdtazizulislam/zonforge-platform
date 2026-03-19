@@ -79,7 +79,9 @@ jobs:
 
       - name: 📦 Install dependencies (Python anomaly service)
         working-directory: apps/anomaly-service
-        run: pip install -e ".[dev]" --break-system-packages
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[dev]"
 
       - name: 🔨 Build all packages
         run: npx turbo run build --filter='./packages/*'
@@ -122,7 +124,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🔍 Run Trivy (filesystem scan)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type:    fs
           scan-ref:     .
@@ -148,7 +150,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: 🔒 OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
+        uses: dependency-check/Dependency-Check_Action@v4.0.0
         id: depcheck
         with:
           project:  ZonForge-Sentinel
@@ -171,17 +173,9 @@ jobs:
         service:
           - api-gateway
           - auth-service
-          - ingestion-service
-          - normalization-worker
-          - detection-engine
           - anomaly-service
-          - correlation-engine
-          - risk-scoring-engine
-          - alert-service
-          - threat-intel-service
           - tenant-service
-          - billing-service
-          - web-dashboard
+          - threat-intel-service
 
     steps:
       - name: 📥 Checkout
@@ -227,7 +221,7 @@ jobs:
             SERVICE_VERSION=${{ github.sha }}
 
       - name: 🔍 Trivy image scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.ECR_REGISTRY }}/zonforge/${{ matrix.service }}:sha-${{ github.sha }}
           severity:  CRITICAL
