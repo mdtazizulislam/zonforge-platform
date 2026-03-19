@@ -40,8 +40,30 @@ Invoke-RestMethod -Uri "http://localhost:3001/v1/events/ingest" `
 ## Demo Artifacts
 
 - API examples: `docs/demo/api/*`
-- Screenshot capture guidance: `docs/demo/screenshots/README.md`
+- Screenshot set: `docs/demo/screenshots/*`
+- Architecture diagrams: `docs/demo/architecture/*`
 - Local verification report: `proof/runs/2026-03-19_local-dev-boot-fix.md`
+
+## Visual Artifact Inventory
+
+1. `docs/demo/screenshots/dashboard-home.png`
+2. `docs/demo/screenshots/dashboard-health.png`
+3. `docs/demo/screenshots/services-running.png`
+4. `docs/demo/screenshots/health-check-proof.png`
+5. `docs/demo/screenshots/ai-intelligence-or-module-proof.png`
+
+All files above were captured from a running local platform path in this repository context.
+
+## Capture Method
+
+- Runtime verified first using `./scripts/demo-health-check.ps1`.
+- Web/API screenshots captured from live local endpoints.
+- Services and health-proof visuals captured from live command output rendered into capture pages under `docs/demo/screenshots/_capture/`.
+
+## Architecture Layer
+
+- Diagram markdown: `docs/demo/architecture/zonforge-platform-architecture.md`
+- Mermaid source: `docs/demo/architecture/zonforge-platform-architecture.mmd`
 
 ## Demo Truth Policy
 
