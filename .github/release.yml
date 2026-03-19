@@ -1,0 +1,27 @@
+changelog:
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: Security
+      labels:
+        - security
+    - title: Features
+      labels:
+        - enhancement
+        - feature
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+    - title: Documentation and DX
+      labels:
+        - documentation
+        - dx
+    - title: Maintenance
+      labels:
+        - chore
+        - dependencies
+    - title: Uncategorized
+      labels:
+        - "*"
