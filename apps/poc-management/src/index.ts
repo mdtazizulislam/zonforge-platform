@@ -89,7 +89,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     name:        'Day 1: First Connector Live',
     description: 'Connect at least one data source (M365, AWS, or Google Workspace)',
     dueDay:      1,
-    notes:       undefined,
     autoCheck:   true,
     metricKey:   'active_connectors',
     metricTarget: 1,
@@ -98,7 +97,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     name:        'Day 7: First Alert Generated',
     description: 'Platform generates at least one security alert from real data',
     dueDay:      7,
-    notes:       undefined,
     autoCheck:   true,
     metricKey:   'total_alerts',
     metricTarget: 1,
@@ -108,7 +106,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     description: 'Primary analysts complete onboarding walkthrough',
     dueDay:      7,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 14: First True Positive Confirmed',
@@ -117,7 +114,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     autoCheck:   true,
     metricKey:   'resolved_alerts',
     metricTarget: 1,
-    notes:       undefined,
   },
   {
     name:        'Day 14: Risk Score Baseline',
@@ -126,7 +122,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     autoCheck:   true,
     metricKey:   'risk_profiles',
     metricTarget: 5,
-    notes:       undefined,
   },
   {
     name:        'Day 21: First Playbook Executed',
@@ -135,35 +130,30 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     autoCheck:   true,
     metricKey:   'playbook_executions',
     metricTarget: 1,
-    notes:       undefined,
   },
   {
     name:        'Day 21: Compliance Report Generated',
     description: 'Run SOC2/ISO27001 compliance assessment',
     dueDay:      21,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 28: Executive Demo',
     description: 'Present board-level security report to executive sponsor',
     dueDay:      28,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 30: ROI Report Delivered',
     description: 'Share value realization report with customer',
     dueDay:      30,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 30: Commercial Discussion',
     description: 'Procurement/contract review call scheduled',
     dueDay:      30,
     autoCheck:   false,
-    notes:       undefined,
   },
 ]
 
@@ -388,7 +378,6 @@ async function start() {
         lastActivity:    new Date(),
         loginCount:      0,
         featuresUsed:    [],
-        churnReason:     undefined,
         salesOwner:      body.salesOwner || user.email,
         notes:           '',
         createdAt:       new Date(),

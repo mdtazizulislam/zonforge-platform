@@ -146,6 +146,85 @@ export const anomalyBaselines = pgTable('anomaly_baselines', {
 }))
 
 // ─────────────────────────────────────────────
+// POC RECORDS (sales engineering trials)
+// ─────────────────────────────────────────────
+
+export const pocRecords = pgTable('poc_records', {
+  id:                   uuid('id').primaryKey().defaultRandom(),
+  tenantId:             uuid('tenant_id').notNull().references(() => tenants.id),
+  companyName:          text('company_name').notNull(),
+  companySize:          text('company_size').notNull(),
+  industry:             text('industry').notNull(),
+  country:              text('country').notNull(),
+  championName:         text('champion_name').notNull(),
+  championEmail:        text('champion_email').notNull(),
+  championTitle:        text('champion_title').notNull(),
+  economicBuyerName:    text('economic_buyer_name'),
+  dealOwner:            text('deal_owner').notNull(),
+  targetPlan:           text('target_plan').notNull(),
+  targetMrr:            integer('target_mrr').notNull().default(0),
+  competitorsMentioned: text('competitors_mentioned').array().notNull().default([]),
+  status:               text('status').notNull().default('active'),
+  startDate:            text('start_date').notNull(),
+  endDate:              text('end_date').notNull(),
+  durationDays:         integer('duration_days').notNull().default(30),
+  actualEndDate:        text('actual_end_date'),
+  successCriteria:      jsonb('success_criteria').notNull().default([]),
+  milestones:           jsonb('milestones').notNull().default([]),
+  checkIns:             jsonb('check_ins').notNull().default([]),
+  criteriaMetCount:     integer('criteria_met_count').notNull().default(0),
+  criteriaTotalCount:   integer('criteria_total_count').notNull().default(0),
+  successScore:         integer('success_score').notNull().default(0),
+  currentWeek:          integer('current_week').notNull().default(1),
+  wonAt:                text('won_at'),
+  lostAt:               text('lost_at'),
+  lostReason:           text('lost_reason'),
+  lostNotes:            text('lost_notes'),
+  dealValue:            integer('deal_value'),
+  createdAt:            timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:            timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  tenantIdx:            index('poc_records_tenant_idx').on(t.tenantId),
+  statusIdx:            index('poc_records_status_idx').on(t.status),
+  createdIdx:           index('poc_records_created_idx').on(t.createdAt),
+}))
+
+export const pocEngagements = pgTable('poc_engagements', {
+  id:                   uuid('id').primaryKey().defaultRandom(),
+  tenantId:             uuid('tenant_id').notNull().references(() => tenants.id),
+  companyName:          text('company_name').notNull(),
+  contactName:          text('contact_name').notNull(),
+  contactEmail:         text('contact_email').notNull(),
+  contactTitle:         text('contact_title').notNull(),
+  industry:             text('industry').notNull(),
+  companySize:          text('company_size').notNull(),
+  useCase:              text('use_case').notNull(),
+  estimatedDealSize:    integer('estimated_deal_size').notNull().default(0),
+  status:               text('status').notNull().default('active'),
+  startDate:            timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate:              timestamp('end_date', { withTimezone: true }).notNull(),
+  extendedUntil:        timestamp('extended_until', { withTimezone: true }),
+  trialDays:            integer('trial_days').notNull().default(30),
+  successCriteria:      text('success_criteria').array().notNull().default([]),
+  milestones:           jsonb('milestones').notNull().default([]),
+  valueRealized:        jsonb('value_realized').notNull().default({}),
+  healthScore:          integer('health_score').notNull().default(100),
+  lastActivity:         timestamp('last_activity', { withTimezone: true }).notNull().defaultNow(),
+  loginCount:           integer('login_count').notNull().default(0),
+  featuresUsed:         text('features_used').array().notNull().default([]),
+  churnRisk:            text('churn_risk').notNull().default('low'),
+  churnReason:          text('churn_reason'),
+  salesOwner:           text('sales_owner').notNull(),
+  notes:                text('notes').notNull().default(''),
+  createdAt:            timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:            timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  tenantIdx:            index('poc_engagements_tenant_idx').on(t.tenantId),
+  statusIdx:            index('poc_engagements_status_idx').on(t.status),
+  createdIdx:           index('poc_engagements_created_idx').on(t.createdAt),
+}))
+
+// ─────────────────────────────────────────────
 // RELATIONS
 // ─────────────────────────────────────────────
 
