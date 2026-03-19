@@ -6,7 +6,7 @@ import { zValidator }  from '@hono/zod-validator'
 import { v4 as uuid }  from 'uuid'
 import { eq, and, desc, gte, count } from 'drizzle-orm'
 import Anthropic       from '@anthropic-ai/sdk'
-import Redis           from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -68,7 +68,6 @@ async function computeEngagement(
   ))
 
   return {
-    lastLoginAt:          undefined,
     totalLogins:          loginCount,
     alertsInvestigated:   alertCount,
     playbooksCreated:     playbookCount,
@@ -199,7 +198,7 @@ async function start() {
   initDb(postgresConfig)
   log.info('✅ PostgreSQL connected')
 
-  const redis = new Redis({
+  const redis = new IORedis({
     host: redisConfig.host, port: redisConfig.port,
     password: redisConfig.password, tls: redisConfig.tls ? {} : undefined,
     maxRetriesPerRequest: 3,

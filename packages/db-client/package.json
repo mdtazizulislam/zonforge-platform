@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@zonforge/shared-types": "*",
+    "@zonforge/event-schema": "*",
     "drizzle-orm": "^0.30.0",
     "postgres": "^3.4.0",
     "@clickhouse/client": "^0.2.9",

@@ -89,7 +89,7 @@ async function collectBoardData(
     ? Math.round(alerts.reduce((s, a) => s + (a.detectionGapMinutes ?? 10), 0) / alerts.length)
     : 14
 
-  const healthyConn   = connectors.filter(c => c.isHealthy).length
+  const healthyConn   = connectors.filter(c => c.status === 'active').length
   const uptimePct     = connectors.length > 0 ? Math.round((healthyConn / connectors.length) * 100) : 100
 
   // Top 3 incidents for board
@@ -122,7 +122,7 @@ async function collectBoardData(
   const recommendations: string[] = []
   if (openCritical.length > 0)  recommendations.push(`Resolve ${openCritical.length} critical open alert(s) immediately`)
   if (currentPosture < 80)      recommendations.push('Invest in MFA enforcement to reach 80+ posture score')
-  if (connectors.some(c => !c.isHealthy)) recommendations.push('Restore failed data connectors for complete coverage')
+  if (connectors.some(c => c.status !== 'active')) recommendations.push('Restore failed data connectors for complete coverage')
 
   return {
     tenantName:  tenantRow?.name ?? 'Organization',
