@@ -5,7 +5,16 @@ This directory contains demo-support assets for local verification and walkthrou
 ## Contents
 
 - `api/`: sample request/response artifacts aligned with the verified local path.
-- `screenshots/`: screenshot naming convention, capture guidance, and current status.
+- `screenshots/`: screenshot captures and capture guidance.
+- `architecture/`: Mermaid architecture assets and rendered diagram markdown.
+
+## Current Visual Set
+
+- `screenshots/dashboard-home.png`
+- `screenshots/dashboard-health.png`
+- `screenshots/services-running.png`
+- `screenshots/health-check-proof.png`
+- `screenshots/ai-intelligence-or-module-proof.png`
 
 ## Policy
 
