@@ -171,12 +171,33 @@ curl -X POST "http://localhost:3001/v1/events/ingest" \
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/ROADMAP.md](docs/ROADMAP.md)
 
+## Release Management
+
+- [CHANGELOG.md](CHANGELOG.md)
+- [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md)
+
+Release notes category mapping for GitHub Releases:
+
+- [/.github/release.yml](.github/release.yml)
+
+## Governance and Contributing
+
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CODEOWNERS](CODEOWNERS)
+- [docs/REPOSITORY_GOVERNANCE.md](docs/REPOSITORY_GOVERNANCE.md)
+- [docs/BRANCH_PROTECTION_CHECKLIST.md](docs/BRANCH_PROTECTION_CHECKLIST.md)
+
 ## Security Notes
 
 - Do not commit `.env.local` or production secrets.
 - Use dedicated local-only credentials for development infrastructure.
 - Treat all demo/sample payloads as synthetic unless explicitly marked as real captures.
 - Review [docs/SECURITY.md](docs/SECURITY.md) before external deployment.
+
+Security disclosure and response process:
+
+- [SECURITY.md](SECURITY.md)
+- [docs/SECURITY_RESPONSE_PROCESS.md](docs/SECURITY_RESPONSE_PROCESS.md)
 
 ## Roadmap
 
@@ -186,3 +207,7 @@ Current repository status:
 
 - Required local platform path is verified and documented.
 - Optional services remain intentionally outside minimum local success criteria until individually validated.
+
+Maintenance references:
+
+- [docs/MAINTENANCE.md](docs/MAINTENANCE.md)
