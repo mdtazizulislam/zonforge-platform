@@ -1,0 +1,17 @@
+=== HEALTH CHECK 2026-03-19 14:21:22 ===
+PASS :3000  svc=zonforge-api-gateway  status=ok
+PASS :3001  svc=ingestion-service  status=ok
+PASS :3002  svc=normalization-worker  status=ok
+PASS :3003  svc=detection-engine  status=ok
+PASS :3005  svc=threat-intel-service  status=ok
+PASS :3006  svc=correlation-engine  status=ok
+PASS :3007  svc=risk-scoring-engine  status=ok
+PASS :3008  svc=alert-service  status=ok
+PASS :3015  svc=ai-soc-analyst  status=ok
+PASS :3020  svc=behavioral-ai  status=ok
+PASS :3021  svc=alert-triage-ai  status=ok
+PASS :3022  svc=security-assistant  status=ok
+=== DASHBOARD ===
+PASS :5173  HTTP 200
+
+Source: Verified local run in proof/runs/2026-03-19_local-dev-boot-fix.md

@@ -1,0 +1,26 @@
+{
+  "tenantId": "demo-tenant",
+  "connectorId": "demo-connector",
+  "sourceType": "m365",
+  "events": [
+    {
+      "eventId": "evt-demo-0001",
+      "occurredAt": "2026-03-19T18:21:22.000Z",
+      "actor": {
+        "type": "user",
+        "id": "user-1234",
+        "ip": "203.0.113.10"
+      },
+      "action": "login_failed",
+      "target": {
+        "type": "application",
+        "id": "mailbox-service"
+      },
+      "metadata": {
+        "provider": "m365",
+        "region": "us-east-1",
+        "severity": "medium"
+      }
+    }
+  ]
+}

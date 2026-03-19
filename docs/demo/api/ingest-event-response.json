@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "message": "Events accepted for processing",
+  "data": {
+    "batchId": "demo-batch-20260319-0001",
+    "accepted": 1,
+    "queued": 1
+  },
+  "note": "Sample/demo response shape for local walkthrough. Use real API output in live demos when available."
+}
