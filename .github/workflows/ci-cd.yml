@@ -1,0 +1,352 @@
+name: 🚀 ZonForge Sentinel — CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, release/**]
+    tags:     ['v*.*.*']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group:             ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION:    "20"
+  PYTHON_VERSION:  "3.11"
+  AWS_REGION:      us-east-1
+  ECR_REGISTRY:    ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+# ─────────────────────────────────────────────────────────────────
+# JOB: BUILD + TEST
+# ─────────────────────────────────────────────────────────────────
+
+jobs:
+  build-test:
+    name: 🔨 Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB:       zonforge_test
+          POSTGRES_USER:     zonforge
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ["5432:5432"]
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+        ports: ["6379:6379"]
+
+    env:
+      ZONFORGE_POSTGRES_HOST:     localhost
+      ZONFORGE_POSTGRES_PASSWORD: test_password
+      ZONFORGE_JWT_SECRET:        "test-jwt-secret-min-32-chars-here-aa"
+      ZONFORGE_HMAC_SECRET:       "test-hmac-secret-min-32-chars-here-bb"
+      ZONFORGE_ENCRYPTION_KEY:    "0000000000000000000000000000000000000000000000000000000000000000"
+      ZONFORGE_API_KEY_SALT:      "test-api-key-salt-min-32-chars-here-c"
+      ZONFORGE_ENV:               test
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: 📦 Install dependencies (npm)
+        run: npm ci
+
+      - name: 📦 Install dependencies (Python anomaly service)
+        working-directory: apps/anomaly-service
+        run: pip install -e ".[dev]" --break-system-packages
+
+      - name: 🔨 Build all packages
+        run: npx turbo run build --filter='./packages/*'
+
+      - name: 🔨 Build all apps
+        run: npx turbo run build --filter='./apps/*' --filter='./collectors/*'
+
+      - name: 🔍 TypeScript type-check
+        run: npx turbo run typecheck
+
+      - name: 🗃️ Run database migrations
+        run: |
+          npx drizzle-kit push --config=packages/db-client/drizzle.config.ts
+
+      - name: 🧪 Run TypeScript tests
+        run: npx turbo run test --filter='./packages/*' --filter='./apps/*'
+
+      - name: 🧪 Run Python tests
+        working-directory: apps/anomaly-service
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: 📊 Upload test coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB: SECURITY SCAN
+  # ─────────────────────────────────────────────────────────────────
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔍 Run Trivy (filesystem scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type:    fs
+          scan-ref:     .
+          severity:     CRITICAL,HIGH
+          exit-code:    "1"
+          ignore-unfixed: true
+          format:       sarif
+          output:       trivy-results.sarif
+
+      - name: 📤 Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: 🔐 Run Gitleaks (secrets detection)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      - name: 📦 npm audit
+        run: npm audit --audit-level=high
+
+      - name: 🔒 OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        id: depcheck
+        with:
+          project:  ZonForge-Sentinel
+          path:     .
+          format:   HTML
+          args:     "--failOnCVSS 8 --enableRetired"
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB: BUILD + PUSH DOCKER IMAGES
+  # ─────────────────────────────────────────────────────────────────
+
+  docker-build:
+    name: 🐳 Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [build-test, security-scan]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - auth-service
+          - ingestion-service
+          - normalization-worker
+          - detection-engine
+          - anomaly-service
+          - correlation-engine
+          - risk-scoring-engine
+          - alert-service
+          - threat-intel-service
+          - tenant-service
+          - billing-service
+          - web-dashboard
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: 🔑 Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ECR_REGISTRY }}/zonforge/${{ matrix.service }}
+          tags:   |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: ⚡ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🐳 Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context:    .
+          file:       apps/${{ matrix.service }}/Dockerfile
+          push:       true
+          tags:       ${{ steps.meta.outputs.tags }}
+          labels:     ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to:   type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            SERVICE_VERSION=${{ github.sha }}
+
+      - name: 🔍 Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/zonforge/${{ matrix.service }}:sha-${{ github.sha }}
+          severity:  CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB: DEPLOY TO STAGING
+  # ─────────────────────────────────────────────────────────────────
+
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: ⚓ Update kubeconfig
+        run: aws eks update-kubeconfig --name zonforge-staging --region ${{ env.AWS_REGION }}
+
+      - name: 🗃️ Run database migrations
+        run: |
+          kubectl run db-migrate \
+            --image=${{ env.ECR_REGISTRY }}/zonforge/api-gateway:sha-${{ github.sha }} \
+            --restart=Never \
+            --rm \
+            --attach \
+            -n zonforge \
+            --env="ZONFORGE_POSTGRES_HOST=${{ secrets.STAGING_DB_HOST }}" \
+            --env="ZONFORGE_POSTGRES_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}" \
+            -- npx tsx scripts/db-setup.ts migrate
+
+      - name: 🚀 Helm upgrade (staging)
+        run: |
+          helm upgrade --install zonforge ./infra/helm/charts/zonforge \
+            -f infra/helm/values/staging.yaml \
+            -n zonforge \
+            --create-namespace \
+            --atomic \
+            --timeout 10m \
+            --set global.image.tag=sha-${{ github.sha }} \
+            --set global.gitSha=${{ github.sha }}
+
+      - name: ✅ Smoke tests
+        run: |
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=api-gateway \
+            -n zonforge \
+            --timeout=120s
+
+          # Health check all services
+          kubectl exec -n zonforge deploy/api-gateway -- \
+            curl -sf http://localhost:3000/health
+
+  # ─────────────────────────────────────────────────────────────────
+  # JOB: DEPLOY TO PRODUCTION (tags only, manual approval)
+  # ─────────────────────────────────────────────────────────────────
+
+  deploy-production:
+    name: 🏭 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production    # requires manual approval in GitHub
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ env.AWS_REGION }}
+
+      - name: ⚓ Update kubeconfig
+        run: aws eks update-kubeconfig --name zonforge-prod --region ${{ env.AWS_REGION }}
+
+      - name: 🗃️ Run database migrations
+        run: |
+          kubectl run db-migrate-${{ github.sha }} \
+            --image=${{ env.ECR_REGISTRY }}/zonforge/api-gateway:${{ github.ref_name }} \
+            --restart=Never \
+            --rm \
+            --attach \
+            -n zonforge \
+            -- npx tsx scripts/db-setup.ts migrate
+
+      - name: 🚀 Helm upgrade (production) — rolling deploy
+        run: |
+          helm upgrade --install zonforge ./infra/helm/charts/zonforge \
+            -f infra/helm/values/production.yaml \
+            -n zonforge \
+            --atomic \
+            --timeout 15m \
+            --set global.image.tag=${{ github.ref_name }} \
+            --set global.gitSha=${{ github.sha }} \
+            --history-max 5
+
+      - name: ✅ Production smoke test
+        run: |
+          curl -sf https://api.zonforge.com/health | jq .
+          curl -sf https://api.zonforge.com/v1/platform/health | jq .overall
+
+      - name: 📝 Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          generateReleaseNotes: true
+          draft:                false
+          prerelease:           ${{ contains(github.ref_name, '-rc') }}

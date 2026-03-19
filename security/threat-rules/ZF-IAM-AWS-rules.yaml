@@ -1,0 +1,310 @@
+# ZF-IAM-001: Service Account Interactive Login
+id: ZF-IAM-001
+name: Service Account Interactive Login
+description: >
+  A service account or machine identity performs an interactive
+  (human-style) login. Service accounts should authenticate only
+  via API keys or service-to-service tokens, never interactively.
+  This indicates either service account credential theft or misconfiguration.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0003
+      name: Persistence
+    - id: TA0004
+      name: Privilege Escalation
+  techniques:
+    - id: T1078
+      name: Valid Accounts
+      sub_techniques:
+        - id: T1078.003
+          name: Local Accounts
+  coverage_level: full
+
+source_types: [m365_entra, google_workspace, aws_cloudtrail]
+event_categories: [authentication]
+
+detection:
+  type: threshold
+  window_minutes: 60
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [login_success, ConsoleLogin]
+    - field: outcome
+      operator: eq
+      value: success
+    - field: actor_user_type
+      operator: eq
+      value: service_account
+
+  filters:
+    - field: actor_user_email
+      operator: contains_any
+      value: [svc-, service-, sa-, automation-, bot-, system-,
+              .svc@, -sa@, _svc@]
+  count_min: 1
+
+alert:
+  title: "Service Account Interactive Login — {{actor_user_id}}"
+  description: >
+    Service account {{actor_user_id}} performed an interactive
+    login from {{actor_ip}} at {{event_time}}. Service accounts
+    should not log in interactively.
+  priority: P2
+  recommended_actions:
+    - "Verify no human is using service account credentials directly"
+    - "Rotate service account credentials immediately"
+    - "Review what actions were performed in this session"
+    - "Enforce service account policy: no interactive logins"
+
+confidence_score: 0.88
+false_positive_notes: "Misconfigured automation scripts using interactive auth. Should be very rare."
+
+---
+
+# ZF-OAUTH-001: Suspicious OAuth Application Grant
+id: ZF-OAUTH-001
+name: Suspicious OAuth Application Consent Grant
+description: >
+  A user grants OAuth consent to an application requesting broad
+  permissions (Mail.Read, Files.ReadWrite.All, etc.) or consents
+  to a newly registered application. Common vector for phishing
+  and OAuth token theft attacks.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0001
+      name: Initial Access
+    - id: TA0006
+      name: Credential Access
+  techniques:
+    - id: T1566
+      name: Phishing
+      sub_techniques:
+        - id: T1566.002
+          name: Spearphishing Link
+    - id: T1550
+      name: Use Alternate Authentication Material
+  coverage_level: partial
+
+source_types: [m365_entra, google_workspace]
+event_categories: [authentication, account_management]
+
+detection:
+  type: threshold
+  window_minutes: 30
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [oauth_consent_granted, AUTHORIZE_API_CLIENT_ACCESS,
+              Consent_to_application, oauth_token_authorized]
+    - field: outcome
+      operator: eq
+      value: success
+    - field: metadata.requestedScopes
+      operator: contains_any
+      value: [Mail.Read, Mail.ReadWrite, Files.ReadWrite.All,
+              Directory.ReadWrite.All, User.ReadWrite.All,
+              full_account_access]
+  count_min: 1
+
+alert:
+  title: "Broad OAuth Permission Granted — {{actor_user_id}}"
+  description: >
+    User {{actor_user_id}} granted OAuth consent to application
+    requesting sensitive permissions: {{requested_scopes}}.
+  priority: P2
+  recommended_actions:
+    - "Verify the OAuth application is legitimate and approved"
+    - "Review the application publisher and OAuth consent screen"
+    - "If suspicious, revoke OAuth grant immediately"
+    - "Audit what data the application accessed after the grant"
+
+confidence_score: 0.78
+false_positive_notes: "Legitimate SaaS integrations request broad permissions. Build an approved application allowlist."
+
+---
+
+# ZF-RANSOMWARE-001: Shadow Copy Deletion (Ransomware Pre-cursor)
+id: ZF-RANSOMWARE-001
+name: Volume Shadow Copy Deletion Detected
+description: >
+  A process deletes Windows Volume Shadow Copies (VSS), which is
+  one of the most reliable early indicators of ransomware activity.
+  Ransomware deletes shadow copies to prevent recovery before
+  beginning file encryption. This is an extremely high-confidence
+  critical indicator.
+severity: critical
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0040
+      name: Impact
+  techniques:
+    - id: T1490
+      name: Inhibit System Recovery
+  coverage_level: full
+
+source_types: [aws_cloudtrail, generic_webhook, edr_crowdstrike, edr_sentinelone]
+event_categories: [cloud_resource, process_activity]
+
+detection:
+  type: threshold
+  window_minutes: 15
+  group_by: [tenant_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [shadow_copy_deletion, DeleteSnapshot, DeleteVolume,
+              vssadmin_delete_shadows, wmic_shadowcopy_delete,
+              StopLogging, DeleteTrail]
+  count_min: 1
+
+alert:
+  title: "CRITICAL: Shadow Copy Deletion — Possible Ransomware"
+  description: >
+    Shadow copy or backup deletion detected on {{target_asset_id}}
+    at {{event_time}}. This is a critical early-stage ransomware
+    indicator. Immediate response required.
+  priority: P1
+  recommended_actions:
+    - "IMMEDIATE: Isolate the affected system from the network"
+    - "Activate your ransomware incident response playbook"
+    - "Check for mass file rename/encryption on the same system"
+    - "Identify the process responsible and quarantine"
+    - "Verify backup integrity from an isolated backup system"
+
+confidence_score: 0.95
+false_positive_notes: "Legitimate backup maintenance or storage optimization. Extremely rare. Always treat as P1 until ruled out."
+
+---
+
+# ZF-AWS-002: Mass S3 Object Deletion
+id: ZF-AWS-002
+name: Mass S3 Object Deletion
+description: >
+  A large number of S3 objects are deleted in a short time window
+  by a single identity. This may indicate a destructive attack,
+  ransomware encrypting cloud storage, or accidental mass deletion.
+severity: critical
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0040
+      name: Impact
+  techniques:
+    - id: T1485
+      name: Data Destruction
+    - id: T1490
+      name: Inhibit System Recovery
+  coverage_level: full
+
+source_types: [aws_cloudtrail]
+event_categories: [file_access]
+
+detection:
+  type: threshold
+  window_minutes: 15
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [bulk_file_delete, DeleteObject, DeleteObjects]
+    - field: outcome
+      operator: eq
+      value: success
+
+  aggregate:
+    count_min: 100
+
+alert:
+  title: "Mass S3 Deletion — {{actor_user_id}} deleted {{event_count}} objects"
+  description: >
+    {{actor_user_id}} deleted {{event_count}} S3 objects across
+    buckets {{affected_buckets}} in {{window_minutes}} minutes.
+  priority: P1
+  recommended_actions:
+    - "Check if S3 versioning is enabled — recovery may be possible"
+    - "Identify which buckets and objects were affected"
+    - "Check if this was an authorized maintenance operation"
+    - "If unauthorized, contain the identity and assess data loss"
+    - "Enable S3 Object Lock on critical buckets to prevent future mass deletion"
+
+confidence_score: 0.88
+false_positive_notes: "Authorized cleanup scripts and migration jobs. Tune bucket exclusion list for known automation accounts."
+
+---
+
+# ZF-AWS-003: IAM Wildcard Policy Attachment
+id: ZF-AWS-003
+name: IAM Wildcard or AdministratorAccess Policy Attached
+description: >
+  A user attaches an IAM policy with wildcard permissions (Action: *)
+  or the AWS AdministratorAccess managed policy to a role, user, or
+  group. This is a clear indicator of privilege escalation or
+  misconfiguration that creates a path to full AWS account takeover.
+severity: high
+enabled: true
+
+mitre:
+  tactics:
+    - id: TA0004
+      name: Privilege Escalation
+    - id: TA0003
+      name: Persistence
+  techniques:
+    - id: T1098
+      name: Account Manipulation
+      sub_techniques:
+        - id: T1098.001
+          name: Additional Cloud Credentials
+  coverage_level: full
+
+source_types: [aws_cloudtrail]
+event_categories: [account_management]
+
+detection:
+  type: threshold
+  window_minutes: 30
+  group_by: [actor_user_id]
+
+  conditions:
+    - field: event_action
+      operator: in
+      value: [AttachRolePolicy, AttachUserPolicy, AttachGroupPolicy,
+              PutRolePolicy, PutUserPolicy, PutGroupPolicy]
+    - field: outcome
+      operator: eq
+      value: success
+    - field: metadata.awsRequestParams.policyArn
+      operator: contains_any
+      value: [AdministratorAccess, PowerUserAccess, arn:aws:iam::aws:policy/AdministratorAccess]
+  count_min: 1
+
+alert:
+  title: "IAM AdministratorAccess Granted — {{actor_user_id}}"
+  description: >
+    {{actor_user_id}} attached AdministratorAccess or wildcard policy
+    to {{target_resource}} at {{event_time}}.
+  priority: P2
+  recommended_actions:
+    - "Verify this was an authorized change via your change management process"
+    - "Review who the target principal is and whether this level of access is justified"
+    - "If unauthorized, remove the policy attachment immediately"
+    - "Audit all actions taken by the newly-privileged principal"
+
+confidence_score: 0.87
+false_positive_notes: "Authorized IAM admin operations. Cross-reference with change management tickets."

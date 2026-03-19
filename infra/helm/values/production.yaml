@@ -1,0 +1,285 @@
+# ─────────────────────────────────────────────────────────────────
+# ZonForge Sentinel — Helm Chart Values (Production)
+#
+# Usage:
+#   helm upgrade --install zonforge ./infra/helm/charts/zonforge \
+#     -f infra/helm/values/production.yaml \
+#     -n zonforge --create-namespace
+# ─────────────────────────────────────────────────────────────────
+
+global:
+  image:
+    registry: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+    pullPolicy: IfNotPresent
+  imagePullSecrets: []
+  env: production
+  clusterName: zonforge-prod
+  region: us-east-1
+
+# ── Shared secret reference ───────────────────────────────────────
+secrets:
+  # References to AWS Secrets Manager secrets (injected via External Secrets Operator)
+  externalSecretName: zonforge-platform-secrets
+  # Keys mapped to env vars:
+  #   ZONFORGE_JWT_SECRET
+  #   ZONFORGE_ENCRYPTION_KEY
+  #   ZONFORGE_HMAC_SECRET
+  #   ZONFORGE_API_KEY_SALT
+  #   ZONFORGE_POSTGRES_PASSWORD
+  #   ZONFORGE_REDIS_PASSWORD
+  #   ZONFORGE_STRIPE_SECRET_KEY
+  #   ZONFORGE_SENDGRID_API_KEY
+  #   ZONFORGE_ANTHROPIC_API_KEY
+  #   ZONFORGE_OTX_API_KEY
+
+# ── Database configuration ────────────────────────────────────────
+postgres:
+  host:     rds-cluster.cluster-xxxx.us-east-1.rds.amazonaws.com
+  port:     5432
+  database: zonforge
+  user:     zonforge
+  ssl:      true
+  poolMin:  2
+  poolMax:  20
+
+clickhouse:
+  host:     http://clickhouse.zonforge.svc.cluster.local:8123
+  database: zonforge_events
+  user:     default
+
+redis:
+  host:     zonforge-elasticache.xxxx.0001.use1.cache.amazonaws.com
+  port:     6379
+  tls:      true
+
+# ── Service-level configuration ───────────────────────────────────
+
+services:
+
+  apiGateway:
+    replicas: 3
+    image:
+      name: zonforge/api-gateway
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "128Mi" }
+      limits:   { cpu: "500m",  memory: "512Mi" }
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 10
+      targetCpuPct: 70
+    port: 3000
+    serviceType: ClusterIP
+
+  authService:
+    replicas: 2
+    image:
+      name: zonforge/auth-service
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "128Mi" }
+      limits:   { cpu: "250m",  memory: "256Mi" }
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCpuPct: 70
+    port: 3100
+
+  ingestionService:
+    replicas: 3
+    image:
+      name: zonforge/ingestion-service
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "200m",  memory: "256Mi" }
+      limits:   { cpu: "1000m", memory: "1Gi" }
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 20
+      targetCpuPct: 60
+    port: 3001
+
+  normalizationWorker:
+    replicas: 3
+    image:
+      name: zonforge/normalization-worker
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "200m",  memory: "512Mi" }
+      limits:   { cpu: "2000m", memory: "2Gi" }
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 15
+      targetCpuPct: 60
+    port: 3002
+    env:
+      QUEUE_CONCURRENCY: "20"
+      BATCH_SIZE: "500"
+
+  detectionEngine:
+    replicas: 2
+    image:
+      name: zonforge/detection-engine
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "200m",  memory: "256Mi" }
+      limits:   { cpu: "1000m", memory: "1Gi" }
+    port: 3003
+
+  anomalyService:
+    replicas: 2
+    image:
+      name: zonforge/anomaly-service
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "500m",  memory: "512Mi" }
+      limits:   { cpu: "2000m", memory: "2Gi" }
+    port: 3004
+    env:
+      ANOMALY_ZSCORE_THRESHOLD: "2.5"
+      BASELINE_DAYS: "30"
+      WORKERS: "2"
+
+  correlationEngine:
+    replicas: 2
+    image:
+      name: zonforge/correlation-engine
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "256Mi" }
+      limits:   { cpu: "500m",  memory: "512Mi" }
+    port: 3006
+
+  riskScoringEngine:
+    replicas: 2
+    image:
+      name: zonforge/risk-scoring-engine
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "256Mi" }
+      limits:   { cpu: "500m",  memory: "512Mi" }
+    port: 3007
+
+  alertService:
+    replicas: 2
+    image:
+      name: zonforge/alert-service
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "256Mi" }
+      limits:   { cpu: "500m",  memory: "512Mi" }
+    port: 3008
+
+  threatIntelService:
+    replicas: 2
+    image:
+      name: zonforge/threat-intel-service
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "256Mi" }
+      limits:   { cpu: "500m",  memory: "512Mi" }
+    port: 3005
+    env:
+      THREAT_INTEL_REFRESH_INTERVAL_MS: "21600000"   # 6 hours
+
+  tenantService:
+    replicas: 2
+    image:
+      name: zonforge/tenant-service
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "128Mi" }
+      limits:   { cpu: "250m",  memory: "256Mi" }
+    port: 3101
+
+  billingService:
+    replicas: 1
+    image:
+      name: zonforge/billing-service
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "100m",  memory: "128Mi" }
+      limits:   { cpu: "250m",  memory: "256Mi" }
+    port: 3010
+
+  webDashboard:
+    replicas: 2
+    image:
+      name: zonforge/web-dashboard
+      tag:  "{{RELEASE_TAG}}"
+    resources:
+      requests: { cpu: "10m",   memory: "32Mi" }
+      limits:   { cpu: "100m",  memory: "128Mi" }
+    port: 80
+    serviceType: ClusterIP
+
+# ── Ingress ───────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class:             alb
+    alb.ingress.kubernetes.io/scheme:        internet-facing
+    alb.ingress.kubernetes.io/target-type:   ip
+    alb.ingress.kubernetes.io/ssl-policy:    ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/listen-ports:  '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect:  "443"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:123456789012:certificate/xxxx"
+    alb.ingress.kubernetes.io/waf-acl-id:    "xxxx"   # Optional WAF
+  rules:
+    - host: api.zonforge.com
+      paths:
+        - path: /
+          service: api-gateway
+          port: 3000
+    - host: app.zonforge.com
+      paths:
+        - path: /
+          service: web-dashboard
+          port: 80
+
+# ── Service Accounts (for IRSA) ───────────────────────────────────
+serviceAccounts:
+  create: true
+  annotations:
+    # IRSA: allow services to assume IAM roles without static credentials
+    ingestion-service:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/zonforge-ingestion"
+    anomaly-service:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/zonforge-anomaly"
+    billing-service:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/zonforge-billing"
+    audit-export:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/zonforge-audit-export"
+
+# ── Monitoring ────────────────────────────────────────────────────
+monitoring:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    labels:
+      release: kube-prometheus-stack
+  prometheusRule:
+    enabled: true
+    namespace: monitoring
+  grafana:
+    dashboardConfigmap: zonforge-dashboards
+
+# ── Istio ─────────────────────────────────────────────────────────
+istio:
+  enabled:           true
+  mtls:              STRICT
+  ingressGateway:    istio-ingressgateway
+  inject:            true
+
+# ── Pod Disruption Budgets ────────────────────────────────────────
+podDisruptionBudgets:
+  apiGateway:        { minAvailable: 2 }
+  ingestionService:  { minAvailable: 2 }
+  normalizationWorker: { minAvailable: 2 }
+  detectionEngine:   { minAvailable: 1 }
+  alertService:      { minAvailable: 1 }

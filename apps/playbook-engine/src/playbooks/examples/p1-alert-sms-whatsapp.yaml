@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────────────
+# ZonForge Playbook: P1 Alert → SMS + WhatsApp + PagerDuty
+#
+# Triggers on: any P1 or P2 severity alert
+# Actions:
+#   1. Send SMS to on-call analyst (instant)
+#   2. Send WhatsApp to team lead (with full context)
+#   3. Create PagerDuty incident (escalation + phone call)
+#   4. Document only (safe audit record)
+# ─────────────────────────────────────────────────────────────────────
+
+id: p1-alert-full-notification
+name: "P1/P2 Alert — Full Notification Stack"
+description: >
+  When a high or critical severity alert fires, immediately notify
+  the on-call analyst via SMS, team lead via WhatsApp, and create
+  a PagerDuty incident for phone escalation.
+enabled: true
+
+trigger:
+  severity:  [high, critical]
+  priority:  [P1, P2]
+  auto_run:  true     # no analyst approval needed for notifications
+
+actions:
+
+  # ── 1. SMS to on-call analyst ───────────────────────────────────
+  - type: notify_sms
+    name: "SMS to on-call analyst"
+    config:
+      to: "${env:TWILIO_DEFAULT_TO}"
+      message: |
+        🚨 [ZonForge] {{priority}} ALERT
+        {{title}}
+        User: {{user}}
+        IP: {{ip}}
+        Time: {{time}}
+        → https://app.zonforge.com/alerts/{{alertId}}
+
+  # ── 2. WhatsApp to team lead ───────────────────────────────────
+  - type: notify_whatsapp
+    name: "WhatsApp to security team lead"
+    config:
+      to: "${env:TWILIO_WHATSAPP_DEFAULT_TO}"
+      # Uses default rich template — no override needed
+
+  # ── 3. PagerDuty incident (phone call escalation) ─────────────
+  - type: notify_pagerduty
+    name: "PagerDuty — phone escalation"
+    config:
+      severity: "critical"
+      # PAGERDUTY_INTEGRATION_KEY from .env
+
+  # ── 4. Audit record ───────────────────────────────────────────
+  - type: document_only
+    name: "Audit: notification sent"
+    config: {}

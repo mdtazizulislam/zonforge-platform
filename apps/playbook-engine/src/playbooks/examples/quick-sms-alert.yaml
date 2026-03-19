@@ -1,0 +1,14 @@
+# Quick setup: P1 alerts → SMS only
+# Minimum viable alert notification
+id: quick-sms-p1
+name: "Quick SMS — P1 Alerts Only"
+enabled: true
+trigger:
+  severity: [critical]
+  priority: [P1]
+  auto_run: true
+actions:
+  - type: notify_sms
+    name: "SMS to analyst"
+    config:
+      to: "${env:TWILIO_DEFAULT_TO}"

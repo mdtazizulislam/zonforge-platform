@@ -1,0 +1,66 @@
+scenario: data_exfiltration
+version: "1.0"
+name: "Data Exfiltration via Mass Download + Email Forwarding"
+description: >
+  Simulates an insider threat or post-compromise data exfiltration:
+  bulk file download followed by creation of email forwarding rules
+  to an external domain.
+mitre_tactics:
+  - TA0009   # Collection
+  - TA0010   # Exfiltration
+mitre_techniques:
+  - T1530    # Data from Cloud Storage
+  - T1114.003 # Email Forwarding Rule
+severity: high
+expected_detections:
+  - ZF-DATA-001    # mass download rule
+category: exfiltration
+
+steps:
+  - step: 1
+    name: reconnaissance
+    event_type: file_list
+    count: 20
+    delay_ms: 150
+    params:
+      source_type:  "m365_entra"
+      event_action: "FileAccessed"
+    description: "Attacker browses SharePoint structure"
+
+  - step: 2
+    name: mass_download
+    event_type: file_download
+    count: 120
+    delay_ms: 80
+    params:
+      source_type:  "m365_entra"
+      event_action: "FileDownloaded"
+      sensitivity:  "confidential"
+    description: "120 confidential files downloaded in 3 minutes"
+
+  - step: 3
+    name: email_forward_rule
+    event_type: email_rule_created
+    count: 1
+    delay_ms: 500
+    params:
+      source_type:   "m365_entra"
+      event_action:  "New-InboxRule"
+      forward_to:    "attacker@external-domain.com"
+    description: "Email auto-forward rule to external domain"
+
+  - step: 4
+    name: exfil_via_email
+    event_type: email_sent_external
+    count: 5
+    delay_ms: 300
+    params:
+      source_type:  "m365_entra"
+      recipient_domain: "external-domain.com"
+    description: "Sends emails with attachments to external domain"
+
+evaluation:
+  require_alert:       true
+  require_severity:    ["high", "critical"]
+  detection_window_ms: 45000
+  pass_threshold_pct:  85
