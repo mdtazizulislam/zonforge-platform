@@ -1,12 +1,19 @@
 import { eq, and, desc, gte, count, sql, inArray } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
-import type Redis from 'ioredis'
+import type { Redis } from 'ioredis'
 import { getDb, schema } from '@zonforge/db-client'
 import { createLogger } from '@zonforge/logger'
-import { PLAN_PRICING } from '../../billing-service/src/plans.js'
 import type { PlanTier } from '@zonforge/shared-types'
 
 const log = createLogger({ service: 'mssp-console' })
+
+const PLAN_MRR_CENTS: Record<PlanTier, number> = {
+  starter: 0,
+  growth: 7900,
+  business: 19900,
+  enterprise: 49900,
+  mssp: 99900,
+}
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -99,8 +106,7 @@ export class MsspConsoleService {
       .where(inArray(schema.subscriptions.status, ['active', 'trialing', 'past_due']))
 
     const totalMrr = subs.reduce((sum, s) => {
-      const plan = PLAN_PRICING[s.planTier as PlanTier]
-      return sum + (plan?.monthlyPriceCents ?? 0)
+      return sum + (PLAN_MRR_CENTS[s.planTier as PlanTier] ?? 0)
     }, 0)
 
     // Tenants by plan
@@ -185,7 +191,7 @@ export class MsspConsoleService {
         connectorsActive:  0,
         identitiesMonitor: 0,
         eventsToday:       0,
-        mrr:             PLAN_PRICING[t.planTier as PlanTier]?.monthlyPriceCents ?? 0,
+        mrr:             PLAN_MRR_CENTS[t.planTier as PlanTier] ?? 0,
         trialEndsAt:     null,
         subStatus:       'active',
       }))
@@ -234,10 +240,10 @@ export class MsspConsoleService {
         .groupBy(schema.alerts.severity),
 
       // Connector health
-      db.select({ status: schema.connectors.status, isHealthy: schema.connectors.isHealthy, cnt: count() })
+      db.select({ status: schema.connectors.status, cnt: count() })
         .from(schema.connectors)
         .where(eq(schema.connectors.tenantId, tenantId))
-        .groupBy(schema.connectors.status, schema.connectors.isHealthy),
+        .groupBy(schema.connectors.status),
 
       // Subscription
       db.select()
@@ -257,7 +263,7 @@ export class MsspConsoleService {
 
     const alertMap        = new Map(alerts.map(a => [a.severity, Number(a.cnt)]))
     const totalConn       = connectors.reduce((s, c) => s + Number(c.cnt), 0)
-    const healthyConn     = connectors.filter(c => c.isHealthy).reduce((s, c) => s + Number(c.cnt), 0)
+    const healthyConn     = connectors.filter(c => c.status === 'active').reduce((s, c) => s + Number(c.cnt), 0)
     const connectorHealth = totalConn > 0 ? Math.round((healthyConn / totalConn) * 100) : 100
     const sub             = subs[0]
 
@@ -277,7 +283,7 @@ export class MsspConsoleService {
       connectorsActive: totalConn,
       identitiesMonitor: 0,
       eventsToday:      0,
-      mrr:              PLAN_PRICING[tenant.planTier as PlanTier]?.monthlyPriceCents ?? 0,
+      mrr:              PLAN_MRR_CENTS[tenant.planTier as PlanTier] ?? 0,
       trialEndsAt:      sub?.trialEndsAt ?? null,
       subStatus:        sub?.status ?? 'active',
     }
@@ -384,8 +390,7 @@ export class MsspConsoleService {
     let   totalMrr = 0
 
     for (const s of activeSubs) {
-      const plan = PLAN_PRICING[s.planTier as PlanTier]
-      const mrr  = plan?.monthlyPriceCents ?? 0
+      const mrr  = PLAN_MRR_CENTS[s.planTier as PlanTier] ?? 0
       totalMrr  += mrr
       if (!byPlan[s.planTier]) byPlan[s.planTier] = { count: 0, mrr: 0 }
       byPlan[s.planTier]!.count++
@@ -393,7 +398,7 @@ export class MsspConsoleService {
     }
 
     const newMrr = newTenants.reduce((s, t) =>
-      s + (PLAN_PRICING[t.planTier as PlanTier]?.monthlyPriceCents ?? 0), 0)
+      s + (PLAN_MRR_CENTS[t.planTier as PlanTier] ?? 0), 0)
 
     return {
       totalMrr,

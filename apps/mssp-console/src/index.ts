@@ -2,7 +2,7 @@ import { Hono }       from 'hono'
 import { serve }      from '@hono/node-server'
 import { cors }       from 'hono/cors'
 import { secureHeaders } from 'hono/secure-headers'
-import Redis          from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { initDb, closeDb } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -19,7 +19,7 @@ async function start() {
   initDb(postgresConfig)
   log.info('✅ PostgreSQL connected')
 
-  const redis = new Redis({
+  const redis = new IORedis({
     host:     redisConfig.host,
     port:     redisConfig.port,
     password: redisConfig.password,
@@ -27,7 +27,7 @@ async function start() {
     maxRetriesPerRequest: 3,
   })
   redis.on('connect', () => log.info('✅ Redis connected'))
-  redis.on('error',   (e) => log.error({ err: e }, 'Redis error'))
+  redis.on('error',   (e: unknown) => log.error({ err: e }, 'Redis error'))
 
   const service = new MsspConsoleService(redis)
 

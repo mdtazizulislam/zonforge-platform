@@ -23,15 +23,15 @@ const log = createLogger({ service: 'compliance-reports:vuln' })
 export type ScannerFormat = 'tenable' | 'qualys' | 'openvas' | 'generic_csv' | 'generic_json'
 
 export interface VulnerabilityFinding {
-  cveId?:        string
-  pluginId?:     string
+  cveId?:        string | undefined
+  pluginId?:     string | undefined
   assetIp:       string
-  assetHostname?: string
+  assetHostname?: string | undefined
   severity:      'critical' | 'high' | 'medium' | 'low' | 'info'
-  cvssScore?:    number
+  cvssScore?:    number | undefined
   title:         string
   description:   string
-  solution?:     string
+  solution?:     string | undefined
   exploitable:   boolean
   patchAvailable: boolean
   firstSeen:     Date

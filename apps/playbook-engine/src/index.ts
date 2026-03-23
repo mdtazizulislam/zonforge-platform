@@ -5,7 +5,8 @@ import { secureHeaders } from 'hono/secure-headers'
 import { zValidator } from '@hono/zod-validator'
 import { z }          from 'zod'
 import { Worker }     from 'bullmq'
-import Redis          from 'ioredis'
+import { Redis }      from 'ioredis'
+import { v4 as uuid } from 'uuid'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -13,12 +14,30 @@ import { PlaybookEngineService, type AlertForTrigger } from './services/playbook
 import {
   requestIdMiddleware, authMiddleware,
 } from '@zonforge/auth-utils'
-import {
-  QUEUE_NAMES, createQueue, getQueueConnection,
-} from '../ingestion-service/src/queues.js'
 import { eq, desc } from 'drizzle-orm'
+import type { ConnectionOptions } from 'bullmq'
 
 const log = createLogger({ service: 'playbook-engine' })
+
+const QUEUE_NAMES = {
+  ALERT_NOTIFICATIONS: 'zf-alert-notifications',
+} as const
+
+function getQueueConnection(config: {
+  host: string
+  port: number
+  password: string | undefined
+  tls?: boolean
+}): ConnectionOptions {
+  return {
+    host: config.host,
+    port: config.port,
+    ...(config.password ? { password: config.password } : {}),
+    ...(config.tls ? { tls: {} } : {}),
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  }
+}
 
 const CreatePlaybookSchema = z.object({
   name:              z.string().min(1).max(200),
@@ -52,7 +71,7 @@ async function start() {
     enableReadyCheck: false,
   })
   redis.on('connect', () => log.info('✅ Redis connected'))
-  redis.on('error',   (e) => log.error({ err: e }, 'Redis error'))
+  redis.on('error', (e: unknown) => log.error({ err: e }, 'Redis error'))
 
   const service    = new PlaybookEngineService(redis)
   const connection = getQueueConnection(redisConfig)
@@ -129,7 +148,7 @@ async function start() {
     const db   = getDb()
 
     const [pb] = await db.insert(schema.playbooks).values({
-      id:                require('uuid').v4(),
+      id:                uuid(),
       tenantId:          user.tenantId,
       name:              body.name,
       description:       body.description,
@@ -225,7 +244,7 @@ async function start() {
     return ctx.json({ success: true, data: result })
   })
 
-  app.get('/health', (ctx) => ctx.json({
+  app.get('/health', async (ctx) => ctx.json({
     status: 'ok', service: 'playbook-engine', timestamp: new Date(),
     actions: Object.keys((await import('./executors/action.executors.js')).ACTION_EXECUTORS),
   }))

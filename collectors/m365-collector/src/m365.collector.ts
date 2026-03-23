@@ -3,7 +3,7 @@ import {
   type CollectorConfig,
   type CollectorResult,
   type CursorState,
-} from '../../collector-base/src/index.js'
+} from '@zonforge/collector-base'
 import { M365GraphClient, type M365AuthConfig } from './services/graph.client.js'
 
 // ─────────────────────────────────────────────
@@ -134,7 +134,7 @@ export class M365Collector extends BaseCollector {
     }
   }
 
-  protected async saveCursorState(state: CursorState): Promise<void> {
+  protected override async saveCursorState(state: CursorState): Promise<void> {
     this.m365Cursor = state as M365CursorState
     this.cursorState = state
   }

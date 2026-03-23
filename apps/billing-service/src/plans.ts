@@ -27,6 +27,17 @@ export interface PlanPrice {
   features: string[]
 }
 
+function withStripePriceIds(monthlyEnv: string, annualEnv: string) {
+  return {
+    ...(process.env[monthlyEnv]
+      ? { stripeMonthlyPriceId: process.env[monthlyEnv] }
+      : {}),
+    ...(process.env[annualEnv]
+      ? { stripeAnnualPriceId: process.env[annualEnv] }
+      : {}),
+  }
+}
+
 export const PLAN_PRICING: Record<PlanTier, PlanPrice> = {
   starter: {
     tier:              'starter',
@@ -35,8 +46,7 @@ export const PLAN_PRICING: Record<PlanTier, PlanPrice> = {
     monthlyPriceCents:  0,
     annualPriceCents:   0,
     currency:          'usd',
-    stripeMonthlyPriceId: process.env['STRIPE_PRICE_STARTER_MONTHLY'],
-    stripeAnnualPriceId:  process.env['STRIPE_PRICE_STARTER_ANNUAL'],
+    ...withStripePriceIds('STRIPE_PRICE_STARTER_MONTHLY', 'STRIPE_PRICE_STARTER_ANNUAL'),
     trialDays:          14,
     highlighted:        false,
     limits: {
@@ -63,8 +73,7 @@ export const PLAN_PRICING: Record<PlanTier, PlanPrice> = {
     monthlyPriceCents:  29900,   // $299/month
     annualPriceCents:   24900,   // $249/month billed annually
     currency:          'usd',
-    stripeMonthlyPriceId: process.env['STRIPE_PRICE_GROWTH_MONTHLY'],
-    stripeAnnualPriceId:  process.env['STRIPE_PRICE_GROWTH_ANNUAL'],
+    ...withStripePriceIds('STRIPE_PRICE_GROWTH_MONTHLY', 'STRIPE_PRICE_GROWTH_ANNUAL'),
     trialDays:          14,
     highlighted:        false,
     limits: {
@@ -93,8 +102,7 @@ export const PLAN_PRICING: Record<PlanTier, PlanPrice> = {
     monthlyPriceCents:  99900,   // $999/month
     annualPriceCents:   83300,   // $833/month billed annually
     currency:          'usd',
-    stripeMonthlyPriceId: process.env['STRIPE_PRICE_BUSINESS_MONTHLY'],
-    stripeAnnualPriceId:  process.env['STRIPE_PRICE_BUSINESS_ANNUAL'],
+    ...withStripePriceIds('STRIPE_PRICE_BUSINESS_MONTHLY', 'STRIPE_PRICE_BUSINESS_ANNUAL'),
     trialDays:          14,
     highlighted:        true,   // "Most popular"
     limits: {

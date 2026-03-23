@@ -72,12 +72,12 @@ export interface TriggerEvent {
   triggeredAt:   Date
   confidence:    TriggerConfidence
   triggerType:   string   // 'api_key_used' | 'login_attempt' | 's3_access' | etc.
-  sourceIp?:     string
-  sourceCountry?: string
-  userAgent?:    string
-  requestPath?:  string
-  rawRequest?:   Record<string, unknown>
-  alertId?:      string   // linked alert
+  sourceIp?:     string | undefined
+  sourceCountry?: string | undefined
+  userAgent?:    string | undefined
+  requestPath?:  string | undefined
+  rawRequest?:   Record<string, unknown> | undefined
+  alertId?:      string | undefined   // linked alert
 }
 
 // ─────────────────────────────────────────────

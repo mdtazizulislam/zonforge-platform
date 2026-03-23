@@ -1,20 +1,20 @@
-import Redis from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { redisConfig } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
 
 const log = createLogger({ service: 'tenant-service:redis' })
-let _redis: Redis | null = null
+let _redis: IORedis | null = null
 
-export function getRedis(): Redis {
+export function getRedis(): IORedis {
   if (_redis) return _redis
-  _redis = new Redis({
+  _redis = new IORedis({
     host: redisConfig.host, port: redisConfig.port,
     password: redisConfig.password,
     tls: redisConfig.tls ? {} : undefined,
     maxRetriesPerRequest: 3,
-    retryStrategy: (t) => Math.min(t * 100, 3000),
+    retryStrategy: (t: number) => Math.min(t * 100, 3000),
   })
-  _redis.on('error', (e) => log.error({ err: e }, 'Redis error'))
+  _redis.on('error', (e: unknown) => log.error({ err: e }, 'Redis error'))
   return _redis
 }
 

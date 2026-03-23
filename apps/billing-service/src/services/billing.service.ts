@@ -1,15 +1,18 @@
 import Stripe from 'stripe'
 import { eq, and } from 'drizzle-orm'
+import { Redis } from 'ioredis'
 import { v4 as uuidv4 } from 'uuid'
 import { getDb, schema } from '@zonforge/db-client'
+import { redisConfig } from '@zonforge/config'
 import { computeAuditHash } from '@zonforge/auth-utils'
 import { createLogger } from '@zonforge/logger'
 import {
-  PLAN_PRICING, PLAN_ORDER, isUpgrade, type PlanPrice,
+  PLAN_PRICING, isUpgrade,
 } from '../plans.js'
 import type { PlanTier } from '@zonforge/shared-types'
 
 const log = createLogger({ service: 'billing-service' })
+let redis: Redis | null = null
 
 // ─────────────────────────────────────────────
 // BILLING SERVICE
@@ -38,15 +41,15 @@ export class BillingService {
     const db = getDb()
 
     // Check existing Stripe customer ID
-    const subs = await db.select({
-      stripeCustomerId: schema.subscriptions.stripeCustomerId,
+    const tenants = await db.select({
+      stripeCustomerId: schema.tenants.stripeCustomerId,
     })
-      .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.tenantId, tenantId))
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, tenantId))
       .limit(1)
 
-    if (subs[0]?.stripeCustomerId) {
-      return subs[0].stripeCustomerId
+    if (tenants[0]?.stripeCustomerId) {
+      return tenants[0].stripeCustomerId
     }
 
     const tenant = await db.select({
@@ -67,9 +70,9 @@ export class BillingService {
     })
 
     // Store customer ID
-    await db.update(schema.subscriptions)
+    await db.update(schema.tenants)
       .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
-      .where(eq(schema.subscriptions.tenantId, tenantId))
+      .where(eq(schema.tenants.id, tenantId))
 
     log.info({ tenantId, customerId: customer.id }, 'Stripe customer created')
     return customer.id
@@ -200,7 +203,7 @@ export class BillingService {
     await this.writeAuditLog({
       tenantId,
       actorId,
-      actorIp,
+      ...(actorIp ? { actorIp } : {}),
       action:       'billing.plan_changed',
       resourceType: 'subscription',
       changes:      { from: oldTier, to: newTier, upgrade },
@@ -333,8 +336,23 @@ export class BillingService {
 
   private async getRedis() {
     try {
-      const { getRedis } = await import('../../../apps/auth-service/src/redis.js')
-      return getRedis()
+      if (redis) return redis
+
+      redis = new Redis({
+        host: redisConfig.host,
+        port: redisConfig.port,
+        password: redisConfig.password,
+        tls: redisConfig.tls ? {} : undefined,
+        maxRetriesPerRequest: 3,
+        retryStrategy: (times: number) => Math.min(times * 100, 3000),
+        lazyConnect: false,
+      })
+
+      redis.on('error', (err: unknown) => {
+        log.error({ err }, 'Redis error')
+      })
+
+      return redis
     } catch {
       return null
     }

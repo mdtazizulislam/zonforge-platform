@@ -159,7 +159,7 @@ export async function generateSoc2Package(
       dataConnectors:       connectors.filter(c => c.status === 'active').length,
       totalConnectors:      connectors.length,
       connectorHealthPct:   connectors.length > 0
-        ? `${Math.round((connectors.filter(c => c.isHealthy).length / connectors.length) * 100)}%`
+        ? `${Math.round((connectors.filter(c => c.status === 'active').length / connectors.length) * 100)}%`
         : 'N/A',
       riskScoredEntities:  riskScores.length,
       automatedPlaybooks:  playbooks.filter(p => p.enabled).length,
@@ -212,7 +212,7 @@ export async function generateSoc2Package(
   // ── A1 — Availability ─────────────────────────
 
   const uptime99 = connectors.length > 0
-    && connectors.some(c => c.isHealthy)
+    && connectors.some(c => c.status === 'active')
 
   const a1: Soc2EvidenceSection = {
     controlId:   'A1',
@@ -221,9 +221,9 @@ export async function generateSoc2Package(
     period:      { from: periodStart, to: periodEnd },
     evidence: {
       activeConnectors:      connectors.filter(c => c.status === 'active').length,
-      healthyConnectors:     connectors.filter(c => c.isHealthy).length,
+      healthyConnectors:     connectors.filter(c => c.status === 'active').length,
       connectorUptime:       connectors.length > 0
-        ? `${Math.round((connectors.filter(c => c.isHealthy).length / connectors.length) * 100)}%`
+        ? `${Math.round((connectors.filter(c => c.status === 'active').length / connectors.length) * 100)}%`
         : 'N/A',
       lastEventTime:         connectors
         .filter(c => c.lastEventAt)

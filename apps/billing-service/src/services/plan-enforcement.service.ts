@@ -1,8 +1,8 @@
 import type { Context, Next } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { getDb, schema } from '@zonforge/db-client'
 import { createLogger } from '@zonforge/logger'
-import { PLAN_PRICING } from '../plans.js'
+import { PLAN_PRICING, PLAN_ORDER } from '../plans.js'
 import type { PlanTier } from '@zonforge/shared-types'
 
 const log = createLogger({ service: 'billing-service:enforcement' })
@@ -24,11 +24,18 @@ interface QuotaCheckResult {
   upgradeRequired?: PlanTier
 }
 
+type BillableFeature =
+  | 'hasLlmNarratives'
+  | 'hasPlaybooks'
+  | 'hasSsoIntegration'
+  | 'hasByok'
+  | 'hasApiAccess'
+
 // ── Feature gate check ────────────────────────
 
 export async function checkFeature(
   tenantId: string,
-  feature:  'hasLlmNarratives' | 'hasPlaybooks' | 'hasSsoIntegration' | 'hasByok' | 'hasApiAccess',
+  feature:  BillableFeature,
 ): Promise<QuotaCheckResult> {
   const db = getDb()
 
@@ -38,15 +45,14 @@ export async function checkFeature(
     .limit(1)
 
   const planTier = (rows[0]?.planTier ?? 'starter') as PlanTier
-  const limits   = PLAN_PRICING[planTier]
+  const requiredPlan = getMinPlanForFeature(feature)
 
-  if (!limits[feature]) {
-    const upgradeRequired = getMinPlanForFeature(feature)
+  if (PLAN_ORDER.indexOf(planTier) < PLAN_ORDER.indexOf(requiredPlan)) {
     return {
       allowed:         false,
       code:            'FEATURE_NOT_AVAILABLE',
-      message:         `Feature "${feature}" requires ${upgradeRequired} plan or higher`,
-      upgradeRequired,
+      message:         `Feature "${feature}" requires ${requiredPlan} plan or higher`,
+      upgradeRequired: requiredPlan,
     }
   }
 
@@ -116,7 +122,6 @@ export async function checkCustomRuleQuota(tenantId: string): Promise<QuotaCheck
     .from(schema.detectionRules)
     .where(and(
       eq(schema.detectionRules.tenantId,  tenantId),
-      eq(schema.detectionRules.isCustom,  true),
       eq(schema.detectionRules.enabled,   true),
     ))
 
@@ -167,7 +172,7 @@ export async function checkTenantActive(tenantId: string): Promise<QuotaCheckRes
 // ── Hono middleware factories ─────────────────
 
 export function requireFeatureMiddleware(
-  feature: 'hasLlmNarratives' | 'hasPlaybooks' | 'hasSsoIntegration' | 'hasByok' | 'hasApiAccess',
+  feature: BillableFeature,
 ) {
   return async (ctx: Context, next: Next) => {
     const user = ctx.var.user
@@ -191,14 +196,14 @@ export function requireFeatureMiddleware(
       }, 402)   // 402 Payment Required
     }
 
-    await next()
+    return next()
   }
 }
 
 export function requireActiveAccountMiddleware() {
   return async (ctx: Context, next: Next) => {
     const user = ctx.var.user
-    if (!user) { await next(); return }
+    if (!user) return next()
 
     const check = await checkTenantActive(user.tenantId)
 
@@ -209,7 +214,7 @@ export function requireActiveAccountMiddleware() {
       }, 402)
     }
 
-    await next()
+    return next()
   }
 }
 
@@ -218,7 +223,7 @@ export function requireActiveAccountMiddleware() {
 // ─────────────────────────────────────────────
 
 function getMinPlanForFeature(
-  feature: string,
+  feature: BillableFeature,
 ): PlanTier {
   const featureMap: Record<string, PlanTier> = {
     hasLlmNarratives:  'growth',
@@ -236,6 +241,3 @@ function getUpgradeTierForConnectors(currentLimit: number): PlanTier {
   if (currentLimit <= 10) return 'enterprise'
   return 'enterprise'
 }
-
-// needed for checkConnectorQuota
-import { and } from 'drizzle-orm'

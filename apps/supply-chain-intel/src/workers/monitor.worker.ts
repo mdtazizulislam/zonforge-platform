@@ -1,7 +1,7 @@
 import { Worker, Queue } from 'bullmq'
 import { v4 as uuid } from 'uuid'
 import { eq, and, gte } from 'drizzle-orm'
-import type Redis from 'ioredis'
+import type { Redis as RedisClient } from 'ioredis'
 import { getDb, schema } from '@zonforge/db-client'
 import { createLogger } from '@zonforge/logger'
 
@@ -31,7 +31,7 @@ export interface ScanJobData {
 // ─────────────────────────────────────────────
 
 export function createMonitorWorker(
-  redis: Redis,
+  redis: RedisClient,
   scanFn: (data: ScanJobData) => Promise<void>,
 ): Worker {
   const worker = new Worker<ScanJobData>(
@@ -40,7 +40,7 @@ export function createMonitorWorker(
       await scanFn(job.data)
     },
     {
-      connection:  redis,
+      connection:  redis as any,
       concurrency: 4,
       limiter: { max: 20, duration: 60_000 },
     },
@@ -64,11 +64,11 @@ export function createMonitorWorker(
 // ─────────────────────────────────────────────
 
 export async function scheduleRepositoryRescan(
-  redis: Redis,
+  redis: RedisClient,
   tenantId: string,
 ): Promise<void> {
   const db    = getDb()
-  const queue = new Queue(SUPPLY_CHAIN_QUEUE, { connection: redis })
+  const queue = new Queue(SUPPLY_CHAIN_QUEUE, { connection: redis as any })
 
   // Find scans from last 7 days (recently registered manifests)
   const recentScans = await db.select({
@@ -155,6 +155,7 @@ export async function generateSupplyChainAlert(
       source: 'supply-chain-intel',
     },
     mttdSlaBreached:    false,
+    firstSignalTime:    new Date(),
     detectionGapMinutes: 0,
     createdAt:          new Date(),
     updatedAt:          new Date(),

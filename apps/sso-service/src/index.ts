@@ -5,11 +5,12 @@ import { secureHeaders } from 'hono/secure-headers'
 import { zValidator } from '@hono/zod-validator'
 import { v4 as uuid } from 'uuid'
 import { eq, and } from 'drizzle-orm'
-import Redis          from 'ioredis'
+import { Redis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
 import { signAccessToken } from '@zonforge/auth-utils'
+import type { UserRole } from '@zonforge/shared-types'
 import {
   ConfigureSamlSchema, ConfigureScimSchema,
   PROVIDER_SETUP_GUIDES,
@@ -54,12 +55,16 @@ function generateSpMetadata(tenantId: string, baseUrl: string): string {
 
 interface ParsedAssertion {
   email:      string
-  firstName?: string
-  lastName?:  string
+  firstName?: string | undefined
+  lastName?:  string | undefined
   nameId:     string
   sessionIndex: string
   groups:     string[]
   attributes: Record<string, unknown>
+}
+
+function mapSsoRole(role: string): UserRole {
+  return role === 'ANALYST' ? 'SECURITY_ANALYST' : 'READ_ONLY'
 }
 
 function parseSamlResponse(
@@ -116,8 +121,8 @@ function parseSamlResponse(
 
   return {
     email,
-    firstName:    firstNameAttr ? attrs[firstNameAttr] as string : undefined,
-    lastName:     lastNameAttr  ? attrs[lastNameAttr]  as string : undefined,
+    ...(firstNameAttr && attrs[firstNameAttr] ? { firstName: attrs[firstNameAttr] as string } : {}),
+    ...(lastNameAttr && attrs[lastNameAttr] ? { lastName: attrs[lastNameAttr] as string } : {}),
     nameId,
     sessionIndex,
     groups,
@@ -164,10 +169,10 @@ async function provisionJitUser(
     tenantId,
     email,
     name:        `${firstName} ${lastName}`.trim() || email,
-    role:        config.jitDefaultRole,
-    provider:    'saml',
-    providerAccountId: assertion.nameId,
-    emailVerified: true,
+    role:        mapSsoRole(config.jitDefaultRole),
+    ssoProvider: 'saml',
+    ssoSubjectId: assertion.nameId,
+    status:      'active',
     createdAt:   new Date(),
     updatedAt:   new Date(),
     lastLoginAt: new Date(),
@@ -195,7 +200,7 @@ function formatScimUser(user: any, baseUrl: string): ScimUser {
       familyName: user.name?.split(' ').slice(1).join(' ') ?? '',
     },
     emails:     [{ value: user.email, primary: true, type: 'work' }],
-    active:     user.active !== false,
+    active:     user.status !== 'suspended',
     meta: {
       resourceType: 'User',
       created:      user.createdAt?.toISOString() ?? new Date().toISOString(),
@@ -296,9 +301,11 @@ async function start() {
 
   app.post('/saml/:tenantId/acs', async (ctx) => {
     const tenantId       = ctx.req.param('tenantId')
-    const formData       = await ctx.req.formData()
-    const samlResponse   = formData.get('SAMLResponse') as string
-    const relayState     = (formData.get('RelayState') as string) ?? '/'
+    const formData       = await ctx.req.parseBody()
+    const samlResponseValue = formData['SAMLResponse']
+    const relayStateValue = formData['RelayState']
+    const samlResponse   = typeof samlResponseValue === 'string' ? samlResponseValue : ''
+    const relayState     = typeof relayStateValue === 'string' ? relayStateValue : '/'
 
     if (!samlResponse) {
       return ctx.text('Missing SAMLResponse', 400)
@@ -419,6 +426,17 @@ async function start() {
       const user = ctx.var.user
       const body = ctx.req.valid('json')
       const db   = getDb()
+      const samlConfigValues = {
+        provider: body.provider,
+        idpEntityId: body.idpEntityId,
+        idpSsoUrl: body.idpSsoUrl,
+        idpCertificate: body.idpCertificate,
+        ...(body.idpMetadataUrl ? { idpMetadataUrl: body.idpMetadataUrl } : {}),
+        attributeMap: body.attributeMap,
+        jitEnabled: body.jitEnabled,
+        jitDefaultRole: mapSsoRole(body.jitDefaultRole),
+        allowedDomains: body.allowedDomains,
+      }
 
       if (!['TENANT_ADMIN','PLATFORM_ADMIN'].includes(user.role)) {
         return ctx.json({ success: false, error: { code: 'FORBIDDEN' } }, 403)
@@ -432,7 +450,7 @@ async function start() {
 
       if (existing[0]) {
         await db.update(schema.ssoConfigs)
-          .set({ ...body, updatedAt: new Date() })
+          .set({ ...samlConfigValues, updatedAt: new Date() })
           .where(eq(schema.ssoConfigs.id, existing[0].id))
       } else {
         await db.insert(schema.ssoConfigs).values({
@@ -443,7 +461,7 @@ async function start() {
           configuredBy: user.id,
           createdAt:    new Date(),
           updatedAt:    new Date(),
-          ...body,
+          ...samlConfigValues,
         })
       }
 
@@ -547,16 +565,16 @@ async function start() {
     }
 
     const userId = uuid()
+    const formattedName = body.name?.formatted ?? (`${body.name?.givenName ?? ''} ${body.name?.familyName ?? ''}`.trim() || email)
     const newUser = {
       id:           userId,
       tenantId,
       email,
-      name:         body.name?.formatted ?? `${body.name?.givenName ?? ''} ${body.name?.familyName ?? ''}`.trim() || email,
-      role:         'VIEWER',
-      provider:     'scim',
-      providerAccountId: body.externalId ?? body.id,
-      emailVerified: true,
-      active:       body.active !== false,
+      name:         formattedName,
+      role:         mapSsoRole('VIEWER'),
+      ssoProvider:  'scim',
+      ssoSubjectId: body.externalId ?? body.id,
+      status:       body.active === false ? 'suspended' : 'active',
       createdAt:    new Date(),
       updatedAt:    new Date(),
     }
@@ -581,7 +599,7 @@ async function start() {
     // Process SCIM patch operations
     for (const op of body.Operations ?? []) {
       if (op.op?.toLowerCase() === 'replace' && op.path === 'active') {
-        updates['active'] = op.value
+        updates['status'] = op.value === false ? 'suspended' : 'active'
         // Deprovisioning: disable account
         if (!op.value) {
           log.warn({ userId: ctx.req.param('id'), tenantId }, 'SCIM deprovisioning: account disabled')
@@ -613,7 +631,7 @@ async function start() {
 
     // Soft-delete: just disable
     await db.update(schema.users)
-      .set({ active: false, updatedAt: new Date() } as any)
+      .set({ status: 'suspended', updatedAt: new Date() } as any)
       .where(and(eq(schema.users.id, ctx.req.param('id')), eq(schema.users.tenantId, tenantId)))
 
     return ctx.body(null, 204)
