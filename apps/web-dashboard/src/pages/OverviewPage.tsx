@@ -22,6 +22,7 @@ export function OverviewPage() {
   const riskUsers  = useRiskUsers()
   const connectors = useConnectors()
   const mttd       = useMttd()
+  const p1Mttd = mttd.data?.['P1'] as { p50?: number; count?: number } | undefined
 
   return (
     <AppShell
@@ -90,16 +91,16 @@ export function OverviewPage() {
             label="MTTD (P1, median)"
             loading={mttd.isLoading}
             value={
-              mttd.data?.['P1'] ? (
+              p1Mttd ? (
                 <span className="stat-number text-gray-100">
-                  {mttd.data['P1'].p50}
+                  {p1Mttd.p50}
                   <span className="text-sm font-normal text-gray-500 ml-1">min</span>
                 </span>
               ) : (
                 <span className="stat-number text-gray-500">—</span>
               )
             }
-            sub={mttd.data?.['P1'] ? `${mttd.data['P1'].count} P1 alerts measured` : 'No P1 data yet'}
+            sub={p1Mttd ? `${p1Mttd.count ?? 0} P1 alerts measured` : 'No P1 data yet'}
           />
         </div>
 

@@ -119,6 +119,7 @@ export default function AlertDetailPage() {
     high:     'from-orange-500/10 border-orange-500/20',
     medium:   'from-yellow-500/10 border-yellow-500/20',
     low:      'from-blue-500/10 border-blue-500/20',
+    info:     'from-cyan-500/10 border-cyan-500/20',
   }[alert.severity] ?? 'from-gray-800/40 border-gray-800'
 
   const priorityDot: Record<string, string> = {
@@ -337,6 +338,8 @@ export default function AlertDetailPage() {
                       open:          'bg-red-500/10 text-red-400',
                       investigating: 'bg-yellow-500/10 text-yellow-400',
                       resolved:      'bg-green-500/10 text-green-400',
+                      suppressed:    'bg-slate-500/10 text-slate-400',
+                      false_positive:'bg-violet-500/10 text-violet-400',
                     }[alert.status] ?? 'bg-gray-700 text-gray-400',
                   )}>
                     {alert.status.replace('_', ' ')}

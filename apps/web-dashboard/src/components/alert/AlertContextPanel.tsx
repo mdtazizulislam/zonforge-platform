@@ -203,7 +203,7 @@ export function AlertContextPanel({ alert }: AlertContextPanelProps) {
             ) : userRisk ? (
               <>
                 <div className="flex items-center gap-4">
-                  <RiskRing score={userRisk.score} label="Risk" />
+                  <RiskRing score={userRisk.score ?? 0} label="Risk" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <Badge variant={userRisk.severity as any} size="xs">
@@ -226,12 +226,12 @@ export function AlertContextPanel({ alert }: AlertContextPanelProps) {
                 </div>
 
                 {/* Contributing signals */}
-                {userRisk.contributingSignals?.length > 0 && (
+                {(userRisk.contributingSignals ?? []).length > 0 && (
                   <div className="mt-3 space-y-1.5">
                     <p className="text-xs text-gray-600 uppercase tracking-wider">
                       Contributing Signals
                     </p>
-                    {userRisk.contributingSignals.slice(0, 3).map((sig: any, i: number) => (
+                    {(userRisk.contributingSignals ?? []).slice(0, 3).map((sig: any, i: number) => (
                       <div key={i} className="flex items-center gap-2">
                         <div className="w-full bg-gray-800 rounded-full h-1.5 flex-1">
                           <div

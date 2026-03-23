@@ -218,6 +218,10 @@ export const api = {
       apiFetch<PipelineHealth>('/v1/health/pipeline'),
   },
 
+  // Backward-compatible helper used in billing views.
+  getPlans: () =>
+    apiFetch<unknown>('/v1/billing/plans'),
+
   // ── Playbooks ─────────────────────────────
 
   playbooks: {
@@ -273,6 +277,7 @@ export type AlertPriority  = 'P1' | 'P2' | 'P3' | 'P4' | 'P5'
 
 export interface AlertSummary {
   id:              string
+  tenantId:        string
   title:           string
   severity:        AlertSeverity
   priority:        AlertPriority
@@ -282,7 +287,7 @@ export interface AlertSummary {
   mitreTactics:    string[]
   mitreTechniques: string[]
   detectionGapMinutes?: number
-  mttdSlaBreached?: boolean
+  mttdSlaBreached: boolean
   assignedTo?:     string
   createdAt:       string
   updatedAt:       string
@@ -293,6 +298,9 @@ export interface AlertDetail extends AlertSummary {
   description:     string
   evidence:        unknown[]
   llmNarrative?:   LlmNarrative
+  llmNarrativeGeneratedAt?: string
+  firstSignalTime?: string
+  assignedAt?: string
   recommendedActions: string[]
 }
 
@@ -306,9 +314,9 @@ export interface LlmNarrative {
 }
 
 export interface AlertListParams {
-  severity?:  string
-  status?:    string
-  priority?:  string
+  severity?:  string | string[]
+  status?:    string | string[]
+  priority?:  string | string[]
   limit?:     number
   from?:      string
 }
@@ -335,6 +343,10 @@ export interface UserRiskScore {
 
 export interface UserRiskProfile {
   riskScore:    UserRiskScore & { contributingSignals: ContributingSignal[] }
+  score?:       number
+  severity?:    string
+  confidenceBand?: string
+  contributingSignals?: ContributingSignal[]
   user:         UserRecord | null
   recentAlerts: AlertSummary[]
   alertCount:   number
@@ -417,7 +429,7 @@ export interface CreateConnectorBody {
   name:                string
   type:                string
   config:              Record<string, unknown>
-  pollIntervalMinutes: number
+  pollIntervalMinutes?: number
 }
 
 export interface ValidationResult {

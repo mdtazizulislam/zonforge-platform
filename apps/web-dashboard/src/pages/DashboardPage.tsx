@@ -286,8 +286,8 @@ export default function DashboardPage() {
           <StatCard
             label="Org Posture Score"
             value={riskLoading ? '—' : `${risk?.data?.postureScore ?? 0}/100`}
-            subLabel={risk?.data?.postureScore >= 80 ? 'Good'
-              : risk?.data?.postureScore >= 60 ? 'Fair' : 'Needs attention'}
+            subLabel={(risk?.data?.postureScore ?? 0) >= 80 ? 'Good'
+              : (risk?.data?.postureScore ?? 0) >= 60 ? 'Fair' : 'Needs attention'}
             icon={ShieldAlert}
             iconColor={
               (risk?.data?.postureScore ?? 0) >= 80 ? 'bg-green-500/15 text-green-400'

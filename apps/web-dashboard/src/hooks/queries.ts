@@ -1,7 +1,27 @@
 import {
   useQuery, useMutation, useQueryClient, type UseQueryResult,
 } from '@tanstack/react-query'
-import { api, type AlertListParams, type CreateConnectorBody } from '@/lib/api'
+import {
+  api,
+  type AlertListParams,
+  type CreateConnectorBody,
+  type AlertSummary,
+  type AlertDetail,
+  type OrgPosture,
+  type PaginatedResult,
+  type UserRiskScore,
+  type UserRiskProfile,
+  type AssetRiskScore,
+  type ConnectorSummary,
+  type MttdMetrics,
+  type PipelineHealth,
+  type AttackCoverageResult,
+  type DetectionRule,
+  type AuditLogEntry,
+  type UsageSummary,
+} from '@/lib/api'
+
+type WithData<T, R = T> = R & { data: T }
 
 // ─────────────────────────────────────────────
 // QUERY KEYS (centralized to avoid typos)
@@ -33,7 +53,13 @@ export const QK = {
 export function useAlerts(params?: AlertListParams) {
   return useQuery({
     queryKey: QK.alerts(params),
-    queryFn:  () => api.alerts.list(params),
+    queryFn:  async (): Promise<WithData<AlertSummary[], PaginatedResult<AlertSummary>>> => {
+      const result = await api.alerts.list(params)
+      return {
+        ...result,
+        data: result.items ?? [],
+      }
+    },
     staleTime: 10_000,
   })
 }
@@ -41,7 +67,10 @@ export function useAlerts(params?: AlertListParams) {
 export function useAlert(id: string) {
   return useQuery({
     queryKey: QK.alert(id),
-    queryFn:  () => api.alerts.get(id),
+    queryFn:  async (): Promise<WithData<AlertDetail, AlertDetail>> => {
+      const alert = await api.alerts.get(id)
+      return { ...alert, data: alert }
+    },
     enabled:  !!id,
   })
 }
@@ -49,10 +78,15 @@ export function useAlert(id: string) {
 export function useUpdateAlertStatus() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, status, notes }: { id: string; status: string; notes?: string }) =>
-      api.alerts.updateStatus(id, status, notes),
-    onSuccess: (_, { id }) => {
-      qc.invalidateQueries({ queryKey: QK.alert(id) })
+    mutationFn: ({ id, alertId, status, notes }: { id?: string; alertId?: string; status: string; notes?: string }) => {
+      const targetId = id ?? alertId
+      if (!targetId) throw new Error('Alert id is required')
+      return api.alerts.updateStatus(targetId, status, notes)
+    },
+    onSuccess: (_, { id, alertId }) => {
+      const targetId = id ?? alertId
+      if (!targetId) return
+      qc.invalidateQueries({ queryKey: QK.alert(targetId) })
       qc.invalidateQueries({ queryKey: ['alerts'] })
     },
   })
@@ -61,10 +95,15 @@ export function useUpdateAlertStatus() {
 export function useAlertFeedback() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, verdict, notes }: { id: string; verdict: string; notes?: string }) =>
-      api.alerts.feedback(id, verdict, notes),
-    onSuccess: (_, { id }) => {
-      qc.invalidateQueries({ queryKey: QK.alert(id) })
+    mutationFn: ({ id, alertId, verdict, notes }: { id?: string; alertId?: string; verdict: string; notes?: string }) => {
+      const targetId = id ?? alertId
+      if (!targetId) throw new Error('Alert id is required')
+      return api.alerts.feedback(targetId, verdict, notes)
+    },
+    onSuccess: (_, { id, alertId }) => {
+      const targetId = id ?? alertId
+      if (!targetId) return
+      qc.invalidateQueries({ queryKey: QK.alert(targetId) })
     },
   })
 }
@@ -76,7 +115,10 @@ export function useAlertFeedback() {
 export function useRiskSummary() {
   return useQuery({
     queryKey: QK.riskSummary,
-    queryFn:  api.risk.summary,
+    queryFn:  async (): Promise<WithData<OrgPosture, OrgPosture>> => {
+      const summary = await api.risk.summary()
+      return { ...summary, data: summary }
+    },
     staleTime: 30_000,
     refetchInterval: 60_000,   // auto-refresh every minute
   })
@@ -85,7 +127,10 @@ export function useRiskSummary() {
 export function useRiskUsers() {
   return useQuery({
     queryKey: QK.riskUsers(),
-    queryFn:  () => api.risk.users({ limit: 50 }),
+    queryFn:  async (): Promise<WithData<PaginatedResult<UserRiskScore>, PaginatedResult<UserRiskScore>>> => {
+      const users = await api.risk.users({ limit: 50 })
+      return { ...users, data: users }
+    },
     staleTime: 30_000,
   })
 }
@@ -93,7 +138,10 @@ export function useRiskUsers() {
 export function useRiskUser(userId: string) {
   return useQuery({
     queryKey: QK.riskUser(userId),
-    queryFn:  () => api.risk.userProfile(userId),
+    queryFn:  async (): Promise<WithData<UserRiskProfile, UserRiskProfile>> => {
+      const profile = await api.risk.userProfile(userId)
+      return { ...profile, data: profile }
+    },
     enabled:  !!userId,
   })
 }
@@ -101,7 +149,10 @@ export function useRiskUser(userId: string) {
 export function useRiskAssets() {
   return useQuery({
     queryKey: QK.riskAssets,
-    queryFn:  () => api.risk.assets({ limit: 50 }),
+    queryFn:  async (): Promise<WithData<PaginatedResult<AssetRiskScore>, PaginatedResult<AssetRiskScore>>> => {
+      const assets = await api.risk.assets({ limit: 50 })
+      return { ...assets, data: assets }
+    },
     staleTime: 60_000,
   })
 }
@@ -109,7 +160,20 @@ export function useRiskAssets() {
 export function useMttd() {
   return useQuery({
     queryKey: QK.mttd,
-    queryFn:  api.risk.mttd,
+    queryFn:  async (): Promise<WithData<Record<string, unknown> & { p50Minutes: number | null; p90Minutes: number | null; p99Minutes: number | null; trend30d: number | null }, Record<string, unknown>>> => {
+      const raw = await api.risk.mttd() as MttdMetrics
+      const primary = (raw['P1'] ?? raw['critical'] ?? raw[Object.keys(raw)[0] ?? ''] ?? {}) as { p50?: number; p95?: number; p90?: number; p99?: number; trend30d?: number }
+      return {
+        ...raw,
+        data: {
+          ...raw,
+          p50Minutes: primary.p50 ?? null,
+          p90Minutes: primary.p90 ?? primary.p95 ?? null,
+          p99Minutes: primary.p99 ?? primary.p95 ?? null,
+          trend30d: primary.trend30d ?? null,
+        },
+      }
+    },
     staleTime: 300_000,
   })
 }
@@ -121,7 +185,10 @@ export function useMttd() {
 export function useConnectors() {
   return useQuery({
     queryKey: QK.connectors,
-    queryFn:  api.connectors.list,
+    queryFn:  async (): Promise<WithData<ConnectorSummary[], ConnectorSummary[]>> => {
+      const connectors = await api.connectors.list()
+      return Object.assign(connectors, { data: connectors })
+    },
     staleTime: 30_000,
     refetchInterval: 60_000,
   })
@@ -140,7 +207,16 @@ export function useCreateConnector() {
 export function usePipelineHealth() {
   return useQuery({
     queryKey: QK.pipelineHealth,
-    queryFn:  api.health.pipeline,
+    queryFn:  async (): Promise<WithData<PipelineHealth & { overall: string }, PipelineHealth>> => {
+      const health = await api.health.pipeline()
+      return {
+        ...health,
+        data: {
+          ...health,
+          overall: health.summary?.overallStatus ?? 'unknown',
+        },
+      }
+    },
     staleTime: 15_000,
     refetchInterval: 30_000,
   })
@@ -153,7 +229,10 @@ export function usePipelineHealth() {
 export function useAttackCoverage(gapsOnly = false) {
   return useQuery({
     queryKey: QK.attackCoverage(gapsOnly),
-    queryFn:  () => api.compliance.attackCoverage(gapsOnly),
+    queryFn:  async (): Promise<WithData<AttackCoverageResult, AttackCoverageResult>> => {
+      const coverage = await api.compliance.attackCoverage(gapsOnly)
+      return { ...coverage, data: coverage }
+    },
     staleTime: 300_000,
   })
 }
@@ -161,7 +240,10 @@ export function useAttackCoverage(gapsOnly = false) {
 export function useDetectionRules() {
   return useQuery({
     queryKey: QK.rules,
-    queryFn:  api.compliance.rules,
+    queryFn:  async (): Promise<WithData<DetectionRule[], DetectionRule[]>> => {
+      const rules = await api.compliance.rules()
+      return Object.assign(rules, { data: rules })
+    },
     staleTime: 300_000,
   })
 }
@@ -169,7 +251,13 @@ export function useDetectionRules() {
 export function useAuditLog(cursor?: string) {
   return useQuery({
     queryKey: QK.auditLog(cursor),
-    queryFn:  () => api.compliance.auditLog({ limit: 100, cursor }),
+    queryFn:  async (): Promise<WithData<AuditLogEntry[], PaginatedResult<AuditLogEntry>>> => {
+      const result = await api.compliance.auditLog({ limit: 100, cursor })
+      return {
+        ...result,
+        data: result.items ?? [],
+      }
+    },
     staleTime: 60_000,
   })
 }
@@ -181,7 +269,10 @@ export function useAuditLog(cursor?: string) {
 export function useUsage() {
   return useQuery({
     queryKey: QK.usage,
-    queryFn:  api.billing.usage,
+    queryFn:  async (): Promise<WithData<UsageSummary, UsageSummary>> => {
+      const usage = await api.billing.usage()
+      return { ...usage, data: usage }
+    },
     staleTime: 300_000,
   })
 }
