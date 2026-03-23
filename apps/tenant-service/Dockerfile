@@ -28,9 +28,9 @@ COPY apps/tenant-service/ ./apps/tenant-service/
 RUN npm run build --workspace=packages/shared-types && \
     npm run build --workspace=packages/event-schema && \
     npm run build --workspace=packages/db-client && \
-    npm run build --workspace=packages/auth-utils && \
-    npm run build --workspace=packages/logger && \
     npm run build --workspace=packages/config && \
+    npm run build --workspace=packages/logger && \
+    npm run build --workspace=packages/auth-utils && \
     npm run build --workspace=apps/tenant-service
 
 FROM node:20-alpine AS production

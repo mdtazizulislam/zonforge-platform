@@ -318,7 +318,7 @@ async function start() {
   // ── POST /v1/assistant/chat (streaming) ───────
 
   app.post('/v1/assistant/chat', async (ctx) => {
-    const user = ctx.var.user
+    const user = (ctx.var as any).user as { tenantId: string }
     const body = await ctx.req.json() as {
       messages: Array<{ role: 'user' | 'assistant'; content: string }>
       sessionId?: string
@@ -398,7 +398,7 @@ async function start() {
   // Context-aware quick suggestions
 
   app.get('/v1/assistant/suggestions', async (ctx) => {
-    const user = ctx.var.user
+    const user = (ctx.var as any).user as { tenantId: string }
     const db   = getDb()
 
     const criticalAlerts = await db.select({ id: schema.alerts.id, title: schema.alerts.title })
