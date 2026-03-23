@@ -94,7 +94,7 @@ jobs:
 
       - name: 🗃️ Run database migrations
         run: |
-          npx drizzle-kit push --config=packages/db-client/drizzle.config.ts
+          npm run db:migrate --workspace=packages/db-client
 
       - name: 🧪 Run TypeScript tests
         run: npx turbo run test --filter='./packages/*' --filter='./apps/*'
