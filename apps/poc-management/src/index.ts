@@ -80,6 +80,16 @@ interface PocEngagement {
   updatedAt:       Date
 }
 
+type AuthUser = {
+  tenantId: string
+  role: string
+  email: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
+
 // ─────────────────────────────────────────────
 // DEFAULT POC MILESTONES (30-day playbook)
 // ─────────────────────────────────────────────
@@ -334,7 +344,7 @@ async function start() {
   app.post('/v1/poc',
     zValidator('json', CreatePocSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const body = ctx.req.valid('json')
       const db   = getDb()
 
@@ -410,7 +420,7 @@ async function start() {
   // ── GET /v1/poc ───────────────────────────────
 
   app.get('/v1/poc', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const pocs = await db.select()
@@ -431,7 +441,7 @@ async function start() {
   // ── GET /v1/poc/:id ───────────────────────────
 
   app.get('/v1/poc/:id', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [poc] = await db.select()
@@ -466,7 +476,7 @@ async function start() {
   app.patch('/v1/poc/:id/milestone',
     zValidator('json', UpdateMilestoneSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const { milestoneId, status, notes } = ctx.req.valid('json')
       const db   = getDb()
 
@@ -496,7 +506,7 @@ async function start() {
   // ── GET /v1/poc/:id/roi ───────────────────────
 
   app.get('/v1/poc/:id/roi', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [poc] = await db.select({ tenantId: schema.pocEngagements.tenantId, trialDays: schema.pocEngagements.trialDays })
@@ -516,7 +526,7 @@ async function start() {
   // ── POST /v1/poc/:id/convert ──────────────────
 
   app.post('/v1/poc/:id/convert', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     await db.update(schema.pocEngagements)
@@ -534,7 +544,7 @@ async function start() {
   // Platform-admin view of all POCs
 
   app.get('/v1/poc/dashboard/summary', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     if (user.role !== 'PLATFORM_ADMIN') return ctx.json({ success: false, error: { code: 'FORBIDDEN' } }, 403)
     const db   = getDb()
 
