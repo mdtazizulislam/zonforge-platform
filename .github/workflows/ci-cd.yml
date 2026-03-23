@@ -49,6 +49,9 @@ jobs:
 
     env:
       ZONFORGE_POSTGRES_HOST:     localhost
+      ZONFORGE_POSTGRES_PORT:     5432
+      ZONFORGE_POSTGRES_DB:       zonforge_test
+      ZONFORGE_POSTGRES_USER:     zonforge
       ZONFORGE_POSTGRES_PASSWORD: test_password
       ZONFORGE_JWT_SECRET:        "test-jwt-secret-min-32-chars-here-aa"
       ZONFORGE_HMAC_SECRET:       "test-hmac-secret-min-32-chars-here-bb"
