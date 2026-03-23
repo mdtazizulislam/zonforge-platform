@@ -25,6 +25,14 @@ const log = createLogger({ service: 'behavioral-ai' })
 const PROFILE_QUEUE = 'zf-behavioral-profile-builds'
 const PROFILE_TTL   = 6 * 60 * 60   // Redis cache: 6 hours
 
+type AuthUser = {
+  tenantId: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
+
 // ─────────────────────────────────────────────
 // PROFILE STORE (Redis-backed)
 // ─────────────────────────────────────────────
@@ -206,7 +214,7 @@ async function start() {
   app.post('/v1/behavioral/build-profiles',
     zValidator('json', BuildProfileSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const { userId, windowDays, force } = ctx.req.valid('json')
 
       if (userId) {
@@ -231,7 +239,7 @@ async function start() {
   // ── GET /v1/behavioral/profile/:userId ────────
 
   app.get('/v1/behavioral/profile/:userId', async (ctx) => {
-    const user    = ctx.var.user
+    const user    = getAuthUser(ctx)
     const userId  = ctx.req.param('userId')
 
     let profile = await store.get(user.tenantId, userId)
@@ -271,7 +279,7 @@ async function start() {
   app.post('/v1/behavioral/check',
     zValidator('json', DeviationCheckSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const req  = ctx.req.valid('json')
 
       // Override tenantId with auth context
@@ -296,7 +304,7 @@ async function start() {
   // Recent behavioral anomalies for tenant
 
   app.get('/v1/behavioral/anomalies', async (ctx) => {
-    const user  = ctx.var.user
+    const user  = getAuthUser(ctx)
     const limit = parseInt(ctx.req.query('limit') ?? '50', 10)
 
     // Anomalies stored in Redis sorted set
@@ -310,7 +318,7 @@ async function start() {
   // ── GET /v1/behavioral/stats ──────────────────
 
   app.get('/v1/behavioral/stats', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const keys = await store.getAll(user.tenantId)
 
     let stableProfiles = 0
