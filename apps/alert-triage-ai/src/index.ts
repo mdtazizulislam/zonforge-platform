@@ -305,7 +305,7 @@ async function start() {
   // ── GET /v1/triage/:alertId ───────────────────
 
   app.get('/v1/triage/:alertId', async (ctx) => {
-    const user    = ctx.var.user
+    const user    = (ctx.var as any).user as { tenantId: string }
     const alertId = ctx.req.param('alertId')
 
     // Check cache first
@@ -330,7 +330,7 @@ async function start() {
   // AI-sorted alert queue
 
   app.get('/v1/triage/queue', async (ctx) => {
-    const user  = ctx.var.user
+    const user  = (ctx.var as any).user as { tenantId: string }
     const db    = getDb()
     const limit = parseInt(ctx.req.query('limit') ?? '30', 10)
 
