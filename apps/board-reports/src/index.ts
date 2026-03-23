@@ -47,6 +47,14 @@ interface BoardReportData {
   industryBenchmark: { percentile: number; vsMedian: string }
 }
 
+type AuthUser = {
+  tenantId: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
+
 async function collectBoardData(
   tenantId: string,
   periodDays: number,
@@ -89,7 +97,7 @@ async function collectBoardData(
     ? Math.round(alerts.reduce((s, a) => s + (a.detectionGapMinutes ?? 10), 0) / alerts.length)
     : 14
 
-  const healthyConn   = connectors.filter(c => c.isHealthy).length
+  const healthyConn   = connectors.filter(c => c.status === 'active').length
   const uptimePct     = connectors.length > 0 ? Math.round((healthyConn / connectors.length) * 100) : 100
 
   // Top 3 incidents for board
@@ -122,7 +130,7 @@ async function collectBoardData(
   const recommendations: string[] = []
   if (openCritical.length > 0)  recommendations.push(`Resolve ${openCritical.length} critical open alert(s) immediately`)
   if (currentPosture < 80)      recommendations.push('Invest in MFA enforcement to reach 80+ posture score')
-  if (connectors.some(c => !c.isHealthy)) recommendations.push('Restore failed data connectors for complete coverage')
+  if (connectors.some(c => c.status !== 'active')) recommendations.push('Restore failed data connectors for complete coverage')
 
   return {
     tenantName:  tenantRow?.name ?? 'Organization',
@@ -461,7 +469,7 @@ async function start() {
       format:     z.enum(['html','json']).default('html'),
     })),
     async (ctx) => {
-      const user   = ctx.var.user
+      const user   = getAuthUser(ctx)
       const { periodDays, format } = ctx.req.valid('json')
 
       log.info({ tenantId: user.tenantId, periodDays }, 'Generating board report')
@@ -509,7 +517,7 @@ async function start() {
   // ── GET /v1/board-report/preview ─────────────
 
   app.get('/v1/board-report/preview', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const data = await collectBoardData(user.tenantId, 30)
     const html = generateHtmlReport(data)
     return ctx.text(html, 200, { 'Content-Type': 'text/html' })

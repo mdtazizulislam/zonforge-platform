@@ -5,7 +5,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { zValidator } from '@hono/zod-validator'
 import { v4 as uuid } from 'uuid'
 import { eq, and, desc } from 'drizzle-orm'
-import Redis          from 'ioredis'
+import { Redis }      from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -30,7 +30,7 @@ async function start() {
     maxRetriesPerRequest: null, enableReadyCheck: false,
   })
   redis.on('connect', () => log.info('✅ Redis connected'))
-  redis.on('error',   e => log.error({ err: e }, 'Redis error'))
+  redis.on('error', (e: unknown) => log.error({ err: e }, 'Redis error'))
 
   const monitor = new TriggerMonitor()
   const app     = new Hono()

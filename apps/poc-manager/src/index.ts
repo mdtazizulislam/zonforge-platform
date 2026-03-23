@@ -6,7 +6,7 @@ import { zValidator }  from '@hono/zod-validator'
 import { v4 as uuid }  from 'uuid'
 import { eq, and, desc, gte, count } from 'drizzle-orm'
 import Anthropic       from '@anthropic-ai/sdk'
-import Redis           from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -22,6 +22,14 @@ import {
 } from '@zonforge/auth-utils'
 
 const log = createLogger({ service: 'poc-manager' })
+
+type AuthUser = {
+  tenantId: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
 
 // ─────────────────────────────────────────────
 // ENGAGEMENT SCORER
@@ -68,7 +76,6 @@ async function computeEngagement(
   ))
 
   return {
-    lastLoginAt:          undefined,
     totalLogins:          loginCount,
     alertsInvestigated:   alertCount,
     playbooksCreated:     playbookCount,
@@ -199,7 +206,7 @@ async function start() {
   initDb(postgresConfig)
   log.info('✅ PostgreSQL connected')
 
-  const redis = new Redis({
+  const redis = new IORedis({
     host: redisConfig.host, port: redisConfig.port,
     password: redisConfig.password, tls: redisConfig.tls ? {} : undefined,
     maxRetriesPerRequest: 3,
@@ -216,7 +223,7 @@ async function start() {
   app.post('/v1/poc',
     zValidator('json', CreatePocSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const body = ctx.req.valid('json')
       const db   = getDb()
 
@@ -309,7 +316,7 @@ async function start() {
   // ── GET /v1/poc — List all POCs (platform admin) ─
 
   app.get('/v1/poc', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const pocs = await db.select()
@@ -323,7 +330,7 @@ async function start() {
   // ── GET /v1/poc/:id — POC detail ─────────────
 
   app.get('/v1/poc/:id', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [poc] = await db.select()

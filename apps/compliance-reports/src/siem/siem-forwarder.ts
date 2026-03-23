@@ -40,6 +40,20 @@ export interface SiemEvent {
   data:      Record<string, unknown>
 }
 
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 // ─────────────────────────────────────────────
 // SPLUNK HEC FORWARDER
 // ─────────────────────────────────────────────
@@ -74,7 +88,7 @@ export async function forwardToSplunk(
     })).join('\n')
 
     try {
-      const resp = await fetch(config.splunkHecUrl, {
+      const resp = await fetchWithTimeout(config.splunkHecUrl, {
         method: 'POST',
         headers: {
           Authorization:  `Splunk ${config.splunkHecToken}`,
@@ -82,8 +96,7 @@ export async function forwardToSplunk(
           'X-Splunk-Request-Channel': crypto.randomUUID(),
         },
         body,
-        signal: AbortSignal.timeout(15_000),
-      })
+      }, 15_000)
 
       if (!resp.ok) {
         const errText = await resp.text()
@@ -147,7 +160,7 @@ export async function forwardToSentinel(
     )
 
     try {
-      const resp = await fetch(
+      const resp = await fetchWithTimeout(
         `https://${config.sentinelWorkspaceId}.ods.opinsights.azure.com/api/logs?api-version=2016-04-01`,
         {
           method: 'POST',
@@ -159,8 +172,8 @@ export async function forwardToSentinel(
             'time-generated-field': 'TimeGenerated',
           },
           body,
-          signal: AbortSignal.timeout(30_000),
         },
+        30_000,
       )
 
       if (resp.status === 200) {
@@ -191,12 +204,11 @@ export async function forwardToWebhook(
   if (!config.webhookUrl) return { forwarded: 0, failed: events.length }
 
   try {
-    const resp = await fetch(config.webhookUrl, {
+    const resp = await fetchWithTimeout(config.webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...config.webhookHeaders },
       body:    JSON.stringify({ events, source: 'zonforge-sentinel' }),
-      signal:  AbortSignal.timeout(15_000),
-    })
+    }, 15_000)
     return resp.ok
       ? { forwarded: events.length, failed: 0 }
       : { forwarded: 0, failed: events.length }

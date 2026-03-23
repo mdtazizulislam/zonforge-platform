@@ -1,4 +1,4 @@
-import Redis from 'ioredis'
+import { Redis } from 'ioredis'
 import { redisConfig } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
 
@@ -15,12 +15,12 @@ export function getRedis(): Redis {
     password:       redisConfig.password,
     tls:            redisConfig.tls ? {} : undefined,
     maxRetriesPerRequest: 3,
-    retryStrategy: (times) => Math.min(times * 100, 3000),
+    retryStrategy: (times: number) => Math.min(times * 100, 3000),
     lazyConnect: false,
   })
 
   _redis.on('connect',   () => log.info('Redis connected'))
-  _redis.on('error',  (e) => log.error({ err: e }, 'Redis error'))
+  _redis.on('error',  (e: unknown) => log.error({ err: e }, 'Redis error'))
   _redis.on('close',     () => log.warn('Redis connection closed'))
 
   return _redis

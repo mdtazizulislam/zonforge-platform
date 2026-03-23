@@ -1,7 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import { randomBytes } from 'crypto'
 import type { Honeypot, HoneypotType } from '../models/honeypot.js'
-import { HONEYPOT_META } from '../models/honeypot.js'
 
 // ─────────────────────────────────────────────
 // HONEYPOT FACTORY
@@ -49,7 +48,6 @@ export function generateHoneypot(
   name?:     string,
 ): GeneratedHoneypot {
   const trackingToken = `ZF-HC-${randomHex(12).toUpperCase()}`
-  const meta = HONEYPOT_META[type]
 
   switch (type) {
 

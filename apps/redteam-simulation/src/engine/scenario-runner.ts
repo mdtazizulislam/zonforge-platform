@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url'
 import { parse as parseYaml } from 'yaml'
 import { v4 as uuid } from 'uuid'
 import { Queue } from 'bullmq'
-import type Redis from 'ioredis'
+import type { Redis } from 'ioredis'
 import { createLogger } from '@zonforge/logger'
 import {
   generateEventsForStep,
@@ -48,7 +48,7 @@ export class ScenarioRunner {
     private readonly queueName = 'zf:raw-events',
   ) {
     this.rawEventsQueue = new Queue(queueName, {
-      connection: redis,
+      connection: redis as unknown as any,
       defaultJobOptions: {
         removeOnComplete: 100,
         removeOnFail:      50,
@@ -209,7 +209,7 @@ export class ScenarioRunner {
         eventsInjected: injected,
         injectedAt:     status === 'injected' ? new Date() : null,
         durationMs:     Date.now() - stepStart,
-        error:          stepError,
+        ...(stepError !== undefined ? { error: stepError } : {}),
       })
     }
 
@@ -242,7 +242,6 @@ export class ScenarioRunner {
       evaluationStatus:  'timeout',
       detectionRatePct:  0,
       gapRules:          [...scenario.expected_detections],
-      detectionGapMs:    undefined,
 
       summary:         `Simulation ${simId.slice(0, 8)} — ${totalEventsInjected} events injected across ${stepResults.filter(s => s.status === 'injected').length} steps`,
       gaps:            [],

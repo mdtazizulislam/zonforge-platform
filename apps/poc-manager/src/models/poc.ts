@@ -153,7 +153,6 @@ export const DEFAULT_MILESTONES: Omit<PocMilestone, 'id'>[] = [
     week:  1,
     title: 'Foundation & First Detections',
     description: 'Connect data sources, validate data flow, see first real detections.',
-    completedAt: undefined,
     tasks: [
       { id: '1-1', title: 'Connect primary identity connector (M365 or Google Workspace)', completed: false, owner: 'zonforge' },
       { id: '1-2', title: 'Configure detection rules for your top 3 threat scenarios', completed: false, owner: 'zonforge' },
@@ -166,7 +165,6 @@ export const DEFAULT_MILESTONES: Omit<PocMilestone, 'id'>[] = [
     week:  2,
     title: 'Detection Tuning & Workflow Integration',
     description: 'Reduce false positives, integrate with existing tools (Jira/ServiceNow/Slack).',
-    completedAt: undefined,
     tasks: [
       { id: '2-1', title: 'Review false positive rate — target < 15%', completed: false, owner: 'zonforge' },
       { id: '2-2', title: 'Configure Jira/ServiceNow playbook integration', completed: false, owner: 'zonforge' },
@@ -179,7 +177,6 @@ export const DEFAULT_MILESTONES: Omit<PocMilestone, 'id'>[] = [
     week:  3,
     title: 'Advanced Capabilities & Team Adoption',
     description: 'AI SOC Analyst, behavioral baselines, compliance reports.',
-    completedAt: undefined,
     tasks: [
       { id: '3-1', title: 'AI SOC Analyst live on P1/P2 alerts — review 3 investigations', completed: false, owner: 'customer' },
       { id: '3-2', title: 'Behavioral baselines established for all monitored users', completed: false, owner: 'zonforge' },
@@ -192,7 +189,6 @@ export const DEFAULT_MILESTONES: Omit<PocMilestone, 'id'>[] = [
     week:  4,
     title: 'ROI Review & Go/No-Go Decision',
     description: 'Measure against success criteria, generate ROI report, present to stakeholders.',
-    completedAt: undefined,
     tasks: [
       { id: '4-1', title: 'Final success criteria assessment', completed: false, owner: 'zonforge' },
       { id: '4-2', title: 'Generate executive ROI report (PDF)', completed: false, owner: 'zonforge' },

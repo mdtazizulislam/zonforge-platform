@@ -13,6 +13,7 @@ import {
   authMiddleware, requirePermission, rateLimitMiddleware,
 } from '../middleware/auth.middleware.js'
 import { createLogger } from '@zonforge/logger'
+import type { Context } from 'hono'
 import type { UserRole } from '@zonforge/shared-types'
 
 const log = createLogger({ service: 'auth-service:routes' })
@@ -33,7 +34,14 @@ authRouter.post(
     const userAgent = ctx.req.header('User-Agent') ?? 'unknown'
 
     try {
-      const result = await login({ ...body, ip, userAgent })
+      const loginInput = {
+        email: body.email,
+        password: body.password,
+        ip,
+        userAgent,
+        ...(body.totpCode ? { totpCode: body.totpCode } : {}),
+      }
+      const result = await login(loginInput)
 
       if (result.requiresMfa) {
         return ctx.json({ success: true, data: { requiresMfa: true,

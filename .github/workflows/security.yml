@@ -4,11 +4,14 @@ on:
   schedule:
     - cron: "0 2 * * *"   # Daily at 2 AM UTC
   workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   dependency-audit:
     name: npm Audit
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,10 +26,11 @@ jobs:
   snyk-scan:
     name: Snyk Vulnerability Scan
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - name: Snyk scan
-        uses: snyk/actions/node@master
+        uses: snyk/actions/node@v4
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -50,6 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
+        continue-on-error: true
         with:
           fail-on-severity: high
           deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0

@@ -1,6 +1,6 @@
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { v4 as uuid }       from 'uuid'
-import type Redis            from 'ioredis'
+import type { Redis }       from 'ioredis'
 import { getDb, schema }    from '@zonforge/db-client'
 import { createLogger }     from '@zonforge/logger'
 import {
@@ -46,6 +46,8 @@ export interface AlertForTrigger {
   mitreTechniques:  string[]
   metadata:         Record<string, unknown>
 }
+
+type PlaybookExecutionStatus = 'pending_approval' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 // ─────────────────────────────────────────────
 // PLAYBOOK ENGINE SERVICE
@@ -113,7 +115,7 @@ export class PlaybookEngineService {
   ): Promise<{
     executionId:   string
     playbookId:    string
-    status:        string
+    status:        PlaybookExecutionStatus
     actionsResult: Array<{ type: string; status: string; message: string }>
   }> {
     const executionId = uuid()
@@ -124,9 +126,9 @@ export class PlaybookEngineService {
       tenantId:       alert.tenantId,
       alertId:        alert.id,
       executionId,
-      affectedUserId: alert.affectedUserId,
-      affectedIp:     alert.affectedIp,
-      affectedEmail:  alert.affectedEmail,
+      ...(alert.affectedUserId !== undefined ? { affectedUserId: alert.affectedUserId } : {}),
+      ...(alert.affectedIp !== undefined ? { affectedIp: alert.affectedIp } : {}),
+      ...(alert.affectedEmail !== undefined ? { affectedEmail: alert.affectedEmail } : {}),
       metadata:       alert.metadata,
     }
 
@@ -150,7 +152,7 @@ export class PlaybookEngineService {
 
     // Update playbook hit count
     await db.update(schema.playbooks)
-      .set({ executionCount: schema.playbooks.executionCount + 1, lastExecutedAt: now })
+      .set({ executionCount: sql`${schema.playbooks.executionCount} + 1`, lastExecutedAt: now })
       .where(eq(schema.playbooks.id, playbook.id))
 
     log.info({
@@ -178,7 +180,7 @@ export class PlaybookEngineService {
 
     // Execute actions sequentially
     const actionsResult: Array<{ type: string; status: string; message: string }> = []
-    let   overallStatus = 'completed'
+    let overallStatus: PlaybookExecutionStatus = 'completed'
 
     for (const action of playbook.actions) {
       // Respect delay
@@ -363,7 +365,7 @@ export class PlaybookEngineService {
 
   private writeAuditEntry(
     tenantId: string, executionId: string,
-    playbookId: string, actorId: string, status: string,
+    playbookId: string, actorId: string, status: PlaybookExecutionStatus,
   ): void {
     // Fire and forget
     import('@zonforge/db-client').then(({ getDb: db, schema: s }) => {

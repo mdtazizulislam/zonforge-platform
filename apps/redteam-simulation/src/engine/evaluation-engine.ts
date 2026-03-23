@@ -106,7 +106,7 @@ export class EvaluationEngine {
       evaluationStatus,
       detectionRatePct,
       gapRules,
-      detectionGapMs:    avgGapMs,
+      ...(avgGapMs !== undefined ? { detectionGapMs: avgGapMs } : {}),
       summary:           this.buildSummary(scenario.name, detectionRatePct, evaluationStatus, detections, gapRules),
       gaps,
       recommendations,
@@ -231,7 +231,11 @@ export class EvaluationEngine {
       `
 
       const resp = await fetch(`${chHost}/?query=${encodeURIComponent(sql)}&readonly=1`, {
-        signal: AbortSignal.timeout(5000),
+        signal: (() => {
+          const c = new AbortController()
+          setTimeout(() => c.abort(), 5000)
+          return c.signal
+        })(),
       })
 
       if (!resp.ok) return []

@@ -5,7 +5,7 @@ import {
   type CollectorResult,
   type CursorState,
   sleep,
-} from '../../collector-base/src/index.js'
+} from '@zonforge/collector-base'
 import { createLogger } from '@zonforge/logger'
 
 // ─────────────────────────────────────────────
@@ -97,15 +97,17 @@ export class GoogleWorkspaceCollector extends BaseCollector {
 
     do {
       try {
-        const resp = await admin.activities.list({
+        const params: admin_reports_v1.Params$Resource$Activities$List = {
           userKey:         'all',
           applicationName: app,
           startTime,
           endTime,
           maxResults:      1000,
-          pageToken,
           customerId:      this.auth.customerId,
-        })
+          ...(pageToken ? { pageToken } : {}),
+        }
+
+        const resp = await admin.activities.list(params)
 
         const items = resp.data.items ?? []
         for (const item of items) {
@@ -143,7 +145,7 @@ export class GoogleWorkspaceCollector extends BaseCollector {
     } while (pageToken)
 
     // Save page token for next poll (resume pagination)
-    this.gCursor.pageTokens[app] = undefined   // clear after full page exhausted
+    delete this.gCursor.pageTokens[app]   // clear after full page exhausted
 
     return events
   }
@@ -224,7 +226,7 @@ export class GoogleWorkspaceCollector extends BaseCollector {
     }
   }
 
-  protected async saveCursorState(state: CursorState): Promise<void> {
+  protected override async saveCursorState(state: CursorState): Promise<void> {
     this.gCursor     = state as GoogleCursorState
     this.cursorState = state
   }

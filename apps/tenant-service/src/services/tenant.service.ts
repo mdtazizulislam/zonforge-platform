@@ -5,9 +5,13 @@ import { RedisKeys, RedisTTL } from '@zonforge/db-client'
 import { PLAN_LIMITS, type PlanTier, TenantSettingsSchema } from '@zonforge/shared-types'
 import { computeAuditHash } from '@zonforge/auth-utils'
 import { createLogger } from '@zonforge/logger'
-import type Redis from 'ioredis'
+import type { Redis } from 'ioredis'
 
 const log = createLogger({ service: 'tenant-service' })
+
+type TenantSettingsInput = {
+  [K in keyof typeof TenantSettingsSchema._type]?: typeof TenantSettingsSchema._type[K] | undefined
+}
 
 // ─────────────────────────────────────────────
 // CREATE TENANT
@@ -19,7 +23,7 @@ export interface CreateTenantInput {
   planTier:   PlanTier
   region:     'us-east-1' | 'eu-west-1' | 'ap-southeast-1'
   createdBy:  string
-  settings?:  Partial<typeof TenantSettingsSchema._type>
+  settings?:  TenantSettingsInput
 }
 
 export async function createTenant(input: CreateTenantInput) {

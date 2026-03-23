@@ -5,16 +5,14 @@ import { z } from 'zod'
 // ─────────────────────────────────────────────
 
 export type HoneypotType =
-  | 'fake_credential'        // username/password pair that nobody should use
-  | 'fake_api_key'           // API key that triggers on any use
-  | 'fake_s3_bucket'         // AWS S3 bucket name planted in configs
-  | 'fake_admin_account'     // AD/Entra user account nobody should log into
-  | 'fake_database_server'   // DB hostname that nobody should query
-  | 'fake_ssh_key'           // Private key planted in scripts/config files
-  | 'fake_webhook_url'       // URL endpoint that logs any caller
-  | 'fake_internal_service'  // Fake microservice URL planted in env vars
-  | 'canary_document'        // Document that phones home if opened
-  | 'canary_email'           // Email address nobody should contact
+  | 'credential'
+  | 'aws_key'
+  | 'api_token'
+  | 's3_bucket'
+  | 'user_account'
+  | 'dns_canary'
+  | 'oauth_client'
+  | 'db_record'
 
 export type HoneypotStatus = 'active' | 'triggered' | 'retired' | 'deploying'
 
@@ -44,12 +42,12 @@ export interface Honeypot {
 
   // Detection tracking
   triggerCount: number
-  lastTriggeredAt?: Date
+  lastTriggeredAt?: Date | undefined
   triggers:     HoneypotTrigger[]
 
   // Lifecycle
   deployedAt:   Date
-  retiredAt?:   Date
+  retiredAt?:   Date | undefined
   createdBy:    string
 
   // Auto-alert config
@@ -68,10 +66,10 @@ export interface HoneypotTrigger {
   triggeredAt:   Date
 
   // Who triggered it
-  actorIp?:       string
-  actorUserId?:   string
-  actorCountry?:  string
-  actorUserAgent?: string
+  actorIp?:       string | undefined
+  actorUserId?:   string | undefined
+  actorCountry?:  string | undefined
+  actorUserAgent?: string | undefined
 
   // How it was triggered
   triggerMethod:  'login_attempt' | 'api_call' | 'bucket_access' | 'dns_lookup'
@@ -81,7 +79,21 @@ export interface HoneypotTrigger {
   // Derived intel
   isExternal:     boolean
   threatScore:    number     // 0–100
-  linkedAlertId?: string
+  linkedAlertId?: string | undefined
+}
+
+export type TriggerConfidence = 'definite' | 'high' | 'medium'
+
+export interface TriggerEvent {
+  honeypotId: string
+  tenantId: string
+  triggeredAt: Date
+  confidence: TriggerConfidence
+  triggerType: string
+  sourceIp?: string | undefined
+  userAgent?: string | undefined
+  requestPath?: string | undefined
+  rawRequest?: Record<string, unknown> | undefined
 }
 
 // ─────────────────────────────────────────────
@@ -107,9 +119,8 @@ export interface HoneypotGridSummary {
 export const DeployHoneypotSchema = z.object({
   name:         z.string().min(1).max(200),
   type:         z.enum([
-    'fake_credential','fake_api_key','fake_s3_bucket','fake_admin_account',
-    'fake_database_server','fake_ssh_key','fake_webhook_url',
-    'fake_internal_service','canary_document','canary_email',
+    'credential','aws_key','api_token','s3_bucket',
+    'user_account','dns_canary','oauth_client','db_record',
   ]),
   placement:    z.enum([
     'm365_sharepoint','aws_parameter_store','github_repo',
@@ -131,29 +142,36 @@ export function generateHoneypotValue(type: HoneypotType, tenantSlug: string): s
   const id = Math.random().toString(36).slice(2, 10)
 
   switch (type) {
-    case 'fake_credential':
+    case 'credential':
       return `honeypot_svc_${tenantSlug}_${id}`    // username format
-    case 'fake_api_key':
+    case 'aws_key':
       return `zfhp_${id}${Math.random().toString(36).slice(2, 34)}`
-    case 'fake_s3_bucket':
+    case 's3_bucket':
       return `${tenantSlug}-internal-backup-${id}`
-    case 'fake_admin_account':
+    case 'user_account':
       return `svc.backup.admin.${id}@${tenantSlug}.internal`
-    case 'fake_database_server':
+    case 'db_record':
       return `db-backup-${id}.internal.${tenantSlug}.com`
-    case 'fake_ssh_key':
-      return `PRIVATE_KEY_REDACTED_BEGIN\nb3BlbnNzaC1rZXktdjEAAAAA[HONEYPOT:${id}]\nPRIVATE_KEY_REDACTED_END`
-    case 'fake_webhook_url':
-      return `https://hooks.${tenantSlug}.internal/webhook/${id}/ingest`
-    case 'fake_internal_service':
-      return `http://svc-internal-${id}.${tenantSlug}.local:8080`
-    case 'canary_document':
-      return `confidential_roadmap_${id}.docx`
-    case 'canary_email':
-      return `archive.backup.${id}@${tenantSlug}.com`
+    case 'api_token':
+      return `zftok_${tenantSlug}_${id}_${Math.random().toString(36).slice(2, 12)}`
+    case 'dns_canary':
+      return `canary-${id}.${tenantSlug}.internal`
+    case 'oauth_client':
+      return `oauth-${tenantSlug}-${id}`
     default:
       return `honeypot-${id}`
   }
+}
+
+export const HONEYPOT_META: Record<HoneypotType, { description: string }> = {
+  credential: { description: 'Username/password credential canary' },
+  aws_key: { description: 'AWS access key canary' },
+  api_token: { description: 'API token canary' },
+  s3_bucket: { description: 'S3 bucket reference canary' },
+  user_account: { description: 'User account canary' },
+  dns_canary: { description: 'DNS canary token' },
+  oauth_client: { description: 'OAuth client secret canary' },
+  db_record: { description: 'Database record canary' },
 }
 
 // ─────────────────────────────────────────────
@@ -166,7 +184,7 @@ export const RECOMMENDED_GRID: Array<Omit<Honeypot,
 >> = [
   {
     name:         'Fake Admin Credential',
-    type:         'fake_credential',
+    type:         'credential',
     placement:    'm365_sharepoint',
     description:  'Fake admin username/password planted in SharePoint IT runbook. Any login attempt = immediate compromise indicator.',
     tags:         ['credential', 'identity', 'high-value'],
@@ -175,7 +193,7 @@ export const RECOMMENDED_GRID: Array<Omit<Honeypot,
   },
   {
     name:         'Fake AWS API Key',
-    type:         'fake_api_key',
+    type:         'aws_key',
     placement:    'aws_parameter_store',
     description:  'Decommissioned-looking AWS key planted in legacy config. Any API call = credential theft indicator.',
     tags:         ['aws', 'cloud', 'api-key'],
@@ -184,7 +202,7 @@ export const RECOMMENDED_GRID: Array<Omit<Honeypot,
   },
   {
     name:         'Fake S3 Backup Bucket',
-    type:         'fake_s3_bucket',
+    type:         's3_bucket',
     placement:    'github_repo',
     description:  'Fake S3 bucket name planted in old deployment scripts. Any access = attacker probing cloud resources.',
     tags:         ['s3', 'cloud', 'storage'],
@@ -193,7 +211,7 @@ export const RECOMMENDED_GRID: Array<Omit<Honeypot,
   },
   {
     name:         'Fake Service Account',
-    type:         'fake_admin_account',
+    type:         'user_account',
     placement:    'confluence_page',
     description:  'Dormant admin account documented in Confluence "emergency access" page. Any login = insider threat or lateral movement.',
     tags:         ['identity', 'service-account'],
@@ -201,8 +219,8 @@ export const RECOMMENDED_GRID: Array<Omit<Honeypot,
     alertSeverity:  'critical',
   },
   {
-    name:         'Canary Document: Strategy 2025',
-    type:         'canary_document',
+    name:         'Canary DNS Token',
+    type:         'dns_canary',
     placement:    'm365_sharepoint',
     description:  'Document titled "Confidential M&A Strategy 2025" planted in SharePoint. Any open or download = data exfiltration.',
     tags:         ['document', 'canary', 'exfil'],
@@ -210,8 +228,8 @@ export const RECOMMENDED_GRID: Array<Omit<Honeypot,
     alertSeverity:  'high',
   },
   {
-    name:         'Fake Database Server',
-    type:         'fake_database_server',
+    name:         'Database Canary Record',
+    type:         'db_record',
     placement:    'aws_parameter_store',
     description:  'Decommissioned DB hostname in Parameter Store. Any connection attempt = lateral movement indicator.',
     tags:         ['database', 'lateral-movement'],
@@ -219,38 +237,20 @@ export const RECOMMENDED_GRID: Array<Omit<Honeypot,
     alertSeverity:  'high',
   },
   {
-    name:         'Canary Email: IT Helpdesk',
-    type:         'canary_email',
+    name:         'API Token Canary',
+    type:         'api_token',
     placement:    'email_signature',
-    description:  'Fake IT helpdesk email planted in auto-signature. Any email = phishing campaign or insider threat.',
-    tags:         ['email', 'phishing'],
+    description:  'Fake API token planted in communication channels and config snippets.',
+    tags:         ['api', 'token'],
     alertOnTrigger: true,
     alertSeverity:  'high',
   },
   {
-    name:         'Fake Internal Webhook',
-    type:         'fake_webhook_url',
+    name:         'OAuth Client Canary',
+    type:         'oauth_client',
     placement:    'slack_message',
-    description:  'Webhook URL posted in historical Slack message. Any HTTP call = attacker harvesting internal URLs.',
-    tags:         ['webhook', 'recon'],
-    alertOnTrigger: true,
-    alertSeverity:  'high',
-  },
-  {
-    name:         'Fake SSH Key in Scripts',
-    type:         'fake_ssh_key',
-    placement:    'github_repo',
-    description:  'Invalidated-looking private key in archived repo. Any use attempt = SSH key harvesting.',
-    tags:         ['ssh', 'credential'],
-    alertOnTrigger: true,
-    alertSeverity:  'critical',
-  },
-  {
-    name:         'Fake Internal Service URL',
-    type:         'fake_internal_service',
-    placement:    'aws_parameter_store',
-    description:  'Non-existent internal microservice URL in Parameter Store. Any connection = network reconnaissance.',
-    tags:         ['recon', 'network'],
+    description:  'OAuth secret published as decoy. Any use indicates credential harvesting.',
+    tags:         ['oauth', 'recon'],
     alertOnTrigger: true,
     alertSeverity:  'high',
   },

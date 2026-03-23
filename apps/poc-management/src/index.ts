@@ -80,6 +80,16 @@ interface PocEngagement {
   updatedAt:       Date
 }
 
+type AuthUser = {
+  tenantId: string
+  role: string
+  email: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
+
 // ─────────────────────────────────────────────
 // DEFAULT POC MILESTONES (30-day playbook)
 // ─────────────────────────────────────────────
@@ -89,7 +99,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     name:        'Day 1: First Connector Live',
     description: 'Connect at least one data source (M365, AWS, or Google Workspace)',
     dueDay:      1,
-    notes:       undefined,
     autoCheck:   true,
     metricKey:   'active_connectors',
     metricTarget: 1,
@@ -98,7 +107,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     name:        'Day 7: First Alert Generated',
     description: 'Platform generates at least one security alert from real data',
     dueDay:      7,
-    notes:       undefined,
     autoCheck:   true,
     metricKey:   'total_alerts',
     metricTarget: 1,
@@ -108,7 +116,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     description: 'Primary analysts complete onboarding walkthrough',
     dueDay:      7,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 14: First True Positive Confirmed',
@@ -117,7 +124,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     autoCheck:   true,
     metricKey:   'resolved_alerts',
     metricTarget: 1,
-    notes:       undefined,
   },
   {
     name:        'Day 14: Risk Score Baseline',
@@ -126,7 +132,6 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     autoCheck:   true,
     metricKey:   'risk_profiles',
     metricTarget: 5,
-    notes:       undefined,
   },
   {
     name:        'Day 21: First Playbook Executed',
@@ -135,35 +140,30 @@ const DEFAULT_MILESTONES: Omit<PocMilestone, 'id' | 'status' | 'completedAt'>[] 
     autoCheck:   true,
     metricKey:   'playbook_executions',
     metricTarget: 1,
-    notes:       undefined,
   },
   {
     name:        'Day 21: Compliance Report Generated',
     description: 'Run SOC2/ISO27001 compliance assessment',
     dueDay:      21,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 28: Executive Demo',
     description: 'Present board-level security report to executive sponsor',
     dueDay:      28,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 30: ROI Report Delivered',
     description: 'Share value realization report with customer',
     dueDay:      30,
     autoCheck:   false,
-    notes:       undefined,
   },
   {
     name:        'Day 30: Commercial Discussion',
     description: 'Procurement/contract review call scheduled',
     dueDay:      30,
     autoCheck:   false,
-    notes:       undefined,
   },
 ]
 
@@ -344,7 +344,7 @@ async function start() {
   app.post('/v1/poc',
     zValidator('json', CreatePocSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const body = ctx.req.valid('json')
       const db   = getDb()
 
@@ -388,7 +388,6 @@ async function start() {
         lastActivity:    new Date(),
         loginCount:      0,
         featuresUsed:    [],
-        churnReason:     undefined,
         salesOwner:      body.salesOwner || user.email,
         notes:           '',
         createdAt:       new Date(),
@@ -421,7 +420,7 @@ async function start() {
   // ── GET /v1/poc ───────────────────────────────
 
   app.get('/v1/poc', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const pocs = await db.select()
@@ -442,7 +441,7 @@ async function start() {
   // ── GET /v1/poc/:id ───────────────────────────
 
   app.get('/v1/poc/:id', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [poc] = await db.select()
@@ -477,7 +476,7 @@ async function start() {
   app.patch('/v1/poc/:id/milestone',
     zValidator('json', UpdateMilestoneSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const { milestoneId, status, notes } = ctx.req.valid('json')
       const db   = getDb()
 
@@ -507,7 +506,7 @@ async function start() {
   // ── GET /v1/poc/:id/roi ───────────────────────
 
   app.get('/v1/poc/:id/roi', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [poc] = await db.select({ tenantId: schema.pocEngagements.tenantId, trialDays: schema.pocEngagements.trialDays })
@@ -527,7 +526,7 @@ async function start() {
   // ── POST /v1/poc/:id/convert ──────────────────
 
   app.post('/v1/poc/:id/convert', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     await db.update(schema.pocEngagements)
@@ -545,7 +544,7 @@ async function start() {
   // Platform-admin view of all POCs
 
   app.get('/v1/poc/dashboard/summary', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     if (user.role !== 'PLATFORM_ADMIN') return ctx.json({ success: false, error: { code: 'FORBIDDEN' } }, 403)
     const db   = getDb()
 

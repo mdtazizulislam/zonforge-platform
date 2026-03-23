@@ -3,6 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json turbo.json tsconfig.base.json ./
 COPY packages/shared-types/package.json   ./packages/shared-types/
+COPY packages/event-schema/package.json   ./packages/event-schema/
 COPY packages/db-client/package.json      ./packages/db-client/
 COPY packages/auth-utils/package.json     ./packages/auth-utils/
 COPY packages/logger/package.json         ./packages/logger/
@@ -10,6 +11,7 @@ COPY packages/config/package.json         ./packages/config/
 COPY apps/tenant-service/package.json     ./apps/tenant-service/
 RUN npm install --workspace=apps/tenant-service \
     --workspace=packages/shared-types \
+    --workspace=packages/event-schema \
     --workspace=packages/db-client \
     --workspace=packages/auth-utils \
     --workspace=packages/logger \
@@ -24,10 +26,11 @@ COPY turbo.json tsconfig.base.json package.json ./
 COPY packages/ ./packages/
 COPY apps/tenant-service/ ./apps/tenant-service/
 RUN npm run build --workspace=packages/shared-types && \
+    npm run build --workspace=packages/event-schema && \
     npm run build --workspace=packages/db-client && \
-    npm run build --workspace=packages/auth-utils && \
-    npm run build --workspace=packages/logger && \
     npm run build --workspace=packages/config && \
+    npm run build --workspace=packages/logger && \
+    npm run build --workspace=packages/auth-utils && \
     npm run build --workspace=apps/tenant-service
 
 FROM node:20-alpine AS production

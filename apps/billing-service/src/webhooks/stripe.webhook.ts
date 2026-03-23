@@ -196,19 +196,18 @@ async function activateSubscription(
       planTier,
       status:              'active',
       stripeSubscriptionId: stripeSubId,
-      stripeCustomerId:     customerId,
       updatedAt:           now,
     })
     .where(eq(schema.subscriptions.tenantId, tenantId))
 
   await db.update(schema.tenants)
-    .set({ planTier, status: 'active', updatedAt: now })
+    .set({ planTier, status: 'active', stripeCustomerId: customerId, updatedAt: now })
     .where(eq(schema.tenants.id, tenantId))
 }
 
 async function updateSubscriptionStatus(
   tenantId:   string,
-  stripeSubId: string,
+  _stripeSubId: string,
   status:     string,
 ): Promise<void> {
   const db = getDb()
@@ -219,9 +218,9 @@ async function updateSubscriptionStatus(
 
 async function getTenantByCustomer(customerId: string): Promise<string | null> {
   const db = getDb()
-  const rows = await db.select({ tenantId: schema.subscriptions.tenantId })
-    .from(schema.subscriptions)
-    .where(eq(schema.subscriptions.stripeCustomerId, customerId))
+  const rows = await db.select({ tenantId: schema.tenants.id })
+    .from(schema.tenants)
+    .where(eq(schema.tenants.stripeCustomerId, customerId))
     .limit(1)
   return rows[0]?.tenantId ?? null
 }

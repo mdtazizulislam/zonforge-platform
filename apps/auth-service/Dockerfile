@@ -57,6 +57,7 @@ COPY packages/logger/src          ./packages/logger/src
 COPY packages/logger/tsconfig.json       ./packages/logger/
 COPY packages/config/src          ./packages/config/src
 COPY packages/config/tsconfig.json       ./packages/config/
+COPY apps/auth-service/package.json      ./apps/auth-service/
 COPY apps/auth-service/src        ./apps/auth-service/src
 COPY apps/auth-service/tsconfig.json     ./apps/auth-service/
 
@@ -64,9 +65,9 @@ COPY apps/auth-service/tsconfig.json     ./apps/auth-service/
 RUN npm run build --workspace=packages/shared-types && \
     npm run build --workspace=packages/event-schema && \
     npm run build --workspace=packages/db-client && \
-    npm run build --workspace=packages/auth-utils && \
-    npm run build --workspace=packages/logger && \
     npm run build --workspace=packages/config && \
+    npm run build --workspace=packages/logger && \
+    npm run build --workspace=packages/auth-utils && \
     npm run build --workspace=apps/auth-service
 
 # ── Stage 3: Production ───────────────────────────────────────────

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@zonforge/shared-types": "*", "@zonforge/db-client": "*",
+    "@zonforge/auth-utils": "*",
     "@zonforge/logger": "*", "@zonforge/config": "*",
     "hono": "^4.3.0", "@hono/node-server": "^1.11.0",
     "@hono/zod-validator": "^0.2.2",

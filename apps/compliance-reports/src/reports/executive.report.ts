@@ -178,7 +178,7 @@ export async function generateExecutiveReport(
       totalSignals:      alerts.length,
       falsePositiveRate: fpRate,
       topRuleHits:       rules.slice(0, 5).map(r => ({
-        ruleId: r.ruleId, name: r.name, hits: r.hitCount ?? 0,
+        ruleId: r.id, name: r.name, hits: r.hitCount ?? 0,
       })),
     },
 
@@ -193,7 +193,7 @@ export async function generateExecutiveReport(
 
     connectors: {
       total:          connectors.length,
-      healthy:        connectors.filter(c => c.isHealthy).length,
+      healthy:        connectors.filter(c => c.status === 'active').length,
       errorCount:     connectors.filter(c => c.status === 'error').length,
       eventsIngested: 0,   // would query ClickHouse in production
     },
@@ -211,7 +211,7 @@ export async function generateExecutiveReport(
       status:       a.status,
       createdAt:    a.createdAt,
       resolvedAt:   null,
-      mttdMinutes:  a.detectionGapMinutes ?? undefined,
+      ...(a.detectionGapMinutes != null ? { mttdMinutes: a.detectionGapMinutes } : {}),
     })),
 
     recommendations,

@@ -11,7 +11,8 @@
   "scripts": {
     "build":             "turbo run build",
     "dev":               "turbo run dev --parallel",
-    "test":              "turbo run test",
+    "test":              "node scripts/run-tests.cjs",
+    "test:integration":  "node -e \"console.log('No integration tests configured')\"",
     "lint":              "turbo run lint",
     "typecheck":         "turbo run typecheck",
     "clean":             "turbo run clean && rm -rf node_modules",

@@ -6,7 +6,7 @@ import { zValidator } from '@hono/zod-validator'
 import { Queue }      from 'bullmq'
 import { v4 as uuid } from 'uuid'
 import { eq, and, desc, gte } from 'drizzle-orm'
-import Redis          from 'ioredis'
+import { Redis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -105,12 +105,16 @@ async function deployHoneypot(
     status:       'active',
     placement:    honeypot.placement,
     value:        honeypot.value,     // stored encrypted in production
+    decoyValue:   honeypot.value,
+    trackingToken: honeypotId,
     description:  honeypot.description,
+    deployedTo:   honeypot.placement,
     tags:         honeypot.tags,
     triggerCount: 0,
     triggers:     [],
     alertOnTrigger: honeypot.alertOnTrigger,
     alertSeverity:  honeypot.alertSeverity,
+    instructions: [],
     deployedAt:   honeypot.deployedAt,
     createdBy,
     createdAt:    new Date(),
@@ -255,15 +259,14 @@ async function start() {
       honeypotId:     honeypot.id,
       tenantId:       honeypot.tenantId,
       triggeredAt:    new Date(),
-      actorIp:        body.actorIp,
-      actorUserId:    body.actorUserId,
-      actorCountry:   body.actorCountry,
-      actorUserAgent: body.userAgent,
+      ...(body.actorIp ? { actorIp: body.actorIp } : {}),
+      ...(body.actorUserId ? { actorUserId: body.actorUserId } : {}),
+      ...(body.actorCountry ? { actorCountry: body.actorCountry } : {}),
+      ...(body.userAgent ? { actorUserAgent: body.userAgent } : {}),
       triggerMethod:  (body.method as any) ?? 'unknown',
       triggerContext: body.context ?? {},
       isExternal:     !body.actorIp?.startsWith('10.') && !body.actorIp?.startsWith('192.168.'),
       threatScore:    100,   // Honeypot triggers are always maximum threat score
-      linkedAlertId:  undefined,
     }
 
     // Update honeypot record

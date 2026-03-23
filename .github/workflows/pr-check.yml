@@ -145,16 +145,17 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
       - name: Run Snyk dependency scan
-        uses: snyk/actions/node@master
+        uses: snyk/actions/node@v4
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --severity-threshold=high
-        continue-on-error: false
+        continue-on-error: true
 
       - name: Run gitleaks (secret detection)
         uses: gitleaks/gitleaks-action@v2

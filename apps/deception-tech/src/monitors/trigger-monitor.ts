@@ -103,7 +103,7 @@ export class TriggerMonitor {
 
     // Publish to Redis for AI SOC analyst auto-investigation
     try {
-      const { default: Redis } = await import('ioredis')
+      const { Redis } = await import('ioredis')
       const publisher = new Redis({
         host:     process.env['REDIS_HOST'] ?? 'localhost',
         port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
@@ -167,6 +167,7 @@ export class TriggerMonitor {
           falsePositiveRate: '0%',
         },
         mttdSlaBreached:     false,
+        firstSignalTime:     new Date(),
         detectionGapMinutes: 0,
         createdAt:           new Date(),
         updatedAt:           new Date(),

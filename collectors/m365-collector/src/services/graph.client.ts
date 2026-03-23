@@ -1,5 +1,5 @@
 import { createLogger } from '@zonforge/logger'
-import { sleep } from '../../collector-base/src/index.js'
+import { sleep } from '@zonforge/collector-base'
 
 // ─────────────────────────────────────────────
 // Microsoft Graph API Client
@@ -12,6 +12,36 @@ import { sleep } from '../../collector-base/src/index.js'
 // ─────────────────────────────────────────────
 
 const log = createLogger({ service: 'collector:m365:graph' })
+
+async function fetchWithTimeout(
+  input: string | URL | Request,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function toFormUrlEncoded(values: Record<string, string>): string {
+  return new URLSearchParams(values).toString()
+}
+
+interface GraphDeltaResponse {
+  value: Array<Record<string, unknown>>
+  '@odata.nextLink'?: string
+  '@odata.deltaLink'?: string
+}
+
+interface GraphListResponse {
+  value: Array<Record<string, unknown>>
+  '@odata.nextLink'?: string
+}
 
 export interface M365AuthConfig {
   azureTenantId: string     // Azure AD tenant GUID (NOT ZonForge tenant)
@@ -39,19 +69,18 @@ export class M365GraphClient {
     }
 
     const url  = `https://login.microsoftonline.com/${this.auth.azureTenantId}/oauth2/v2.0/token`
-    const body = new URLSearchParams({
+    const body = toFormUrlEncoded({
       client_id:     this.auth.clientId,
       client_secret: this.auth.clientSecret,
       scope:         'https://graph.microsoft.com/.default',
       grant_type:    'client_credentials',
     })
 
-    const resp = await fetch(url, {
+    const resp = await fetchWithTimeout(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
-      signal:  AbortSignal.timeout(15_000),
-    })
+    }, 15_000)
 
     if (!resp.ok) {
       const err = await resp.text()
@@ -75,14 +104,13 @@ export class M365GraphClient {
 
   private async graphGet<T>(url: string): Promise<T> {
     const token = await this.getToken()
-    const resp  = await fetch(url, {
+    const resp  = await fetchWithTimeout(url, {
       headers: {
         Authorization:    `Bearer ${token}`,
         'Content-Type':   'application/json',
         ConsistencyLevel: 'eventual',
       },
-      signal: AbortSignal.timeout(30_000),
-    })
+    }, 30_000)
 
     if (resp.status === 429) {
       // Throttled — respect Retry-After header
@@ -127,11 +155,7 @@ export class M365GraphClient {
     // Follow @odata.nextLink pagination
     let currentUrl: string | null = url
     while (currentUrl) {
-      const data = await this.graphGet<{
-        value:              Array<Record<string, unknown>>
-        '@odata.nextLink'?: string
-        '@odata.deltaLink'?: string
-      }>(currentUrl)
+      const data: GraphDeltaResponse = await this.graphGet<GraphDeltaResponse>(currentUrl)
 
       events.push(...(data.value ?? []))
 
@@ -172,10 +196,7 @@ export class M365GraphClient {
         ` and loggedByService eq '${category}'`
 
       while (url) {
-        const data = await this.graphGet<{
-          value:              Array<Record<string, unknown>>
-          '@odata.nextLink'?: string
-        }>(url)
+        const data: GraphListResponse = await this.graphGet<GraphListResponse>(url)
 
         events.push(...(data.value ?? []))
         url = data['@odata.nextLink'] ?? null

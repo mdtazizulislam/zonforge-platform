@@ -37,9 +37,16 @@ tenantRouter.post('/admin/tenants', zValidator('json', CreateTenantBody), async 
 
   const body = ctx.req.valid('json')
   try {
-    const result = await createTenant({
-      ...body,
+    const payload = {
+      name: body.name,
+      slug: body.slug,
+      planTier: body.planTier,
+      region: body.region,
       createdBy: user.id,
+      ...(body.settings !== undefined ? { settings: body.settings } : {}),
+    }
+    const result = await createTenant({
+      ...payload,
     })
     return ctx.json({ success: true, data: result, meta: meta(ctx) }, 201)
   } catch (err) {
@@ -94,7 +101,11 @@ tenantRouter.patch(
 
     const updates = ctx.req.valid('json')
     try {
-      const settings = await updateTenantSettings(tenantId, updates, user.id, ip, redis)
+      const normalizedUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([, v]) => v !== undefined),
+      ) as Partial<typeof TenantSettingsSchema._type>
+
+      const settings = await updateTenantSettings(tenantId, normalizedUpdates, user.id, ip, redis)
       return ctx.json({ success: true, data: { settings }, meta: meta(ctx) })
     } catch (err) {
       return handleError(ctx, err)

@@ -4,7 +4,7 @@ import { cors }       from 'hono/cors'
 import { secureHeaders } from 'hono/secure-headers'
 import { eq, and, desc, gte, count, avg } from 'drizzle-orm'
 import { v4 as uuid } from 'uuid'
-import Redis          from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -40,6 +40,14 @@ interface ThreatForecast {
   topRisks:      string[]
   activeGlobalCampaigns: string[]
   generatedAt:   Date
+}
+
+type AuthUser = {
+  tenantId: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
 }
 
 // Simulates a time-series model on historical alerts
@@ -346,7 +354,7 @@ async function generateBenchmarkReport(
 async function start() {
   initDb(postgresConfig)
 
-  const redis = new Redis({
+  const redis = new IORedis({
     host: redisConfig.host, port: redisConfig.port,
     password: redisConfig.password, tls: redisConfig.tls ? {} : undefined,
     maxRetriesPerRequest: 3,
@@ -361,7 +369,7 @@ async function start() {
   // ── GET /v1/ai/threat-forecast ────────────────
 
   app.get('/v1/ai/threat-forecast', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const cacheKey = `zf:ai:forecast:${user.tenantId}`
@@ -377,7 +385,7 @@ async function start() {
   // ── GET /v1/ai/benchmark ──────────────────────
 
   app.get('/v1/ai/benchmark', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [tenant] = await db.select({ planTier: schema.tenants.planTier })

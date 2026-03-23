@@ -7,7 +7,7 @@ import { z }          from 'zod'
 import { Queue }      from 'bullmq'
 import { v4 as uuid } from 'uuid'
 import { eq, and, desc, gte } from 'drizzle-orm'
-import Redis          from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -33,7 +33,7 @@ async function start() {
   initDb(postgresConfig)
   log.info('✅ PostgreSQL connected')
 
-  const redis = new Redis({
+  const redis = new IORedis({
     host:     redisConfig.host,
     port:     redisConfig.port,
     password: redisConfig.password,
@@ -42,7 +42,7 @@ async function start() {
     enableReadyCheck: false,
   })
   redis.on('connect', () => log.info('✅ Redis connected'))
-  redis.on('error',   (e) => log.error({ err: e }, 'Redis error'))
+  redis.on('error',   (e: unknown) => log.error({ err: e }, 'Redis error'))
 
   // ── Load all available scenarios ─────────────
   const runner    = new ScenarioRunner(redis)
@@ -64,7 +64,7 @@ async function start() {
     log.info('⏰ 6-hour simulation scheduler started')
   }
 
-  const simQueue = new Queue(SIMULATION_QUEUE_NAME, { connection: redis })
+  const simQueue = new Queue(SIMULATION_QUEUE_NAME, { connection: redis as unknown as any })
 
   // ─────────────────────────────────────────────
   // HTTP API
