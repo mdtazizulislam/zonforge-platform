@@ -23,6 +23,14 @@ import {
 
 const log = createLogger({ service: 'poc-manager' })
 
+type AuthUser = {
+  tenantId: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
+
 // ─────────────────────────────────────────────
 // ENGAGEMENT SCORER
 // Queries platform usage to measure POC health
@@ -215,7 +223,7 @@ async function start() {
   app.post('/v1/poc',
     zValidator('json', CreatePocSchema),
     async (ctx) => {
-      const user = ctx.var.user
+      const user = getAuthUser(ctx)
       const body = ctx.req.valid('json')
       const db   = getDb()
 
@@ -308,7 +316,7 @@ async function start() {
   // ── GET /v1/poc — List all POCs (platform admin) ─
 
   app.get('/v1/poc', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const pocs = await db.select()
@@ -322,7 +330,7 @@ async function start() {
   // ── GET /v1/poc/:id — POC detail ─────────────
 
   app.get('/v1/poc/:id', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [poc] = await db.select()

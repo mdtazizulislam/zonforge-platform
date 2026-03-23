@@ -47,6 +47,14 @@ interface BoardReportData {
   industryBenchmark: { percentile: number; vsMedian: string }
 }
 
+type AuthUser = {
+  tenantId: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
+
 async function collectBoardData(
   tenantId: string,
   periodDays: number,
@@ -461,7 +469,7 @@ async function start() {
       format:     z.enum(['html','json']).default('html'),
     })),
     async (ctx) => {
-      const user   = ctx.var.user
+      const user   = getAuthUser(ctx)
       const { periodDays, format } = ctx.req.valid('json')
 
       log.info({ tenantId: user.tenantId, periodDays }, 'Generating board report')
@@ -509,7 +517,7 @@ async function start() {
   // ── GET /v1/board-report/preview ─────────────
 
   app.get('/v1/board-report/preview', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const data = await collectBoardData(user.tenantId, 30)
     const html = generateHtmlReport(data)
     return ctx.text(html, 200, { 'Content-Type': 'text/html' })
