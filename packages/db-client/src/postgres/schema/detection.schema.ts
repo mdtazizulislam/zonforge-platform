@@ -113,6 +113,7 @@ export const alerts = pgTable('alerts', {
   status:                alertStatusEnum('status').notNull().default('open'),
   // Evidence
   evidence:              jsonb('evidence').notNull().default([]),
+  metadata:              jsonb('metadata').notNull().default({}),
   // LLM Narrative
   llmNarrative:          jsonb('llm_narrative'),
   llmNarrativeGeneratedAt: timestamp('llm_narrative_generated_at', { withTimezone: true }),

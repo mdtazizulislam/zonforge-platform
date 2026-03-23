@@ -6,7 +6,7 @@ import { zValidator } from '@hono/zod-validator'
 import { Worker, Queue } from 'bullmq'
 import { v4 as uuid } from 'uuid'
 import { eq, and, desc } from 'drizzle-orm'
-import Redis          from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -63,16 +63,16 @@ async function start() {
   initDb(postgresConfig)
   log.info('✅ PostgreSQL connected')
 
-  const redis = new Redis({
+  const redis = new IORedis({
     host: redisConfig.host, port: redisConfig.port,
     password: redisConfig.password, tls: redisConfig.tls ? {} : undefined,
     maxRetriesPerRequest: null, enableReadyCheck: false,
   })
   redis.on('connect', () => log.info('✅ Redis connected'))
-  redis.on('error', e => log.error({ err: e }, 'Redis error'))
+  redis.on('error', (e: unknown) => log.error({ err: e }, 'Redis error'))
 
   const engine = new PackageRiskEngine()
-  const queue  = new Queue(SCAN_QUEUE, { connection: redis })
+  const queue  = new Queue(SCAN_QUEUE, { connection: redis as any })
 
   // ── BullMQ Worker ─────────────────────────────
 
@@ -145,7 +145,7 @@ async function start() {
           .where(eq(schema.supplyChainScans.id, scanId))
       }
     },
-    { connection: redis, concurrency: 3 },
+    { connection: redis as any, concurrency: 3 },
   )
 
   worker.on('error', err => log.error({ err }, 'Scan worker error'))
@@ -173,9 +173,11 @@ async function start() {
     const contentType = ctx.req.header('content-type') ?? ''
 
     if (contentType.includes('multipart/form-data')) {
-      const form = await ctx.req.formData()
-      projectName = (form.get('projectName') as string) ?? projectName
-      const file  = form.get('manifest') as File | null
+      const form = await ctx.req.parseBody()
+      const projectNameValue = form['projectName']
+      projectName = typeof projectNameValue === 'string' ? projectNameValue : projectName
+      const manifestValue = form['manifest']
+      const file  = manifestValue instanceof File ? manifestValue : null
 
       if (file) {
         const content = await file.text()

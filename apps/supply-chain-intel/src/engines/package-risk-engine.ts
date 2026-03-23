@@ -9,6 +9,20 @@ import { v4 as uuid } from 'uuid'
 
 const log = createLogger({ service: 'supply-chain:risk-engine' })
 
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 // ─────────────────────────────────────────────
 // PACKAGE RISK ENGINE
 //
@@ -164,7 +178,7 @@ export class PackageRiskEngine {
     name:      string,
     version:   string,
     ecosystem: Ecosystem,
-  ): Promise<Array<{ id: string; cvss?: number; summary?: string }>> {
+  ): Promise<Array<{ id: string; cvss?: number | undefined; summary?: string | undefined }>> {
     if (!name || !version || version === '*') return []
 
     // Map ecosystem names to OSV format
@@ -174,15 +188,14 @@ export class PackageRiskEngine {
     }
 
     try {
-      const resp = await fetch('https://api.osv.dev/v1/query', {
+      const resp = await fetchWithTimeout('https://api.osv.dev/v1/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           version,
           package: { name, ecosystem: osvEcosystem[ecosystem] },
         }),
-        signal: AbortSignal.timeout(8_000),
-      })
+      }, 8_000)
 
       if (!resp.ok) return []
 

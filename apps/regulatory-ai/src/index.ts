@@ -5,7 +5,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { zValidator } from '@hono/zod-validator'
 import { eq, and, desc, gte, count } from 'drizzle-orm'
 import Anthropic      from '@anthropic-ai/sdk'
-import Redis          from 'ioredis'
+import { Redis as IORedis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -84,7 +84,7 @@ class ComplianceMonitor {
           .from(schema.connectors)
           .where(and(
             eq(schema.connectors.tenantId, tenantId),
-            eq(schema.connectors.isHealthy, true),
+            eq(schema.connectors.status, 'active'),
           ))
 
         const ruleCount = Number(rules[0]?.cnt ?? 0)
@@ -133,7 +133,7 @@ class ComplianceMonitor {
           .where(and(eq(schema.auditLogs.tenantId, tenantId), gte(schema.auditLogs.createdAt, cutoff)))
 
         const auditCount = Number(auditRows[0]?.cnt ?? 0)
-        evidence.push({ type: 'audit_log_entry', title: 'Audit Entries (90d)', value: auditCount, collectedAt: new Date(), source: 'audit_logs', supports: auditCount > 100 ? 'compliant' : 'partial' })
+        evidence.push({ type: 'audit_log_entry', title: 'Audit Entries (90d)', value: auditCount, collectedAt: new Date(), source: 'audit_logs', supports: auditCount > 100 ? 'compliant' : 'neutral' })
         evidence.push({ type: 'configuration', title: 'Immutable Audit Storage', value: 'WORM S3 (7-year retention)', collectedAt: new Date(), source: 'platform_config', supports: 'compliant' })
 
         if (auditCount < 100) gaps.push('Low audit log volume — verify all change events are captured')
@@ -277,7 +277,7 @@ async function start() {
   initDb(postgresConfig)
   log.info('✅ PostgreSQL connected')
 
-  const redis = new Redis({
+  const redis = new IORedis({
     host: redisConfig.host, port: redisConfig.port,
     password: redisConfig.password, tls: redisConfig.tls ? {} : undefined,
     maxRetriesPerRequest: 3,

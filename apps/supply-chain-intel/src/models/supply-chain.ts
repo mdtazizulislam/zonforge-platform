@@ -29,30 +29,30 @@ export interface PackageFinding {
   ecosystem:     Ecosystem
   name:          string
   version:       string
-  resolvedVersion?: string
+  resolvedVersion?: string | undefined
   riskLevel:     RiskLevel
   threatCategories: ThreatCategory[]
   cveIds:        string[]
-  cvssScore?:    number
+  cvssScore?:    number | undefined
   description:   string
   evidence:      string[]
-  firstPublished?: Date
-  lastPublished?:  Date
-  weeklyDownloads?: number
+  firstPublished?: Date | undefined
+  lastPublished?:  Date | undefined
+  weeklyDownloads?: number | undefined
   maintainers:   PackageMaintainer[]
-  typosquatOf?:  string    // name of legitimate package being spoofed
+  typosquatOf?:  string | undefined    // name of legitimate package being spoofed
   remediationAdvice: string
   affectedFiles: string[]  // which files in repo depend on this
 }
 
 export interface PackageMaintainer {
   name:         string
-  email?:       string
-  githubHandle?: string
-  registeredAt?: Date
-  packageCount?: number
+  email?:       string | undefined
+  githubHandle?: string | undefined
+  registeredAt?: Date | undefined
+  packageCount?: number | undefined
   suspicious:   boolean
-  suspicionReason?: string
+  suspicionReason?: string | undefined
 }
 
 // ─────────────────────────────────────────────
@@ -106,8 +106,8 @@ export interface SbomEntry {
   license:     string
   isDirect:    boolean
   depth:       number    // 0 = direct, 1 = transitive level 1, etc.
-  hash?:       string    // integrity hash (SHA-256 of package content)
-  sourceUrl?:  string
+  hash?:       string | undefined    // integrity hash (SHA-256 of package content)
+  sourceUrl?:  string | undefined
   riskLevel:   RiskLevel
 }
 
@@ -122,7 +122,7 @@ export interface CveMapping {
   packageName: string
   ecosystem:   Ecosystem
   affectedVersions: string[]
-  patchedVersion?:  string
+  patchedVersion?:  string | undefined
   description: string
   exploitAvailable: boolean
   exploitedInWild:  boolean

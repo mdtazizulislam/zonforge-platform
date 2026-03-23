@@ -5,7 +5,7 @@ import { secureHeaders } from 'hono/secure-headers'
 import { zValidator } from '@hono/zod-validator'
 import { v4 as uuid } from 'uuid'
 import { eq, and, desc } from 'drizzle-orm'
-import Redis          from 'ioredis'
+import { Redis } from 'ioredis'
 import { initDb, closeDb, getDb, schema } from '@zonforge/db-client'
 import { postgresConfig, redisConfig, env } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
@@ -58,12 +58,13 @@ async function buildTopologyFromData(
   const connectorNodes: string[] = []
   for (const conn of connectors) {
     const nodeId = `${twinId}-svc-${conn.id.slice(0, 8)}`
+    const isHealthy = conn.status === 'active'
     nodes.push({
       id: nodeId,
-      type: conn.sourceType?.includes('aws') ? 'cloud_service' : 'saas_application',
-      label: sourceMap[conn.sourceType as string] ?? conn.name,
-      properties: { sourceType: conn.sourceType, healthy: conn.isHealthy },
-      risk: conn.isHealthy ? 25 : 60,
+      type: conn.type.includes('aws') ? 'cloud_service' : 'saas_application',
+      label: sourceMap[conn.type as string] ?? conn.name,
+      properties: { sourceType: conn.type, healthy: isHealthy },
+      risk: isHealthy ? 25 : 60,
       privilege: 'high',
       internet_exposed: true,
       hasHoneypot: false,
@@ -223,7 +224,7 @@ function findAttackPaths(topology: TwinTopology, scenario: string): AttackPath[]
       const steps: AttackStep[] = [
         {
           stepNumber: 1, fromNode: internet.id, toNode: services[0]!.id,
-          technique: 'T1566', description: 'Phishing email delivers initial access',
+          technique: 'T1566',
           likelihood: 45, detectable: false,
           description: 'Phishing bypasses email gateway — not detectable by ZonForge',
         },
@@ -276,7 +277,7 @@ function findAttackPaths(topology: TwinTopology, scenario: string): AttackPath[]
       const steps: AttackStep[] = [
         {
           stepNumber: 1, fromNode: internet.id, toNode: targetSvc.id,
-          technique: 'T1566', description: 'OAuth consent phishing — user grants malicious app',
+          technique: 'T1566',
           likelihood: 55, detectable: false,
           description: 'Consent phishing — ZonForge detects only after consent granted',
         },

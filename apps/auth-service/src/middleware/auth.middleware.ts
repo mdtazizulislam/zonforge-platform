@@ -32,7 +32,7 @@ export async function requestIdMiddleware(ctx: Context, next: Next) {
   const { v4: uuidv4 } = await import('uuid')
   ctx.set('requestId', uuidv4())
   ctx.header('X-Request-Id', ctx.var.requestId)
-  await next()
+  return next()
 }
 
 // ── JWT auth middleware ───────────────────────
@@ -66,7 +66,7 @@ export async function authMiddleware(ctx: Context, next: Next) {
       jti:      payload.jti,
     })
 
-    await next()
+    return next()
   } catch (err) {
     if (err instanceof JwtVerificationError) {
       return ctx.json({ success: false,
@@ -90,7 +90,7 @@ export function requirePermission(permission: string) {
         error: { code: 'FORBIDDEN',
                  message: `Role ${user.role} lacks permission: ${permission}` } }, 403)
     }
-    await next()
+    return next()
   }
 }
 
@@ -116,7 +116,7 @@ export async function tenantGuard(ctx: Context, next: Next) {
       error: { code: 'FORBIDDEN', message: 'Access denied to this tenant' } }, 403)
   }
 
-  await next()
+  return next()
 }
 
 // ── Rate limit middleware ─────────────────────
@@ -141,6 +141,6 @@ export function rateLimitMiddleware(
         error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests' } }, 429)
     }
 
-    await next()
+    return next()
   }
 }

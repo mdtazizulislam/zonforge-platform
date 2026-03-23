@@ -37,7 +37,7 @@ export function createMsspRouter(service: MsspConsoleService) {
       return ctx.json({ success: false,
         error: { code: 'FORBIDDEN', message: 'PLATFORM_ADMIN access required' } }, 403)
     }
-    await next()
+    return next()
   })
 
   // ── GET /v1/mssp/overview ─────────────────────
@@ -56,8 +56,8 @@ export function createMsspRouter(service: MsspConsoleService) {
     const db     = getDb()
     const limit  = Math.min(parseInt(ctx.req.query('limit') ?? '50', 10), 200)
     const search = ctx.req.query('search')
-    const status = ctx.req.query('status')
-    const plan   = ctx.req.query('plan')
+    const status = ctx.req.query('status') as 'active' | 'suspended' | 'trial' | 'cancelled' | 'snapshot' | undefined
+    const plan   = ctx.req.query('plan') as 'starter' | 'growth' | 'business' | 'enterprise' | 'mssp' | undefined
 
     const conditions: any[] = []
     if (status) conditions.push(eq(schema.tenants.status, status))
@@ -105,7 +105,8 @@ export function createMsspRouter(service: MsspConsoleService) {
     const tenantId = ctx.req.param('id')
     const adminId  = ctx.var.user.id
 
-    const { signAccessToken, jwtConfig } = await import('@zonforge/auth-utils')
+    const { signAccessToken } = await import('@zonforge/auth-utils')
+    const { jwtConfig } = await import('@zonforge/config')
     const { getDb: db, schema: s, eq: dbEq } = await import('@zonforge/db-client')
 
     // Verify tenant exists
@@ -120,15 +121,13 @@ export function createMsspRouter(service: MsspConsoleService) {
     }
 
     // Issue short-lived impersonation token (15 minutes only)
-    const token = await signAccessToken({
-      userId:         adminId,
-      tenantId,
+    const { token } = await signAccessToken({
+      sub:            adminId,
+      tid:            tenantId,
       role:           'TENANT_ADMIN',
       email:          ctx.var.user.email,
-      jti:            `impersonate-${Date.now()}`,
-      isImpersonation: true,
-      originalAdminId: adminId,
-    }, { ...jwtConfig, expiresIn: '15m' })
+      region:         ctx.var.user.region,
+    }, { ...jwtConfig, accessExpirySeconds: 900 })
 
     log.warn({ adminId, tenantId }, '⚠️  MSSP admin impersonating tenant')
 
@@ -161,7 +160,15 @@ export function createMsspRouter(service: MsspConsoleService) {
     zValidator('json', WhiteLabelSchema),
     async (ctx) => {
       const tenantId = ctx.req.param('id')
-      const config   = ctx.req.valid('json')
+      const config = Object.fromEntries(
+        Object.entries(ctx.req.valid('json')).filter(([, v]) => v !== undefined),
+      ) as {
+        brandName?: string
+        brandLogoUrl?: string
+        brandPrimaryColor?: string
+        customDomain?: string
+        supportEmail?: string
+      }
 
       await service.updateWhiteLabel(tenantId, config)
       return ctx.json({ success: true, data: { updated: true }, meta: meta(ctx) })

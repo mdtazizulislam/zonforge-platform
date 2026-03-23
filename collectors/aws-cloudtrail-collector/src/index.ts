@@ -3,7 +3,7 @@ import {
   type CollectorConfig,
   type CollectorResult,
   type CursorState,
-} from '../../collector-base/src/index.js'
+} from '@zonforge/collector-base'
 import {
   CloudTrailS3Reader,
   type AwsAuthConfig,
@@ -118,7 +118,7 @@ export class CloudTrailCollector extends BaseCollector {
     }
   }
 
-  protected async saveCursorState(state: CursorState): Promise<void> {
+  protected override async saveCursorState(state: CursorState): Promise<void> {
     this.ctCursor    = state as CloudTrailCursorState
     this.cursorState = state
   }
@@ -149,7 +149,7 @@ async function start() {
     region:       process.env['ZF_AWS_REGION'] ?? 'us-east-1',
     s3Bucket:     requireEnv('ZF_AWS_CLOUDTRAIL_BUCKET'),
     s3Prefix:     process.env['ZF_AWS_CLOUDTRAIL_PREFIX'] ?? 'AWSLogs',
-    sqsQueueUrl:  process.env['ZF_AWS_SQS_URL'],
+    ...(process.env['ZF_AWS_SQS_URL'] ? { sqsQueueUrl: process.env['ZF_AWS_SQS_URL'] } : {}),
   }
 
   const collector = new CloudTrailCollector(collectorConfig, authConfig)

@@ -2,6 +2,25 @@ import { createLogger } from '@zonforge/logger'
 
 const log = createLogger({ service: 'playbook-engine:executors' })
 
+async function fetchWithTimeout(
+  input: string | URL | Request,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+function toFormUrlEncoded(values: Record<string, string>): string {
+  return new URLSearchParams(values).toString()
+}
+
 // ─────────────────────────────────────────────
 // BASE TYPES
 // ─────────────────────────────────────────────
@@ -66,25 +85,25 @@ export async function executeDisableUserM365(
 
   try {
     // 1. Get access token
-    const tokenResp = await fetch(
+    const tokenResp = await fetchWithTimeout(
       `https://login.microsoftonline.com/${tenantDomain}/oauth2/v2.0/token`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
+        body: toFormUrlEncoded({
           grant_type:    'client_credentials',
           client_id:     clientId,
           client_secret: clientSecret,
           scope:         'https://graph.microsoft.com/.default',
         }),
-        signal: AbortSignal.timeout(10_000),
       },
+      10_000,
     )
     const tokenData = await tokenResp.json() as { access_token?: string }
     if (!tokenData.access_token) throw new Error('Failed to obtain access token')
 
     // 2. Disable account
-    const patchResp = await fetch(
+    const patchResp = await fetchWithTimeout(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userId)}`,
       {
         method: 'PATCH',
@@ -93,8 +112,8 @@ export async function executeDisableUserM365(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ accountEnabled: false }),
-        signal: AbortSignal.timeout(10_000),
       },
+      10_000,
     )
 
     if (!patchResp.ok) {
@@ -103,13 +122,13 @@ export async function executeDisableUserM365(
     }
 
     // 3. Revoke all refresh tokens
-    await fetch(
+    await fetchWithTimeout(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userId)}/revokeSignInSessions`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
-        signal: AbortSignal.timeout(10_000),
       },
+      10_000,
     )
 
     log.info({ userId, tenantId: ctx.tenantId }, 'M365 user disabled and sessions revoked')
@@ -197,7 +216,7 @@ export async function executeBlockIpCloudflare(
   }
 
   try {
-    const resp = await fetch(
+    const resp = await fetchWithTimeout(
       `https://api.cloudflare.com/client/v4/zones/${zoneId}/firewall/access_rules/rules`,
       {
         method: 'POST',
@@ -210,8 +229,8 @@ export async function executeBlockIpCloudflare(
           configuration: { target: 'ip', value: ip },
           notes:         config.notes ?? `ZonForge Sentinel — blocked via playbook (alert: ${ctx.alertId})`,
         }),
-        signal: AbortSignal.timeout(10_000),
       },
+      10_000,
     )
 
     const data = await resp.json() as { success: boolean; result?: { id: string } }
@@ -293,8 +312,8 @@ export async function executeBlockIpAwsWaf(
 
 export async function executeCreateJiraTicket(
   config: ActionConfig & {
-    jiraUrl:     string
-    projectKey:  string
+    jiraUrl?:    string
+    projectKey?: string
     issueType?:  string
     priority?:   string
     assignee?:   string
@@ -321,7 +340,7 @@ export async function executeCreateJiraTicket(
   ].filter(Boolean).join('\n')
 
   try {
-    const resp = await fetch(`${jiraUrl.replace(/\/$/, '')}/rest/api/3/issue`, {
+    const resp = await fetchWithTimeout(`${jiraUrl.replace(/\/$/, '')}/rest/api/3/issue`, {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${Buffer.from(`${email}:${apiToken}`).toString('base64')}`,
@@ -341,8 +360,7 @@ export async function executeCreateJiraTicket(
           labels:    [(config.labels as string[]) ?? ['security', 'zonforge']].flat(),
         },
       }),
-      signal: AbortSignal.timeout(15_000),
-    })
+    }, 15_000)
 
     const data = await resp.json() as { key?: string; id?: string }
     if (!resp.ok) throw new Error(`Jira API error: ${resp.status}`)
@@ -364,7 +382,7 @@ export async function executeCreateJiraTicket(
 // ─────────────────────────────────────────────
 
 export async function executeCreateServiceNowIncident(
-  config: ActionConfig & { instanceUrl: string; urgency?: number; impact?: number },
+  config: ActionConfig & { instanceUrl?: string; urgency?: number; impact?: number },
   ctx:    ActionContext,
 ): Promise<ActionResult> {
   const { instanceUrl } = config
@@ -376,7 +394,7 @@ export async function executeCreateServiceNowIncident(
   }
 
   try {
-    const resp = await fetch(
+    const resp = await fetchWithTimeout(
       `${instanceUrl.replace(/\/$/, '')}/api/now/table/incident`,
       {
         method: 'POST',
@@ -393,8 +411,8 @@ export async function executeCreateServiceNowIncident(
           category:          'Security',
           subcategory:       'Threat Detection',
         }),
-        signal: AbortSignal.timeout(15_000),
       },
+      15_000,
     )
 
     const data = await resp.json() as { result?: { number?: string; sys_id?: string } }
@@ -425,7 +443,7 @@ export async function executeNotifyPagerDuty(
   }
 
   try {
-    const resp = await fetch('https://events.pagerduty.com/v2/enqueue', {
+    const resp = await fetchWithTimeout('https://events.pagerduty.com/v2/enqueue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -446,8 +464,7 @@ export async function executeNotifyPagerDuty(
           },
         },
       }),
-      signal: AbortSignal.timeout(10_000),
-    })
+    }, 10_000)
 
     const data = await resp.json() as { status?: string; dedup_key?: string }
     if (data.status !== 'success') throw new Error(`PagerDuty status: ${data.status}`)
@@ -486,29 +503,30 @@ export async function executeRequireMfaReauth(
 
   try {
     // Get token
-    const tokenResp = await fetch(
+    const tokenResp = await fetchWithTimeout(
       `https://login.microsoftonline.com/${tenantDomain}/oauth2/v2.0/token`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
+        body: toFormUrlEncoded({
           grant_type: 'client_credentials',
           client_id: clientId, client_secret: clientSecret,
           scope: 'https://graph.microsoft.com/.default',
         }),
       },
+      10_000,
     )
     const { access_token } = await tokenResp.json() as { access_token?: string }
     if (!access_token) throw new Error('Token acquisition failed')
 
     // Revoke sign-in sessions (forces MFA on next login)
-    await fetch(
+    await fetchWithTimeout(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userId)}/revokeSignInSessions`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${access_token}` },
-        signal: AbortSignal.timeout(10_000),
       },
+      10_000,
     )
 
     return {
@@ -632,7 +650,7 @@ export async function executeNotifySms(
 
   for (const to of recipients) {
     try {
-      const resp = await fetch(
+      const resp = await fetchWithTimeout(
         `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
         {
           method:  'POST',
@@ -640,9 +658,9 @@ export async function executeNotifySms(
             'Content-Type':  'application/x-www-form-urlencoded',
             'Authorization': `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
           },
-          body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
-          signal: AbortSignal.timeout(10_000),
+          body: toFormUrlEncoded({ To: to, From: fromNumber, Body: body }),
         },
+        10_000,
       )
 
       const data = await resp.json() as { sid?: string; status?: string; error_message?: string }
@@ -761,7 +779,7 @@ export async function executeNotifyWhatsApp(
 
   for (const to of recipients) {
     try {
-      const resp = await fetch(
+      const resp = await fetchWithTimeout(
         `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
         {
           method:  'POST',
@@ -769,9 +787,9 @@ export async function executeNotifyWhatsApp(
             'Content-Type':  'application/x-www-form-urlencoded',
             'Authorization': `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
           },
-          body: new URLSearchParams({ To: to, From: fromWA, Body: body }),
-          signal: AbortSignal.timeout(10_000),
+          body: toFormUrlEncoded({ To: to, From: fromWA, Body: body }),
         },
+        10_000,
       )
 
       const data = await resp.json() as { sid?: string; status?: string; error_message?: string }

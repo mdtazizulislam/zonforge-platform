@@ -1,6 +1,7 @@
 import { Worker, Queue } from 'bullmq'
-import type Redis from 'ioredis'
+import type { Redis } from 'ioredis'
 import { v4 as uuid } from 'uuid'
+import { eq } from 'drizzle-orm'
 import { getDb, schema } from '@zonforge/db-client'
 import { createLogger } from '@zonforge/logger'
 import { ScenarioRunner }    from '../engine/scenario-runner.js'
@@ -101,7 +102,7 @@ export function createSimulationWorker(redis: Redis): Worker {
         log.error({ err, simId, scenarioId }, 'Simulation injection failed')
         await db.update(schema.simulationResults)
           .set({ status: 'failed', updatedAt: new Date() })
-          .where(schema.simulationResults.id === simId as any)
+          .where(eq(schema.simulationResults.id, simId))
         throw err
       }
 
@@ -139,7 +140,7 @@ export function createSimulationWorker(redis: Redis): Worker {
           durationMs:       evaluated.durationMs,
           updatedAt:        new Date(),
         })
-        .where(schema.simulationResults.id === simId as any)
+        .where(eq(schema.simulationResults.id, simId))
 
       // ── 6. Update security score ───────────
 
@@ -191,7 +192,7 @@ export function createSimulationWorker(redis: Redis): Worker {
     },
 
     {
-      connection:  redis,
+      connection:  redis as unknown as any,
       concurrency: 2,   // max 2 simulations running simultaneously
       limiter: {
         max:      10,
@@ -226,7 +227,7 @@ export function createScheduler(
   tenantId:  string,
   allScenarios: string[],
 ): NodeJS.Timeout {
-  const queue = new Queue(SIMULATION_QUEUE_NAME, { connection: redis })
+  const queue = new Queue(SIMULATION_QUEUE_NAME, { connection: redis as unknown as any })
 
   const INTERVAL_MS = 6 * 60 * 60_000   // 6 hours
   const BATCH_SIZE  = 3

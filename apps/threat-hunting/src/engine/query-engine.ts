@@ -161,12 +161,15 @@ export async function executeHuntQuery(
     headers['X-ClickHouse-Key']      = chPass
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), MAX_TIMEOUT_MS)
+
   try {
     const resp = await fetch(url, {
       method:  'POST',
       headers,
       body:    finalSql,
-      signal:  AbortSignal.timeout(MAX_TIMEOUT_MS),
+      signal:  controller.signal,
     })
 
     const executionMs = Date.now() - start
@@ -205,6 +208,8 @@ export async function executeHuntQuery(
       throw new Error(`Query timeout after ${MAX_TIMEOUT_MS / 1000}s`)
     }
     throw err
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -308,17 +313,16 @@ export async function promoteHuntToRule(
   await db.insert(schema.detectionRules).values({
     id,
     tenantId,
-    ruleId:         `ZF-CUSTOM-${id.slice(0, 8).toUpperCase()}`,
     name,
     description:    promoted.description,
     severity,
     enabled:        true,
-    isCustom:       true,
     hitCount:       0,
+    sourceTypes:    ['threat_hunt'],
+    conditions:     [{ type: 'threat_hunt', query: hunt.query, sourceHuntId: hunt.id }],
     mitreTactics:   [],
     mitreTechniques: techniques,
-    createdAt:       new Date(),
-    updatedAt:       new Date(),
+    createdBy:      userId,
   })
 
   log.info({ huntId: hunt.id, ruleId: id, name, tenantId }, 'Hunt promoted to detection rule')

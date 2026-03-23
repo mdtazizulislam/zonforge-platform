@@ -14,6 +14,7 @@ import { processVulnUpload }        from './vuln/vuln-scanner.js'
 import {
   requestIdMiddleware, authMiddleware,
 } from '@zonforge/auth-utils'
+import type { SiemConfig } from './siem/siem-forwarder.js'
 import type { Context } from 'hono'
 
 const log = createLogger({ service: 'compliance-reports' })
@@ -29,6 +30,20 @@ const SiemConfigSchema = z.object({
   sentinelLogType:         z.string().optional(),
   webhookUrl:              z.string().url().optional(),
 })
+
+function toSiemConfig(input: z.infer<typeof SiemConfigSchema>): SiemConfig {
+  return {
+    provider: input.provider,
+    enabled: input.enabled,
+    ...(input.splunkHecUrl ? { splunkHecUrl: input.splunkHecUrl } : {}),
+    ...(input.splunkHecToken ? { splunkHecToken: input.splunkHecToken } : {}),
+    ...(input.splunkIndex ? { splunkIndex: input.splunkIndex } : {}),
+    ...(input.sentinelWorkspaceId ? { sentinelWorkspaceId: input.sentinelWorkspaceId } : {}),
+    ...(input.sentinelSharedKey ? { sentinelSharedKey: input.sentinelSharedKey } : {}),
+    ...(input.sentinelLogType ? { sentinelLogType: input.sentinelLogType } : {}),
+    ...(input.webhookUrl ? { webhookUrl: input.webhookUrl } : {}),
+  }
+}
 
 async function start() {
   initDb(postgresConfig)
@@ -89,7 +104,7 @@ async function start() {
     zValidator('json', SiemConfigSchema),
     async (ctx) => {
       const user   = ctx.var.user
-      const config = ctx.req.valid('json')
+      const config = toSiemConfig(ctx.req.valid('json'))
 
       if (!['TENANT_ADMIN', 'PLATFORM_ADMIN'].includes(user.role)) {
         return ctx.json({ success: false, error: { code: 'FORBIDDEN' } }, 403)
@@ -119,7 +134,7 @@ async function start() {
     zValidator('json', SiemConfigSchema),
     async (ctx) => {
       const user   = ctx.var.user
-      const config = ctx.req.valid('json')
+      const config = toSiemConfig(ctx.req.valid('json'))
 
       const testEvent = [{
         eventType: 'alert' as const,
@@ -140,8 +155,9 @@ async function start() {
 
   app.post('/v1/compliance/vuln/upload', async (ctx) => {
     const user  = ctx.var.user
-    const form  = await ctx.req.formData()
-    const file  = form.get('file') as File | null
+    const form  = await ctx.req.parseBody()
+    const fileValue = form['file']
+    const file  = fileValue instanceof File ? fileValue : null
 
     if (!file) {
       return ctx.json({ success: false, error: { code: 'MISSING_FILE', message: 'file field required' } }, 400)
