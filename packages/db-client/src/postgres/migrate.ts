@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 
 // ─────────────────────────────────────────────
@@ -11,11 +12,25 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-async function runMigrations() {
-  const url = process.env['ZONFORGE_POSTGRES_URL']
-  if (!url) {
-    throw new Error('ZONFORGE_POSTGRES_URL environment variable is required')
+function resolvePostgresUrl(): string {
+  const explicitUrl = process.env['ZONFORGE_POSTGRES_URL']
+  if (explicitUrl) return explicitUrl
+
+  const host = process.env['ZONFORGE_POSTGRES_HOST']
+  const port = process.env['ZONFORGE_POSTGRES_PORT'] ?? '5432'
+  const db   = process.env['ZONFORGE_POSTGRES_DB']
+  const user = process.env['ZONFORGE_POSTGRES_USER']
+  const pass = process.env['ZONFORGE_POSTGRES_PASSWORD']
+
+  if (!host || !db || !user || !pass) {
+    throw new Error('Missing PostgreSQL configuration: set ZONFORGE_POSTGRES_URL or host/db/user/password variables')
   }
+
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}/${db}`
+}
+
+async function runMigrations() {
+  const url = resolvePostgresUrl()
 
   console.log('[zonforge:migrate] Connecting to PostgreSQL...')
 
@@ -27,11 +42,18 @@ async function runMigrations() {
   })
 
   const db = drizzle(client)
+  const migrationsFolder = path.join(__dirname, 'migrations')
+  const migrationJournal = path.join(migrationsFolder, 'meta', '_journal.json')
 
   try {
+    if (!fs.existsSync(migrationJournal)) {
+      console.log('[zonforge:migrate] No migrations found, skipping')
+      return
+    }
+
     console.log('[zonforge:migrate] Running migrations...')
     await migrate(db, {
-      migrationsFolder: path.join(__dirname, 'migrations'),
+      migrationsFolder,
     })
     console.log('[zonforge:migrate] ✅ Migrations completed successfully')
   } catch (err) {
