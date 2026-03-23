@@ -42,6 +42,14 @@ interface ThreatForecast {
   generatedAt:   Date
 }
 
+type AuthUser = {
+  tenantId: string
+}
+
+function getAuthUser(ctx: any): AuthUser {
+  return (ctx.var as any).user as AuthUser
+}
+
 // Simulates a time-series model on historical alerts
 async function generateThreatForecast(
   tenantId: string,
@@ -361,7 +369,7 @@ async function start() {
   // ── GET /v1/ai/threat-forecast ────────────────
 
   app.get('/v1/ai/threat-forecast', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const cacheKey = `zf:ai:forecast:${user.tenantId}`
@@ -377,7 +385,7 @@ async function start() {
   // ── GET /v1/ai/benchmark ──────────────────────
 
   app.get('/v1/ai/benchmark', async (ctx) => {
-    const user = ctx.var.user
+    const user = getAuthUser(ctx)
     const db   = getDb()
 
     const [tenant] = await db.select({ planTier: schema.tenants.planTier })
