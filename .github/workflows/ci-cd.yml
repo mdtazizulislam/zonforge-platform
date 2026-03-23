@@ -105,10 +105,15 @@ jobs:
 
       - name: 📊 Upload test coverage
         uses: codecov/codecov-action@v4
-        if: always()
+        if: ${{ always() && secrets.CODECOV_TOKEN != '' }}
+        continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+      - name: ⏭️ Skip coverage upload when token is unavailable
+        if: ${{ always() && secrets.CODECOV_TOKEN == '' }}
+        run: echo "CODECOV_TOKEN not configured; skipping coverage upload."
 
   # ─────────────────────────────────────────────────────────────────
   # JOB: SECURITY SCAN
