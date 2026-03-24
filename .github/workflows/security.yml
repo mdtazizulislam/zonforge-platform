@@ -34,7 +34,8 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --all-projects --severity-threshold=medium
+          command: test
+          args: --all-projects --severity-threshold=high
 
   gitleaks:
     name: Secret Detection
