@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Created - ZonForge</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            text-align: center;
+            padding: 60px 40px;
+        }
+        
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .checkmark {
+            color: white;
+        }
+        
+        .email-note {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            color: #555;
+        }
+        
+        .next-steps {
+            text-align: left;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        
+        .next-steps h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .next-steps ol {
+            margin-left: 20px;
+            color: #666;
+        }
+        
+        .next-steps li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        
+        .cta-button {
+            background: #0066ff;
+            color: white;
+            padding: 12px 40px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        
+        .cta-button:hover {
+            background: #0052cc;
+        }
+        
+        .secondary-link {
+            color: #0066ff;
+            text-decoration: none;
+            display: block;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        .secondary-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">
+            <span class="checkmark">✓</span>
+        </div>
+        
+        <h1>Account Created!</h1>
+        <p class="subtitle">
+            Welcome to ZonForge. Your security platform is ready to go.
+        </p>
+        
+        <div class="email-note">
+            <strong>Check your email</strong><br>
+            We've sent you a confirmation email with your login credentials and next steps.
+        </div>
+        
+        <div class="next-steps">
+            <h3>What's Next?</h3>
+            <ol>
+                <li><strong>Verify your email</strong> - Click the link in your confirmation email</li>
+                <li><strong>Complete your profile</strong> - Add your organization details</li>
+                <li><strong>Deploy collectors</strong> - Start monitoring your security</li>
+                <li><strong>Set up alerts</strong> - Configure your threat notifications</li>
+            </ol>
+        </div>
+        
+        <a href="https://zonforge.com" class="cta-button">Back to ZonForge</a>
+        <a href="#" class="secondary-link" onclick="checkEmail()">Need to resend confirmation?</a>
+    </div>
+    
+    <script>
+        // Display email from URL if available
+        const params = new URLSearchParams(window.location.search);
+        const email = params.get('email');
+        
+        if (email) {
+            const emailNote = document.querySelector('.email-note');
+            emailNote.innerHTML = `<strong>Confirmation sent to:</strong><br><code>${email}</code><br><br>Check your inbox for the confirmation email.`;
+        }
+        
+        function checkEmail() {
+            alert('Open your email client or check your spam folder. Add noreply@zonforge.com to your contacts.');
+        }
+    </script>
+</body>
+</html>
