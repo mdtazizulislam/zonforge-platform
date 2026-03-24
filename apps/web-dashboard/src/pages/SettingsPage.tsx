@@ -307,14 +307,14 @@ export default function SettingsPage() {
           {/* Mock keys for display */}
           <ApiKeyRow
             name="M365 Collector"
-            prefix="sk_live_abc123"
+            prefix="demo_key_abc123"
             role="API_CONNECTOR"
             lastUsed={new Date(Date.now() - 5 * 60_000).toISOString()}
             onRevoke={() => {}}
           />
           <ApiKeyRow
             name="CloudTrail Collector"
-            prefix="sk_live_def456"
+            prefix="demo_key_def456"
             role="API_CONNECTOR"
             lastUsed={new Date(Date.now() - 15 * 60_000).toISOString()}
             onRevoke={() => {}}

@@ -92,7 +92,7 @@ RESEND_API_KEY                   ✅      re_REPLACE_WITH_YOUR... Optional
 FROM_EMAIL                       ✅      noreply@zonforge.com    Optional
 SUPPORT_EMAIL                    ✅      support@zonforge.com    Optional
 
-SLACK_BOT_TOKEN                  ✅      xoxb-REPLACE...         Optional (playbooks)
+SLACK_BOT_TOKEN                  ✅      SLACK_BOT_TOKEN_PLACEHOLDER         Optional (playbooks)
 PAGERDUTY_INTEGRATION_KEY        ✅      REPLACE_WITH_YOUR_KEY   Optional (playbooks)
 JIRA_BASE_URL                    ✅      https://yourorg.ati...  Optional (playbooks)
 JIRA_API_TOKEN                   ✅      REPLACE_WITH_YOUR_KEY   Optional (playbooks)

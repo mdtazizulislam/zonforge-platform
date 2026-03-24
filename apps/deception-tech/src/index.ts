@@ -360,7 +360,7 @@ async function start() {
 
 function maskValue(value: string, type: string): string {
   if (!value) return '***'
-  if (type === 'fake_ssh_key') return '-----BEGIN OPENSSH PRIVATE KEY-----\n[MASKED]\n-----END OPENSSH PRIVATE KEY-----'
+  if (type === 'fake_ssh_key') return 'OPENSSH_PRIVATE_KEY_MASKED'
   if (value.length <= 8) return '***'
   return `${value.slice(0, 4)}${'*'.repeat(value.length - 8)}${value.slice(-4)}`
 }
