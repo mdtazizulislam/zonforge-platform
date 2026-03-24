@@ -140,3 +140,28 @@ Please report this problem at https://ntl.fyi/cli-error including the error deta
   "edge_function_logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/logs/edge-functions",
   "url": "https://zonforge.com"
 }
+
+=== STRIPE WIRING DEPLOY 2026-03-24T12:48:50.5459984-04:00 ===
+[deploy] npx --yes netlify-cli deploy --prod --no-build --filter @zonforge/landing-web --dir apps/landing-web/dist --site c74ce83a-0911-4eff-8ad5-adf850203055 --message stripe-live-wiring
+{
+  "site_id": "c74ce83a-0911-4eff-8ad5-adf850203055",
+  "site_name": "ai-powered-cyber-threat",
+  "deploy_id": "69c2c0983897a68770d733c4",
+  "deploy_url": "https://69c2c0983897a68770d733c4--ai-powered-cyber-threat.netlify.app",
+  "logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/deploys/69c2c0983897a68770d733c4",
+  "function_logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/logs/functions",
+  "edge_function_logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/logs/edge-functions",
+  "url": "https://zonforge.com"
+}
+
+=== STRIPE TOKEN CLEANUP DEPLOY 2026-03-24T12:51:38.4759719-04:00 ===
+{
+  "site_id": "c74ce83a-0911-4eff-8ad5-adf850203055",
+  "site_name": "ai-powered-cyber-threat",
+  "deploy_id": "69c2c13fb8ccb8a5f22c9660",
+  "deploy_url": "https://69c2c13fb8ccb8a5f22c9660--ai-powered-cyber-threat.netlify.app",
+  "logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/deploys/69c2c13fb8ccb8a5f22c9660",
+  "function_logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/logs/functions",
+  "edge_function_logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/logs/edge-functions",
+  "url": "https://zonforge.com"
+}

@@ -2553,3 +2553,71 @@ apps/landing-web/dist/index.html:1408:          <a href="mailto:support@zonforge
 apps/landing-web/dist/index.html:1435:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-primary" data-starter-checkout>Start Now</a>
 apps/landing-web/dist/index.html:1506:  document.querySelectorAll('[data-starter-checkout]').forEach((link) => {
 apps/landing-web/dist/index.html:1552:    formData.set('form-name', 'lead-capture');
+
+=== STRIPE LIVE VALIDATION 2026-03-24T12:49:58.3873695-04:00 ===
+[http] https://zonforge.com
+status=200
+[http] https://zonforge.com/demo.html
+status=200
+[check] TODO placeholder
+FOUND_TODO
+[check] stripe link in live html
+STRIPE_LINK_FOUND
+[check] lead form markers
+LEAD_FORM_MARKERS_PRESENT
+[check] demo marker
+DEMO_BOOK_CTA_PRESENT
+[source check]
+610:          <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-hero" data-starter-checkout>Γ¼í Get Security Setup</a>
+1292:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="pc-btn" data-starter-checkout>Start Now</a>
+1383:      <form class="demo-form" id="lead-form" name="lead-capture" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+1384:        <input type="hidden" name="form-name" value="lead-capture">
+1407:          <button class="df-submit" type="submit">Get Security Setup</button>
+1435:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-primary" data-starter-checkout>Start Now</a>
+1499:const STRIPE_PAYMENT_LINK_TODO = 'https://buy.stripe.com/3cIeVe1BL1GWbKk37H2cg00';
+1503:  const checkoutUrl = STRIPE_PAYMENT_LINK_TODO || STARTER_CHECKOUT_FALLBACK_URL;
+1504:  const usesStripeCheckout = Boolean(STRIPE_PAYMENT_LINK_TODO);
+1506:  document.querySelectorAll('[data-starter-checkout]').forEach((link) => {
+1552:    formData.set('form-name', 'lead-capture');
+[dist check]
+610:          <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-hero" data-starter-checkout>Γ¼í Get Security Setup</a>
+1292:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="pc-btn" data-starter-checkout>Start Now</a>
+1383:      <form class="demo-form" id="lead-form" name="lead-capture" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+1384:        <input type="hidden" name="form-name" value="lead-capture">
+1407:          <button class="df-submit" type="submit">Get Security Setup</button>
+1435:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-primary" data-starter-checkout>Start Now</a>
+1499:const STRIPE_PAYMENT_LINK_TODO = 'https://buy.stripe.com/3cIeVe1BL1GWbKk37H2cg00';
+1506:  document.querySelectorAll('[data-starter-checkout]').forEach((link) => {
+1552:    formData.set('form-name', 'lead-capture');
+
+=== STRIPE TOKEN CLEANUP VALIDATION 2026-03-24T12:52:08.9379825-04:00 ===
+[http] zonforge.com status=200
+[http] zonforge.com/demo.html status=200
+[todo-token] NOT_FOUND
+[stripe-link] FOUND
+[hero-cta] PRESENT_WITH_CHECKOUT_TAG
+[starter-cta] PRESENT_WITH_CHECKOUT_TAG
+[lead-form] PRESENT
+[demo-page] BOOK_DEMO_PRESENT
+apps/landing-web/dist/index.html:610:          <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-hero" data-starter-checkout>Γ¼í Get Security Setup</a>
+apps/landing-web/dist/index.html:1292:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="pc-btn" data-starter-checkout>Start Now</a>
+apps/landing-web/dist/index.html:1383:      <form class="demo-form" id="lead-form" name="lead-capture" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+apps/landing-web/dist/index.html:1384:        <input type="hidden" name="form-name" value="lead-capture">
+apps/landing-web/dist/index.html:1407:          <button class="df-submit" type="submit">Get Security Setup</button>
+apps/landing-web/dist/index.html:1435:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-primary" data-starter-checkout>Start Now</a>
+apps/landing-web/dist/index.html:1499:const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/3cIeVe1BL1GWbKk37H2cg00';
+apps/landing-web/dist/index.html:1503:  const checkoutUrl = STRIPE_PAYMENT_LINK || STARTER_CHECKOUT_FALLBACK_URL;
+apps/landing-web/dist/index.html:1504:  const usesStripeCheckout = Boolean(STRIPE_PAYMENT_LINK);
+apps/landing-web/dist/index.html:1506:  document.querySelectorAll('[data-starter-checkout]').forEach((link) => {
+apps/landing-web/dist/index.html:1552:    formData.set('form-name', 'lead-capture');
+apps/landing-web/public/index.html:610:          <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-hero" data-starter-checkout>Γ¼í Get Security Setup</a>
+apps/landing-web/public/index.html:1292:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="pc-btn" data-starter-checkout>Start Now</a>
+apps/landing-web/public/index.html:1383:      <form class="demo-form" id="lead-form" name="lead-capture" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+apps/landing-web/public/index.html:1384:        <input type="hidden" name="form-name" value="lead-capture">
+apps/landing-web/public/index.html:1407:          <button class="df-submit" type="submit">Get Security Setup</button>
+apps/landing-web/public/index.html:1435:        <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-primary" data-starter-checkout>Start Now</a>
+apps/landing-web/public/index.html:1499:const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/3cIeVe1BL1GWbKk37H2cg00';
+apps/landing-web/public/index.html:1503:  const checkoutUrl = STRIPE_PAYMENT_LINK || STARTER_CHECKOUT_FALLBACK_URL;
+apps/landing-web/public/index.html:1504:  const usesStripeCheckout = Boolean(STRIPE_PAYMENT_LINK);
+apps/landing-web/public/index.html:1506:  document.querySelectorAll('[data-starter-checkout]').forEach((link) => {
+apps/landing-web/public/index.html:1552:    formData.set('form-name', 'lead-capture');

@@ -1496,12 +1496,12 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
 </footer>
 
 <script>
-const STRIPE_PAYMENT_LINK_TODO = '';
+const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/3cIeVe1BL1GWbKk37H2cg00';
 const STARTER_CHECKOUT_FALLBACK_URL = 'mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo';
 
 function bindStarterCheckoutLinks() {
-  const checkoutUrl = STRIPE_PAYMENT_LINK_TODO || STARTER_CHECKOUT_FALLBACK_URL;
-  const usesStripeCheckout = Boolean(STRIPE_PAYMENT_LINK_TODO);
+  const checkoutUrl = STRIPE_PAYMENT_LINK || STARTER_CHECKOUT_FALLBACK_URL;
+  const usesStripeCheckout = Boolean(STRIPE_PAYMENT_LINK);
 
   document.querySelectorAll('[data-starter-checkout]').forEach((link) => {
     link.setAttribute('href', checkoutUrl);
