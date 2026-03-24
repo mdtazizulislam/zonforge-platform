@@ -1,6 +1,6 @@
-import { sign, verify } from 'jsonwebtoken';
-import { hash, compare } from 'bcryptjs';
-import { getPool } from './db';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { getPool } from './db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
@@ -10,20 +10,20 @@ export interface JWTPayload {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return hash(password, 10);
+  return bcrypt.hash(password, 10);
 }
 
 export async function verifyPassword(password: string, passwordHash: string): Promise<boolean> {
-  return compare(password, passwordHash);
+  return bcrypt.compare(password, passwordHash);
 }
 
 export function createJWT(payload: JWTPayload): string {
-  return sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 
 export function verifyJWT(token: string): JWTPayload | null {
   try {
-    return verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, JWT_SECRET) as JWTPayload;
   } catch (error) {
     return null;
   }

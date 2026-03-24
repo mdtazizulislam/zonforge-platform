@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { initDatabase, getPool } from './db';
-import { registerUser, loginUser, verifyJWT } from './auth';
-import { handleCheckoutSessionCompleted, verifyWebhookSignature } from './stripe';
+import { initDatabase, getPool } from './db.js';
+import { registerUser, loginUser, verifyJWT } from './auth.js';
+import { handleCheckoutSessionCompleted, verifyWebhookSignature } from './stripe.js';
 
 const app = new Hono();
 

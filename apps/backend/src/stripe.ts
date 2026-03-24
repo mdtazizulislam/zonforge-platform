@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
-import { getPool } from './db';
-import { hashPassword, getUserByEmail } from './auth';
+import { getPool } from './db.js';
+import { hashPassword, getUserByEmail } from './auth.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16',
