@@ -1,0 +1,713 @@
+=== STEP 0 BASELINE ===
+[pwd]
+C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform
+[git branch --show-current]
+main
+[git status --short]
+ M .gitignore
+ M apps/landing-web/public/demo.html
+ M apps/landing-web/public/index.html
+ M proof/runs/step0-baseline.txt
+?? proof/runs/build-proof.txt
+?? proof/runs/final-validation.txt
+?? proof/runs/netlify-deploy.txt
+[npm run build]
+
+> zonforge-platform@4.6.0 build
+> turbo run build
+
+ΓÇó turbo 2.8.19
+
+   ΓÇó Packages in scope: @zonforge/ai-soc-analyst, @zonforge/alert-service, @zonforge/alert-triage-ai, @zonforge/api-gateway, @zonforge/auth-service, @zonforge/auth-utils, @zonforge/aws-cloudtrail-collector, @zonforge/behavioral-ai, @zonforge/billing-service, @zonforge/board-reports, @zonforge/collector-base, @zonforge/compliance-reports, @zonforge/config, @zonforge/correlation-engine, @zonforge/db-client, @zonforge/deception-grid, @zonforge/deception-tech, @zonforge/detection-engine, @zonforge/digital-twin, @zonforge/event-schema, @zonforge/google-workspace-collector, @zonforge/ingestion-service, @zonforge/landing-web, @zonforge/logger, @zonforge/m365-collector, @zonforge/mobile-app, @zonforge/mssp-console, @zonforge/normalization-worker, @zonforge/playbook-engine, @zonforge/poc-management, @zonforge/poc-manager, @zonforge/predictive-intel, @zonforge/predictive-threat, @zonforge/redteam-simulation, @zonforge/regulatory-ai, @zonforge/risk-scoring-engine, @zonforge/security-assistant, @zonforge/shared-types, @zonforge/sso-service, @zonforge/supply-chain-intel, @zonforge/tenant-service, @zonforge/threat-hunting, @zonforge/threat-intel-service, @zonforge/web-dashboard
+   ΓÇó Running build in 44 packages
+   ΓÇó Remote caching disabled
+
+@zonforge/logger:build: cache hit, replaying logs 7f5607073d5db77e
+@zonforge/config:build: cache hit, replaying logs 3c5910ae8d15c418
+@zonforge/logger:build: 
+@zonforge/logger:build: > @zonforge/logger@0.1.0 build
+@zonforge/logger:build: > tsc
+@zonforge/logger:build: 
+@zonforge/config:build: 
+@zonforge/config:build: > @zonforge/config@0.1.0 build
+@zonforge/config:build: > tsc
+@zonforge/config:build: 
+@zonforge/mobile-app:build: cache miss, executing 29ea04324f2b5884
+@zonforge/landing-web:build: cache miss, executing 747cf7c104488464
+@zonforge/web-dashboard:build: cache miss, executing 79b7d99968092b62
+@zonforge/shared-types:build: cache hit, replaying logs e99f079689d3011c
+@zonforge/shared-types:build: 
+@zonforge/shared-types:build: > @zonforge/shared-types@0.1.0 build
+@zonforge/shared-types:build: > tsc
+@zonforge/shared-types:build: 
+@zonforge/event-schema:build: cache hit, replaying logs fdefb1d8aa51dde0
+@zonforge/event-schema:build: 
+@zonforge/event-schema:build: > @zonforge/event-schema@0.1.0 build
+@zonforge/event-schema:build: > tsc
+@zonforge/event-schema:build: 
+@zonforge/db-client:build: cache hit, replaying logs bd7a43e23cd860fb
+@zonforge/db-client:build: 
+@zonforge/db-client:build: > @zonforge/db-client@0.1.0 build
+@zonforge/db-client:build: > tsc
+@zonforge/db-client:build: 
+@zonforge/auth-utils:build: cache hit, replaying logs 66fae4eb8b5eb4ee
+@zonforge/auth-utils:build: 
+@zonforge/auth-utils:build: > @zonforge/auth-utils@0.1.0 build
+@zonforge/auth-utils:build: > tsc
+@zonforge/auth-utils:build: 
+@zonforge/digital-twin:build: cache hit, replaying logs 424295adcaa0148e
+@zonforge/digital-twin:build: 
+@zonforge/digital-twin:build: > @zonforge/digital-twin@0.1.0 build
+@zonforge/digital-twin:build: > tsc
+@zonforge/digital-twin:build: 
+@zonforge/collector-base:build: cache hit, replaying logs 784ccad08afde9df
+@zonforge/collector-base:build: 
+@zonforge/board-reports:build: cache hit, replaying logs 0664c38920129093
+@zonforge/collector-base:build: > @zonforge/collector-base@0.1.0 build
+@zonforge/collector-base:build: > tsc
+@zonforge/collector-base:build: 
+@zonforge/board-reports:build: 
+@zonforge/board-reports:build: > @zonforge/board-reports@0.1.0 build
+@zonforge/board-reports:build: > tsc
+@zonforge/board-reports:build: 
+@zonforge/alert-triage-ai:build: cache hit, replaying logs 79949b63ea444103
+@zonforge/alert-triage-ai:build: 
+@zonforge/alert-triage-ai:build: > @zonforge/alert-triage-ai@0.1.0 build
+@zonforge/alert-triage-ai:build: > tsc
+@zonforge/alert-triage-ai:build: 
+@zonforge/ingestion-service:build: cache hit, replaying logs 15e2a906af05b639
+@zonforge/ingestion-service:build: 
+@zonforge/ingestion-service:build: > @zonforge/ingestion-service@0.1.0 build
+@zonforge/ingestion-service:build: > tsc
+@zonforge/ingestion-service:build: 
+@zonforge/api-gateway:build: cache hit, replaying logs ad4428bcb15b6dd6
+@zonforge/api-gateway:build: 
+@zonforge/api-gateway:build: > @zonforge/api-gateway@0.1.0 build
+@zonforge/api-gateway:build: > tsc
+@zonforge/api-gateway:build: 
+@zonforge/behavioral-ai:build: cache hit, replaying logs 883f35c487c6bbba
+@zonforge/behavioral-ai:build: 
+@zonforge/behavioral-ai:build: > @zonforge/behavioral-ai@0.1.0 build
+@zonforge/behavioral-ai:build: > tsc
+@zonforge/behavioral-ai:build: 
+@zonforge/playbook-engine:build: cache hit, replaying logs 2842204a73901fc3
+@zonforge/playbook-engine:build: 
+@zonforge/playbook-engine:build: > @zonforge/playbook-engine@0.1.0 build
+@zonforge/playbook-engine:build: > tsc
+@zonforge/playbook-engine:build: 
+@zonforge/ai-soc-analyst:build: cache hit, replaying logs b1dacf2ec2e9f9aa
+@zonforge/ai-soc-analyst:build: 
+@zonforge/ai-soc-analyst:build: > @zonforge/ai-soc-analyst@0.1.0 build
+@zonforge/ai-soc-analyst:build: > tsc
+@zonforge/ai-soc-analyst:build: 
+@zonforge/auth-service:build: cache hit, replaying logs a44cb55c76dfdf40
+@zonforge/auth-service:build: 
+@zonforge/auth-service:build: > @zonforge/auth-service@0.1.0 build
+@zonforge/auth-service:build: > tsc
+@zonforge/auth-service:build: 
+@zonforge/poc-manager:build: cache hit, replaying logs 95cf1d380ec2bd04
+@zonforge/poc-manager:build: 
+@zonforge/poc-manager:build: > @zonforge/poc-manager@0.1.0 build
+@zonforge/poc-manager:build: > tsc
+@zonforge/poc-manager:build: 
+@zonforge/billing-service:build: cache hit, replaying logs bb893d65e43a7a4e
+@zonforge/billing-service:build: 
+@zonforge/billing-service:build: > @zonforge/billing-service@0.1.0 build
+@zonforge/billing-service:build: > tsc
+@zonforge/billing-service:build: 
+@zonforge/compliance-reports:build: cache hit, replaying logs 090a64d9f8c7fa47
+@zonforge/compliance-reports:build: 
+@zonforge/compliance-reports:build: > @zonforge/compliance-reports@0.1.0 build
+@zonforge/compliance-reports:build: > tsc
+@zonforge/compliance-reports:build: 
+@zonforge/predictive-threat:build: cache hit, replaying logs ec8e01d4e2012c44
+@zonforge/predictive-threat:build: 
+@zonforge/predictive-threat:build: > @zonforge/predictive-threat@0.1.0 build
+@zonforge/predictive-threat:build: > tsc
+@zonforge/predictive-threat:build: 
+@zonforge/supply-chain-intel:build: cache hit, replaying logs 2d24a6f4749563b4
+@zonforge/deception-grid:build: cache hit, replaying logs 66de6902a5df0bdf
+@zonforge/supply-chain-intel:build: 
+@zonforge/deception-grid:build: 
+@zonforge/deception-grid:build: > @zonforge/deception-grid@0.1.0 build
+@zonforge/deception-grid:build: > tsc
+@zonforge/deception-grid:build: 
+@zonforge/supply-chain-intel:build: > @zonforge/supply-chain-intel@0.1.0 build
+@zonforge/supply-chain-intel:build: > tsc
+@zonforge/redteam-simulation:build: cache hit, replaying logs 7a2c8c80824b12dd
+@zonforge/regulatory-ai:build: cache hit, replaying logs 62e161b3c0ffa6ee
+@zonforge/redteam-simulation:build: 
+@zonforge/redteam-simulation:build: > @zonforge/redteam-simulation@0.1.0 build
+@zonforge/redteam-simulation:build: > tsc
+@zonforge/redteam-simulation:build: 
+@zonforge/supply-chain-intel:build: 
+@zonforge/regulatory-ai:build: 
+@zonforge/regulatory-ai:build: > @zonforge/regulatory-ai@0.1.0 build
+@zonforge/regulatory-ai:build: > tsc
+@zonforge/regulatory-ai:build: 
+@zonforge/security-assistant:build: cache hit, replaying logs 3f6d4d99b90776ba
+@zonforge/deception-tech:build: cache hit, replaying logs 777bd8dc9d4143b6
+@zonforge/deception-tech:build: 
+@zonforge/deception-tech:build: > @zonforge/deception-tech@0.1.0 build
+@zonforge/deception-tech:build: > tsc
+@zonforge/security-assistant:build: 
+@zonforge/deception-tech:build: 
+@zonforge/security-assistant:build: > @zonforge/security-assistant@0.1.0 build
+@zonforge/security-assistant:build: > tsc
+@zonforge/security-assistant:build: 
+@zonforge/poc-management:build: cache hit, replaying logs 87e47d0d64927b5b
+@zonforge/poc-management:build: 
+@zonforge/poc-management:build: > @zonforge/poc-management@0.1.0 build
+@zonforge/poc-management:build: > tsc
+@zonforge/poc-management:build: 
+@zonforge/mssp-console:build: cache hit, replaying logs 60687f8b57385c9a
+@zonforge/mssp-console:build: 
+@zonforge/mssp-console:build: > @zonforge/mssp-console@0.1.0 build
+@zonforge/mssp-console:build: > tsc
+@zonforge/mssp-console:build: 
+@zonforge/predictive-intel:build: cache hit, replaying logs ac31751f53ffd2a7
+@zonforge/predictive-intel:build: 
+@zonforge/predictive-intel:build: > @zonforge/predictive-intel@0.1.0 build
+@zonforge/predictive-intel:build: > tsc
+@zonforge/predictive-intel:build: 
+@zonforge/threat-hunting:build: cache hit, replaying logs 3c7d6661a5d89177
+@zonforge/threat-hunting:build: 
+@zonforge/threat-hunting:build: > @zonforge/threat-hunting@0.1.0 build
+@zonforge/threat-hunting:build: > tsc
+@zonforge/threat-hunting:build: 
+@zonforge/tenant-service:build: cache hit, replaying logs 9b186992b419ad15
+@zonforge/tenant-service:build: 
+@zonforge/tenant-service:build: > @zonforge/tenant-service@0.1.0 build
+@zonforge/tenant-service:build: > tsc
+@zonforge/tenant-service:build: 
+@zonforge/aws-cloudtrail-collector:build: cache hit, replaying logs d37d36914b6d950f
+@zonforge/aws-cloudtrail-collector:build: 
+@zonforge/aws-cloudtrail-collector:build: > @zonforge/aws-cloudtrail-collector@0.1.0 build
+@zonforge/google-workspace-collector:build: cache hit, replaying logs 07cdf3b4a043fd3e
+@zonforge/aws-cloudtrail-collector:build: > tsc
+@zonforge/aws-cloudtrail-collector:build: 
+@zonforge/google-workspace-collector:build: 
+@zonforge/google-workspace-collector:build: > @zonforge/google-workspace-collector@0.1.0 build
+@zonforge/google-workspace-collector:build: > tsc
+@zonforge/google-workspace-collector:build: 
+@zonforge/sso-service:build: cache hit, replaying logs 081dc653010bff72
+@zonforge/sso-service:build: 
+@zonforge/sso-service:build: > @zonforge/sso-service@0.1.0 build
+@zonforge/sso-service:build: > tsc
+@zonforge/sso-service:build: 
+@zonforge/m365-collector:build: cache hit, replaying logs 56cbd361cbd5758c
+@zonforge/m365-collector:build: 
+@zonforge/m365-collector:build: > @zonforge/m365-collector@0.1.0 build
+@zonforge/m365-collector:build: > tsc
+@zonforge/m365-collector:build: 
+@zonforge/threat-intel-service:build: cache hit, replaying logs d387c259a768a786
+@zonforge/threat-intel-service:build: 
+@zonforge/threat-intel-service:build: > @zonforge/threat-intel-service@0.1.0 build
+@zonforge/threat-intel-service:build: > tsc
+@zonforge/threat-intel-service:build: 
+@zonforge/normalization-worker:build: cache hit, replaying logs 5dca6af6d2c51eff
+@zonforge/detection-engine:build: cache hit, replaying logs 17e6cb636e86c63e
+@zonforge/normalization-worker:build: 
+@zonforge/normalization-worker:build: > @zonforge/normalization-worker@0.1.0 build
+@zonforge/normalization-worker:build: > tsc
+@zonforge/normalization-worker:build: 
+@zonforge/detection-engine:build: 
+@zonforge/detection-engine:build: > @zonforge/detection-engine@0.1.0 build
+@zonforge/detection-engine:build: > tsc
+@zonforge/detection-engine:build: 
+@zonforge/risk-scoring-engine:build: cache hit, replaying logs 7973146e6d25bc27
+@zonforge/risk-scoring-engine:build: 
+@zonforge/risk-scoring-engine:build: > @zonforge/risk-scoring-engine@0.1.0 build
+@zonforge/risk-scoring-engine:build: > tsc
+@zonforge/risk-scoring-engine:build: 
+@zonforge/correlation-engine:build: cache hit, replaying logs eb58e75f38aa828a
+@zonforge/correlation-engine:build: 
+@zonforge/correlation-engine:build: > @zonforge/correlation-engine@0.1.0 build
+@zonforge/correlation-engine:build: > tsc
+@zonforge/correlation-engine:build: 
+@zonforge/alert-service:build: cache hit, replaying logs fd038fa95e7be639
+@zonforge/alert-service:build: 
+@zonforge/alert-service:build: > @zonforge/alert-service@0.1.0 build
+@zonforge/alert-service:build: > tsc
+@zonforge/alert-service:build: 
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: > @zonforge/mobile-app@4.6.0 build
+@zonforge/mobile-app:build: > expo export --platform all --output-dir dist
+@zonforge/mobile-app:build: 
+@zonforge/web-dashboard:build: 
+@zonforge/web-dashboard:build: > @zonforge/web-dashboard@0.1.0 build
+@zonforge/web-dashboard:build: > vite build
+@zonforge/web-dashboard:build: 
+@zonforge/landing-web:build: 
+@zonforge/landing-web:build: > @zonforge/landing-web@4.6.0 build
+@zonforge/landing-web:build: > vite build
+@zonforge/landing-web:build: 
+@zonforge/landing-web:build: [33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+@zonforge/landing-web:build: [36mvite v5.4.21 [32mbuilding for production...[36m[39m
+@zonforge/web-dashboard:build: [36mvite v5.4.21 [32mbuilding for production...[36m[39m
+@zonforge/web-dashboard:build: transforming...
+@zonforge/landing-web:build: transforming...
+@zonforge/landing-web:build: [32mΓ£ô[39m 4 modules transformed.
+@zonforge/landing-web:build: rendering chunks...
+@zonforge/landing-web:build: computing gzip size...
+@zonforge/landing-web:build: [2m../dist/[22m[32mdemo.html   [39m[1m[2m44.99 kB[22m[1m[22m[2m Γöé gzip: 11.42 kB[22m
+@zonforge/landing-web:build: [2m../dist/[22m[32mindex.html  [39m[1m[2m83.75 kB[22m[1m[22m[2m Γöé gzip: 17.80 kB[22m
+@zonforge/landing-web:build: [32mΓ£ô built in 281ms[39m
+@zonforge/mobile-app:build: Using src/app as the root directory for Expo Router.
+@zonforge/mobile-app:build: Starting Metro Bundler
+@zonforge/web-dashboard:build: [32mΓ£ô[39m 2781 modules transformed.
+@zonforge/web-dashboard:build: rendering chunks...
+@zonforge/web-dashboard:build: computing gzip size...
+@zonforge/web-dashboard:build: [2mdist/[22m[32mindex.html                                     [39m[1m[2m  1.06 kB[22m[1m[22m[2m Γöé gzip:   0.56 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[35massets/index-B50mEL7a.css                      [39m[1m[2m  2.11 kB[22m[1m[22m[2m Γöé gzip:   0.69 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/check-BU_DXOHM.js                       [39m[1m[2m  0.33 kB[22m[1m[22m[2m Γöé gzip:   0.28 kB[22m[2m Γöé map:     0.74 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/play-Cw-mqZc7.js                        [39m[1m[2m  0.35 kB[22m[1m[22m[2m Γöé gzip:   0.28 kB[22m[2m Γöé map:     0.75 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/chevron-right-B4PMob3E.js               [39m[1m[2m  0.35 kB[22m[1m[22m[2m Γöé gzip:   0.28 kB[22m[2m Γöé map:     0.80 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/loader-circle-HIJi2Jnw.js               [39m[1m[2m  0.37 kB[22m[1m[22m[2m Γöé gzip:   0.29 kB[22m[2m Γöé map:     0.81 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/plus-BoXhX0A1.js                        [39m[1m[2m  0.37 kB[22m[1m[22m[2m Γöé gzip:   0.29 kB[22m[2m Γöé map:     0.83 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/arrow-right-CLDol1Ra.js                 [39m[1m[2m  0.39 kB[22m[1m[22m[2m Γöé gzip:   0.30 kB[22m[2m Γöé map:     0.88 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/clock-BzXdkR8Z.js                       [39m[1m[2m  0.39 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.89 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/circle-check-BqqF7ZeA.js                [39m[1m[2m  0.39 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.92 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/message-square-B2T9FL5Q.js              [39m[1m[2m  0.40 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.86 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/user-avBY0u9z.js                        [39m[1m[2m  0.41 kB[22m[1m[22m[2m Γöé gzip:   0.32 kB[22m[2m Γöé map:     0.90 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/circle-x-DqEIeSia.js                    [39m[1m[2m  0.42 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.99 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/lock-FhHU5_4g.js                        [39m[1m[2m  0.42 kB[22m[1m[22m[2m Γöé gzip:   0.33 kB[22m[2m Γöé map:     0.95 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/trending-up-gOhY8u7c.js                 [39m[1m[2m  0.43 kB[22m[1m[22m[2m Γöé gzip:   0.32 kB[22m[2m Γöé map:     0.92 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/target-CC0nwOOj.js                      [39m[1m[2m  0.44 kB[22m[1m[22m[2m Γöé gzip:   0.30 kB[22m[2m Γöé map:     1.05 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/copy-CVO9wUsr.js                        [39m[1m[2m  0.45 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     0.98 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/activity-pBX5Wf33.js                    [39m[1m[2m  0.45 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     0.91 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/globe-DKNnsOIn.js                       [39m[1m[2m  0.46 kB[22m[1m[22m[2m Γöé gzip:   0.33 kB[22m[2m Γöé map:     1.01 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/database-LL8NGOP6.js                    [39m[1m[2m  0.46 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     1.05 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/eye-CAczM9s5.js                         [39m[1m[2m  0.46 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     0.99 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/upload-vjpRKgCJ.js                      [39m[1m[2m  0.47 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     1.05 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/external-link-Dl44yQur.js               [39m[1m[2m  0.47 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     1.04 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/zap-DvXnutNS.js                         [39m[1m[2m  0.48 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     0.91 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/download-x_ZtVVqS.js                    [39m[1m[2m  0.48 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.07 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/triangle-alert-CrGqLo2s.js              [39m[1m[2m  0.49 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     1.10 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/send-BHufyw0O.js                        [39m[1m[2m  0.50 kB[22m[1m[22m[2m Γöé gzip:   0.37 kB[22m[2m Γöé map:     1.00 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/users-D62FpRqN.js                       [39m[1m[2m  0.52 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.14 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/refresh-cw-DZDR4WPU.js                  [39m[1m[2m  0.54 kB[22m[1m[22m[2m Γöé gzip:   0.37 kB[22m[2m Γöé map:     1.16 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/save-CUo1ECpZ.js                        [39m[1m[2m  0.54 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.10 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/file-text-CWBrN5TF.js                   [39m[1m[2m  0.55 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.23 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/server-CxQyCSbc.js                      [39m[1m[2m  0.55 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     1.37 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/chevron-up-B8H3pOMk.js                  [39m[1m[2m  0.59 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     1.41 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/trending-down-Cg6Le6jP.js               [39m[1m[2m  0.67 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.53 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/star-C7a67AI5.js                        [39m[1m[2m  0.69 kB[22m[1m[22m[2m Γöé gzip:   0.44 kB[22m[2m Γöé map:     1.12 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/cpu-Bj_nRRp1.js                         [39m[1m[2m  0.71 kB[22m[1m[22m[2m Γöé gzip:   0.40 kB[22m[2m Γöé map:     1.78 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AuditLogPage-D828tWdC.js                [39m[1m[2m  1.32 kB[22m[1m[22m[2m Γöé gzip:   0.74 kB[22m[2m Γöé map:     2.65 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/thumbs-up-BGAJbnJS.js                   [39m[1m[2m  1.39 kB[22m[1m[22m[2m Γöé gzip:   0.60 kB[22m[2m Γöé map:     2.89 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/PostureGauge-6Y7JiG8y.js                [39m[1m[2m  2.14 kB[22m[1m[22m[2m Γöé gzip:   1.08 kB[22m[2m Γöé map:     6.91 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/vendor-CsM61ymy.js                      [39m[1m[2m  2.56 kB[22m[1m[22m[2m Γöé gzip:   1.43 kB[22m[2m Γöé map:    25.63 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/sparkles-DEEuJkHo.js                    [39m[1m[2m  2.97 kB[22m[1m[22m[2m Γöé gzip:   1.09 kB[22m[2m Γöé map:     7.83 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/queries-5GM21whc.js                     [39m[1m[2m  3.33 kB[22m[1m[22m[2m Γöé gzip:   1.11 kB[22m[2m Γöé map:    14.52 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/zustand-_1r1RET1.js                     [39m[1m[2m  3.63 kB[22m[1m[22m[2m Γöé gzip:   1.61 kB[22m[2m Γöé map:    14.52 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/LoginPage-0FOEZ3hK.js                   [39m[1m[2m  3.73 kB[22m[1m[22m[2m Γöé gzip:   1.57 kB[22m[2m Γöé map:    14.89 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ui-5Ux2rGWC.js                          [39m[1m[2m  4.05 kB[22m[1m[22m[2m Γöé gzip:   1.51 kB[22m[2m Γöé map:    12.90 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/RiskPage-B3EPf70Y.js                    [39m[1m[2m 10.01 kB[22m[1m[22m[2m Γöé gzip:   3.24 kB[22m[2m Γöé map:    23.10 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AppShell-DLf0hRx1.js                    [39m[1m[2m 11.07 kB[22m[1m[22m[2m Γöé gzip:   3.19 kB[22m[2m Γöé map:    26.13 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/CompliancePage-C-cX8hgE.js              [39m[1m[2m 11.27 kB[22m[1m[22m[2m Γöé gzip:   3.40 kB[22m[2m Γöé map:    27.41 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ConnectorsPage-CWU0WyME.js              [39m[1m[2m 12.04 kB[22m[1m[22m[2m Γöé gzip:   3.71 kB[22m[2m Γöé map:    27.51 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/SettingsPage-bQpbBk6E.js                [39m[1m[2m 12.31 kB[22m[1m[22m[2m Γöé gzip:   3.70 kB[22m[2m Γöé map:    28.76 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/BillingPage-DnoCdDAW.js                 [39m[1m[2m 12.48 kB[22m[1m[22m[2m Γöé gzip:   4.06 kB[22m[2m Γöé map:    29.36 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/PlaybooksPage-CK69GmBa.js               [39m[1m[2m 13.34 kB[22m[1m[22m[2m Γöé gzip:   4.42 kB[22m[2m Γöé map:    28.46 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AlertDetailPage-C8xf0XEB.js             [39m[1m[2m 13.40 kB[22m[1m[22m[2m Γöé gzip:   3.74 kB[22m[2m Γöé map:    32.08 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AiSocAnalystPage-DlNGVBe9.js            [39m[1m[2m 16.68 kB[22m[1m[22m[2m Γöé gzip:   5.01 kB[22m[2m Γöé map:    35.55 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/MsspPage-DY3ibGr2.js                    [39m[1m[2m 16.76 kB[22m[1m[22m[2m Γöé gzip:   4.63 kB[22m[2m Γöé map:    40.15 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/SupplyChainPage-C_TvqEGv.js             [39m[1m[2m 17.15 kB[22m[1m[22m[2m Γöé gzip:   5.62 kB[22m[2m Γöé map:    37.94 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/SecurityValidationPage-CaZdhRG5.js      [39m[1m[2m 17.55 kB[22m[1m[22m[2m Γöé gzip:   5.19 kB[22m[2m Γöé map:    41.23 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/EnterpriseCapabilitiesPage-WZ04O325.js  [39m[1m[2m 17.85 kB[22m[1m[22m[2m Γöé gzip:   5.42 kB[22m[2m Γöé map:    40.20 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AiIntelligencePage-BJun_PPf.js          [39m[1m[2m 18.66 kB[22m[1m[22m[2m Γöé gzip:   5.73 kB[22m[2m Γöé map:    42.64 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AiCapabilitiesPage-CQ1WNhfq.js          [39m[1m[2m 19.50 kB[22m[1m[22m[2m Γöé gzip:   6.20 kB[22m[2m Γöé map:    43.57 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ThreatHuntingPage-DruyHBc_.js           [39m[1m[2m 19.72 kB[22m[1m[22m[2m Γöé gzip:   5.75 kB[22m[2m Γöé map:    46.04 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/EnterpriseSalesPage-BjtAF7Vr.js         [39m[1m[2m 20.70 kB[22m[1m[22m[2m Γöé gzip:   6.11 kB[22m[2m Γöé map:    46.70 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ComplianceReportsPage-BWOoq3Fp.js       [39m[1m[2m 22.91 kB[22m[1m[22m[2m Γöé gzip:   6.39 kB[22m[2m Γöé map:    51.51 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/EnterpriseSetupPage-ByCegxPK.js         [39m[1m[2m 25.03 kB[22m[1m[22m[2m Γöé gzip:   6.78 kB[22m[2m Γöé map:    57.90 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AlertsPage-UUaUrCfG.js                  [39m[1m[2m 33.59 kB[22m[1m[22m[2m Γöé gzip:   8.19 kB[22m[2m Γöé map:    85.03 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/DashboardPage-C9Bo9GYa.js               [39m[1m[2m 40.92 kB[22m[1m[22m[2m Γöé gzip:  10.87 kB[22m[2m Γöé map:   186.55 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/query-DAPcji76.js                       [39m[1m[2m 49.50 kB[22m[1m[22m[2m Γöé gzip:  15.13 kB[22m[2m Γöé map:   173.75 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/index-bvBGTxqw.js                       [39m[1m[2m 82.55 kB[22m[1m[22m[2m Γöé gzip:  28.09 kB[22m[2m Γöé map:   493.40 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/charts-BTHNqpks.js                      [39m[1m[33m517.94 kB[39m[22m[2m Γöé gzip: 149.03 kB[22m[2m Γöé map: 2,024.17 kB[22m
+@zonforge/web-dashboard:build: [33m
+@zonforge/web-dashboard:build: (!) Some chunks are larger than 500 kB after minification. Consider:
+@zonforge/web-dashboard:build: - Using dynamic import() to code-split the application
+@zonforge/web-dashboard:build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+@zonforge/web-dashboard:build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+@zonforge/web-dashboard:build: [32mΓ£ô built in 9.14s[39m
+@zonforge/mobile-app:build: Android Bundled 4770ms C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform\node_modules\expo-router\entry.js (857 modules)
+@zonforge/mobile-app:build: iOS Bundled 6802ms C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform\node_modules\expo-router\entry.js (875 modules)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 15 assets:
+@zonforge/mobile-app:build: ..\..\node_modules\@react-navigation\elements\src\assets\back-icon-mask.png (913 B)
+@zonforge/mobile-app:build: ..\..\node_modules\@react-navigation\elements\src\assets\back-icon.png (10 variations | 338 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\error.png (516 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\file.png (158 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\forward.png (250 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\pkg.png (429 B)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 1 bundle for android:
+@zonforge/mobile-app:build: _expo/static/js/android/entry-4a3695939f614e3abd8fe086b22da4c4.hbc (2.24 MB)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 1 bundle for ios:
+@zonforge/mobile-app:build: _expo/static/js/ios/entry-ce17387cbdfdd6db336b923fab1eeb68.hbc (2.24 MB)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 1 file:
+@zonforge/mobile-app:build: metadata.json (1.52 kB)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: App exported to: dist
+
+ Tasks:    44 successful, 44 total
+Cached:    41 cached, 44 total
+  Time:    15.004s 
+
+
+=== STEP 6 BUILD RECHECK ===
+[timestamp]
+2026-03-24T12:43:30.5744673-04:00
+[npm run build]
+
+> zonforge-platform@4.6.0 build
+> turbo run build
+
+ΓÇó turbo 2.8.19
+
+   ΓÇó Packages in scope: @zonforge/ai-soc-analyst, @zonforge/alert-service, @zonforge/alert-triage-ai, @zonforge/api-gateway, @zonforge/auth-service, @zonforge/auth-utils, @zonforge/aws-cloudtrail-collector, @zonforge/behavioral-ai, @zonforge/billing-service, @zonforge/board-reports, @zonforge/collector-base, @zonforge/compliance-reports, @zonforge/config, @zonforge/correlation-engine, @zonforge/db-client, @zonforge/deception-grid, @zonforge/deception-tech, @zonforge/detection-engine, @zonforge/digital-twin, @zonforge/event-schema, @zonforge/google-workspace-collector, @zonforge/ingestion-service, @zonforge/landing-web, @zonforge/logger, @zonforge/m365-collector, @zonforge/mobile-app, @zonforge/mssp-console, @zonforge/normalization-worker, @zonforge/playbook-engine, @zonforge/poc-management, @zonforge/poc-manager, @zonforge/predictive-intel, @zonforge/predictive-threat, @zonforge/redteam-simulation, @zonforge/regulatory-ai, @zonforge/risk-scoring-engine, @zonforge/security-assistant, @zonforge/shared-types, @zonforge/sso-service, @zonforge/supply-chain-intel, @zonforge/tenant-service, @zonforge/threat-hunting, @zonforge/threat-intel-service, @zonforge/web-dashboard
+   ΓÇó Running build in 44 packages
+   ΓÇó Remote caching disabled
+
+@zonforge/landing-web:build: cache miss, executing 0b35c326ce3c113e
+@zonforge/mobile-app:build: cache miss, executing 6fc171ba1983392e
+@zonforge/shared-types:build: cache hit, replaying logs e99f079689d3011c
+@zonforge/shared-types:build: 
+@zonforge/shared-types:build: > @zonforge/shared-types@0.1.0 build
+@zonforge/shared-types:build: > tsc
+@zonforge/shared-types:build: 
+@zonforge/web-dashboard:build: cache miss, executing 839b4f4a2e650ee9
+@zonforge/config:build: cache hit, replaying logs 3c5910ae8d15c418
+@zonforge/config:build: 
+@zonforge/config:build: > @zonforge/config@0.1.0 build
+@zonforge/config:build: > tsc
+@zonforge/config:build: 
+@zonforge/logger:build: cache hit, replaying logs 7f5607073d5db77e
+@zonforge/logger:build: 
+@zonforge/logger:build: > @zonforge/logger@0.1.0 build
+@zonforge/logger:build: > tsc
+@zonforge/logger:build: 
+@zonforge/event-schema:build: cache hit, replaying logs fdefb1d8aa51dde0
+@zonforge/event-schema:build: 
+@zonforge/event-schema:build: > @zonforge/event-schema@0.1.0 build
+@zonforge/event-schema:build: > tsc
+@zonforge/event-schema:build: 
+@zonforge/db-client:build: cache hit, replaying logs bd7a43e23cd860fb
+@zonforge/db-client:build: 
+@zonforge/db-client:build: > @zonforge/db-client@0.1.0 build
+@zonforge/db-client:build: > tsc
+@zonforge/db-client:build: 
+@zonforge/auth-utils:build: cache hit, replaying logs 66fae4eb8b5eb4ee
+@zonforge/auth-utils:build: 
+@zonforge/auth-utils:build: > @zonforge/auth-utils@0.1.0 build
+@zonforge/auth-utils:build: > tsc
+@zonforge/auth-utils:build: 
+@zonforge/ingestion-service:build: cache hit, replaying logs 15e2a906af05b639
+@zonforge/ingestion-service:build: 
+@zonforge/ingestion-service:build: > @zonforge/ingestion-service@0.1.0 build
+@zonforge/ingestion-service:build: > tsc
+@zonforge/ingestion-service:build: 
+@zonforge/behavioral-ai:build: cache hit, replaying logs 883f35c487c6bbba
+@zonforge/behavioral-ai:build: 
+@zonforge/behavioral-ai:build: > @zonforge/behavioral-ai@0.1.0 build
+@zonforge/behavioral-ai:build: > tsc
+@zonforge/behavioral-ai:build: 
+@zonforge/billing-service:build: cache hit, replaying logs bb893d65e43a7a4e
+@zonforge/billing-service:build: 
+@zonforge/billing-service:build: > @zonforge/billing-service@0.1.0 build
+@zonforge/billing-service:build: > tsc
+@zonforge/billing-service:build: 
+@zonforge/alert-triage-ai:build: cache hit, replaying logs 79949b63ea444103
+@zonforge/alert-triage-ai:build: 
+@zonforge/alert-triage-ai:build: > @zonforge/alert-triage-ai@0.1.0 build
+@zonforge/alert-triage-ai:build: > tsc
+@zonforge/alert-triage-ai:build: 
+@zonforge/deception-grid:build: cache hit, replaying logs 66de6902a5df0bdf
+@zonforge/deception-grid:build: 
+@zonforge/deception-grid:build: > @zonforge/deception-grid@0.1.0 build
+@zonforge/deception-grid:build: > tsc
+@zonforge/deception-grid:build: 
+@zonforge/board-reports:build: cache hit, replaying logs 0664c38920129093
+@zonforge/board-reports:build: 
+@zonforge/board-reports:build: > @zonforge/board-reports@0.1.0 build
+@zonforge/board-reports:build: > tsc
+@zonforge/board-reports:build: 
+@zonforge/digital-twin:build: cache hit, replaying logs 424295adcaa0148e
+@zonforge/digital-twin:build: 
+@zonforge/digital-twin:build: > @zonforge/digital-twin@0.1.0 build
+@zonforge/digital-twin:build: > tsc
+@zonforge/digital-twin:build: 
+@zonforge/deception-tech:build: cache hit, replaying logs 777bd8dc9d4143b6
+@zonforge/deception-tech:build: 
+@zonforge/deception-tech:build: > @zonforge/deception-tech@0.1.0 build
+@zonforge/deception-tech:build: > tsc
+@zonforge/deception-tech:build: 
+@zonforge/regulatory-ai:build: cache hit, replaying logs 62e161b3c0ffa6ee
+@zonforge/regulatory-ai:build: 
+@zonforge/regulatory-ai:build: > @zonforge/regulatory-ai@0.1.0 build
+@zonforge/regulatory-ai:build: > tsc
+@zonforge/regulatory-ai:build: 
+@zonforge/predictive-threat:build: cache hit, replaying logs ec8e01d4e2012c44
+@zonforge/predictive-threat:build: 
+@zonforge/predictive-threat:build: > @zonforge/predictive-threat@0.1.0 build
+@zonforge/predictive-threat:build: > tsc
+@zonforge/predictive-threat:build: 
+@zonforge/security-assistant:build: cache hit, replaying logs 3f6d4d99b90776ba
+@zonforge/security-assistant:build: 
+@zonforge/security-assistant:build: > @zonforge/security-assistant@0.1.0 build
+@zonforge/security-assistant:build: > tsc
+@zonforge/security-assistant:build: 
+@zonforge/poc-management:build: cache hit, replaying logs 87e47d0d64927b5b
+@zonforge/threat-hunting:build: cache hit, replaying logs 3c7d6661a5d89177
+@zonforge/threat-hunting:build: 
+@zonforge/threat-hunting:build: > @zonforge/threat-hunting@0.1.0 build
+@zonforge/threat-hunting:build: > tsc
+@zonforge/threat-hunting:build: 
+@zonforge/poc-management:build: 
+@zonforge/poc-management:build: > @zonforge/poc-management@0.1.0 build
+@zonforge/poc-management:build: > tsc
+@zonforge/poc-management:build: 
+@zonforge/tenant-service:build: cache hit, replaying logs 9b186992b419ad15
+@zonforge/tenant-service:build: 
+@zonforge/tenant-service:build: > @zonforge/tenant-service@0.1.0 build
+@zonforge/tenant-service:build: > tsc
+@zonforge/api-gateway:build: cache hit, replaying logs ad4428bcb15b6dd6
+@zonforge/tenant-service:build: 
+@zonforge/api-gateway:build: 
+@zonforge/api-gateway:build: > @zonforge/api-gateway@0.1.0 build
+@zonforge/api-gateway:build: > tsc
+@zonforge/api-gateway:build: 
+@zonforge/collector-base:build: cache hit, replaying logs 784ccad08afde9df
+@zonforge/compliance-reports:build: cache hit, replaying logs 090a64d9f8c7fa47
+@zonforge/compliance-reports:build: 
+@zonforge/compliance-reports:build: > @zonforge/compliance-reports@0.1.0 build
+@zonforge/compliance-reports:build: > tsc
+@zonforge/compliance-reports:build: 
+@zonforge/ai-soc-analyst:build: cache hit, replaying logs b1dacf2ec2e9f9aa
+@zonforge/ai-soc-analyst:build: 
+@zonforge/ai-soc-analyst:build: > @zonforge/ai-soc-analyst@0.1.0 build
+@zonforge/ai-soc-analyst:build: > tsc
+@zonforge/ai-soc-analyst:build: 
+@zonforge/redteam-simulation:build: cache hit, replaying logs 7a2c8c80824b12dd
+@zonforge/redteam-simulation:build: 
+@zonforge/redteam-simulation:build: > @zonforge/redteam-simulation@0.1.0 build
+@zonforge/redteam-simulation:build: > tsc
+@zonforge/redteam-simulation:build: 
+@zonforge/mssp-console:build: cache hit, replaying logs 60687f8b57385c9a
+@zonforge/supply-chain-intel:build: cache hit, replaying logs 2d24a6f4749563b4
+@zonforge/mssp-console:build: 
+@zonforge/mssp-console:build: > @zonforge/mssp-console@0.1.0 build
+@zonforge/mssp-console:build: > tsc
+@zonforge/mssp-console:build: 
+@zonforge/supply-chain-intel:build: 
+@zonforge/supply-chain-intel:build: > @zonforge/supply-chain-intel@0.1.0 build
+@zonforge/supply-chain-intel:build: > tsc
+@zonforge/supply-chain-intel:build: 
+@zonforge/collector-base:build: 
+@zonforge/collector-base:build: > @zonforge/collector-base@0.1.0 build
+@zonforge/collector-base:build: > tsc
+@zonforge/collector-base:build: 
+@zonforge/poc-manager:build: cache hit, replaying logs 95cf1d380ec2bd04
+@zonforge/poc-manager:build: 
+@zonforge/poc-manager:build: > @zonforge/poc-manager@0.1.0 build
+@zonforge/poc-manager:build: > tsc
+@zonforge/poc-manager:build: 
+@zonforge/sso-service:build: cache hit, replaying logs 081dc653010bff72
+@zonforge/sso-service:build: 
+@zonforge/sso-service:build: > @zonforge/sso-service@0.1.0 build
+@zonforge/sso-service:build: > tsc
+@zonforge/sso-service:build: 
+@zonforge/auth-service:build: cache hit, replaying logs a44cb55c76dfdf40
+@zonforge/auth-service:build: 
+@zonforge/auth-service:build: > @zonforge/auth-service@0.1.0 build
+@zonforge/auth-service:build: > tsc
+@zonforge/auth-service:build: 
+@zonforge/predictive-intel:build: cache hit, replaying logs ac31751f53ffd2a7
+@zonforge/predictive-intel:build: 
+@zonforge/predictive-intel:build: > @zonforge/predictive-intel@0.1.0 build
+@zonforge/predictive-intel:build: > tsc
+@zonforge/predictive-intel:build: 
+@zonforge/playbook-engine:build: cache hit, replaying logs 2842204a73901fc3
+@zonforge/playbook-engine:build: 
+@zonforge/playbook-engine:build: > @zonforge/playbook-engine@0.1.0 build
+@zonforge/playbook-engine:build: > tsc
+@zonforge/playbook-engine:build: 
+@zonforge/correlation-engine:build: cache hit, replaying logs eb58e75f38aa828a
+@zonforge/correlation-engine:build: 
+@zonforge/correlation-engine:build: > @zonforge/correlation-engine@0.1.0 build
+@zonforge/correlation-engine:build: > tsc
+@zonforge/correlation-engine:build: 
+@zonforge/alert-service:build: cache hit, replaying logs fd038fa95e7be639
+@zonforge/risk-scoring-engine:build: cache hit, replaying logs 7973146e6d25bc27
+@zonforge/risk-scoring-engine:build: 
+@zonforge/risk-scoring-engine:build: > @zonforge/risk-scoring-engine@0.1.0 build
+@zonforge/risk-scoring-engine:build: > tsc
+@zonforge/risk-scoring-engine:build: 
+@zonforge/alert-service:build: 
+@zonforge/alert-service:build: > @zonforge/alert-service@0.1.0 build
+@zonforge/alert-service:build: > tsc
+@zonforge/alert-service:build: 
+@zonforge/aws-cloudtrail-collector:build: cache hit, replaying logs d37d36914b6d950f
+@zonforge/aws-cloudtrail-collector:build: 
+@zonforge/aws-cloudtrail-collector:build: > @zonforge/aws-cloudtrail-collector@0.1.0 build
+@zonforge/aws-cloudtrail-collector:build: > tsc
+@zonforge/aws-cloudtrail-collector:build: 
+@zonforge/detection-engine:build: cache hit, replaying logs 17e6cb636e86c63e
+@zonforge/detection-engine:build: 
+@zonforge/detection-engine:build: > @zonforge/detection-engine@0.1.0 build
+@zonforge/detection-engine:build: > tsc
+@zonforge/detection-engine:build: 
+@zonforge/m365-collector:build: cache hit, replaying logs 56cbd361cbd5758c
+@zonforge/m365-collector:build: 
+@zonforge/m365-collector:build: > @zonforge/m365-collector@0.1.0 build
+@zonforge/m365-collector:build: > tsc
+@zonforge/m365-collector:build: 
+@zonforge/google-workspace-collector:build: cache hit, replaying logs 07cdf3b4a043fd3e
+@zonforge/google-workspace-collector:build: 
+@zonforge/google-workspace-collector:build: > @zonforge/google-workspace-collector@0.1.0 build
+@zonforge/google-workspace-collector:build: > tsc
+@zonforge/google-workspace-collector:build: 
+@zonforge/normalization-worker:build: cache hit, replaying logs 5dca6af6d2c51eff
+@zonforge/normalization-worker:build: 
+@zonforge/normalization-worker:build: > @zonforge/normalization-worker@0.1.0 build
+@zonforge/normalization-worker:build: > tsc
+@zonforge/normalization-worker:build: 
+@zonforge/threat-intel-service:build: cache hit, replaying logs d387c259a768a786
+@zonforge/threat-intel-service:build: 
+@zonforge/threat-intel-service:build: > @zonforge/threat-intel-service@0.1.0 build
+@zonforge/threat-intel-service:build: > tsc
+@zonforge/threat-intel-service:build: 
+@zonforge/web-dashboard:build: 
+@zonforge/web-dashboard:build: > @zonforge/web-dashboard@0.1.0 build
+@zonforge/landing-web:build: 
+@zonforge/web-dashboard:build: > vite build
+@zonforge/landing-web:build: > @zonforge/landing-web@4.6.0 build
+@zonforge/web-dashboard:build: 
+@zonforge/landing-web:build: > vite build
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: > @zonforge/mobile-app@4.6.0 build
+@zonforge/landing-web:build: 
+@zonforge/mobile-app:build: > expo export --platform all --output-dir dist
+@zonforge/mobile-app:build: 
+@zonforge/landing-web:build: [33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+@zonforge/landing-web:build: [36mvite v5.4.21 [32mbuilding for production...[36m[39m
+@zonforge/web-dashboard:build: [36mvite v5.4.21 [32mbuilding for production...[36m[39m
+@zonforge/web-dashboard:build: transforming...
+@zonforge/landing-web:build: transforming...
+@zonforge/landing-web:build: [32mΓ£ô[39m 4 modules transformed.
+@zonforge/landing-web:build: rendering chunks...
+@zonforge/landing-web:build: computing gzip size...
+@zonforge/landing-web:build: [2m../dist/[22m[32mdemo.html   [39m[1m[2m44.99 kB[22m[1m[22m[2m Γöé gzip: 11.42 kB[22m
+@zonforge/landing-web:build: [2m../dist/[22m[32mindex.html  [39m[1m[2m83.75 kB[22m[1m[22m[2m Γöé gzip: 17.80 kB[22m
+@zonforge/landing-web:build: [32mΓ£ô built in 236ms[39m
+@zonforge/mobile-app:build: Using src/app as the root directory for Expo Router.
+@zonforge/mobile-app:build: Starting Metro Bundler
+@zonforge/web-dashboard:build: [32mΓ£ô[39m 2781 modules transformed.
+@zonforge/web-dashboard:build: rendering chunks...
+@zonforge/web-dashboard:build: computing gzip size...
+@zonforge/web-dashboard:build: [2mdist/[22m[32mindex.html                                     [39m[1m[2m  1.06 kB[22m[1m[22m[2m Γöé gzip:   0.56 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[35massets/index-B50mEL7a.css                      [39m[1m[2m  2.11 kB[22m[1m[22m[2m Γöé gzip:   0.69 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/check-BU_DXOHM.js                       [39m[1m[2m  0.33 kB[22m[1m[22m[2m Γöé gzip:   0.28 kB[22m[2m Γöé map:     0.74 kB[22m
+@zonforge/web-dashboard:build: [33m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/play-Cw-mqZc7.js                        [39m[1m[2m  0.35 kB[22m[1m[22m[2m Γöé gzip:   0.28 kB[22m[2m Γöé map:     0.75 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/chevron-right-B4PMob3E.js               [39m[1m[2m  0.35 kB[22m[1m[22m[2m Γöé gzip:   0.28 kB[22m[2m Γöé map:     0.80 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/loader-circle-HIJi2Jnw.js               [39m[1m[2m  0.37 kB[22m[1m[22m[2m Γöé gzip:   0.29 kB[22m[2m Γöé map:     0.81 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/plus-BoXhX0A1.js                        [39m[1m[2m  0.37 kB[22m[1m[22m[2m Γöé gzip:   0.29 kB[22m[2m Γöé map:     0.83 kB[22m
+@zonforge/web-dashboard:build: (!) Some chunks are larger than 500 kB after minification. Consider:
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/arrow-right-CLDol1Ra.js                 [39m[1m[2m  0.39 kB[22m[1m[22m[2m Γöé gzip:   0.30 kB[22m[2m Γöé map:     0.88 kB[22m
+@zonforge/web-dashboard:build: - Using dynamic import() to code-split the application
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/clock-BzXdkR8Z.js                       [39m[1m[2m  0.39 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.89 kB[22m
+@zonforge/web-dashboard:build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+@zonforge/web-dashboard:build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/circle-check-BqqF7ZeA.js                [39m[1m[2m  0.39 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.92 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/message-square-B2T9FL5Q.js              [39m[1m[2m  0.40 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.86 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/user-avBY0u9z.js                        [39m[1m[2m  0.41 kB[22m[1m[22m[2m Γöé gzip:   0.32 kB[22m[2m Γöé map:     0.90 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/circle-x-DqEIeSia.js                    [39m[1m[2m  0.42 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     0.99 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/lock-FhHU5_4g.js                        [39m[1m[2m  0.42 kB[22m[1m[22m[2m Γöé gzip:   0.33 kB[22m[2m Γöé map:     0.95 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/trending-up-gOhY8u7c.js                 [39m[1m[2m  0.43 kB[22m[1m[22m[2m Γöé gzip:   0.32 kB[22m[2m Γöé map:     0.92 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/target-CC0nwOOj.js                      [39m[1m[2m  0.44 kB[22m[1m[22m[2m Γöé gzip:   0.30 kB[22m[2m Γöé map:     1.05 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/copy-CVO9wUsr.js                        [39m[1m[2m  0.45 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     0.98 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/activity-pBX5Wf33.js                    [39m[1m[2m  0.45 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     0.91 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/globe-DKNnsOIn.js                       [39m[1m[2m  0.46 kB[22m[1m[22m[2m Γöé gzip:   0.33 kB[22m[2m Γöé map:     1.01 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/database-LL8NGOP6.js                    [39m[1m[2m  0.46 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     1.05 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/eye-CAczM9s5.js                         [39m[1m[2m  0.46 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     0.99 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/upload-vjpRKgCJ.js                      [39m[1m[2m  0.47 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     1.05 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/external-link-Dl44yQur.js               [39m[1m[2m  0.47 kB[22m[1m[22m[2m Γöé gzip:   0.34 kB[22m[2m Γöé map:     1.04 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/zap-DvXnutNS.js                         [39m[1m[2m  0.48 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     0.91 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/download-x_ZtVVqS.js                    [39m[1m[2m  0.48 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.07 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/triangle-alert-CrGqLo2s.js              [39m[1m[2m  0.49 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     1.10 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/send-BHufyw0O.js                        [39m[1m[2m  0.50 kB[22m[1m[22m[2m Γöé gzip:   0.37 kB[22m[2m Γöé map:     1.00 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/users-D62FpRqN.js                       [39m[1m[2m  0.52 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.14 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/refresh-cw-DZDR4WPU.js                  [39m[1m[2m  0.54 kB[22m[1m[22m[2m Γöé gzip:   0.37 kB[22m[2m Γöé map:     1.16 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/save-CUo1ECpZ.js                        [39m[1m[2m  0.54 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.10 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/file-text-CWBrN5TF.js                   [39m[1m[2m  0.55 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.23 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/server-CxQyCSbc.js                      [39m[1m[2m  0.55 kB[22m[1m[22m[2m Γöé gzip:   0.35 kB[22m[2m Γöé map:     1.37 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/chevron-up-B8H3pOMk.js                  [39m[1m[2m  0.59 kB[22m[1m[22m[2m Γöé gzip:   0.31 kB[22m[2m Γöé map:     1.41 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/trending-down-Cg6Le6jP.js               [39m[1m[2m  0.67 kB[22m[1m[22m[2m Γöé gzip:   0.36 kB[22m[2m Γöé map:     1.53 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/star-C7a67AI5.js                        [39m[1m[2m  0.69 kB[22m[1m[22m[2m Γöé gzip:   0.44 kB[22m[2m Γöé map:     1.12 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/cpu-Bj_nRRp1.js                         [39m[1m[2m  0.71 kB[22m[1m[22m[2m Γöé gzip:   0.40 kB[22m[2m Γöé map:     1.78 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AuditLogPage-D828tWdC.js                [39m[1m[2m  1.32 kB[22m[1m[22m[2m Γöé gzip:   0.74 kB[22m[2m Γöé map:     2.65 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/thumbs-up-BGAJbnJS.js                   [39m[1m[2m  1.39 kB[22m[1m[22m[2m Γöé gzip:   0.60 kB[22m[2m Γöé map:     2.89 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/PostureGauge-6Y7JiG8y.js                [39m[1m[2m  2.14 kB[22m[1m[22m[2m Γöé gzip:   1.08 kB[22m[2m Γöé map:     6.91 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/vendor-CsM61ymy.js                      [39m[1m[2m  2.56 kB[22m[1m[22m[2m Γöé gzip:   1.43 kB[22m[2m Γöé map:    25.63 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/sparkles-DEEuJkHo.js                    [39m[1m[2m  2.97 kB[22m[1m[22m[2m Γöé gzip:   1.09 kB[22m[2m Γöé map:     7.83 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/queries-5GM21whc.js                     [39m[1m[2m  3.33 kB[22m[1m[22m[2m Γöé gzip:   1.11 kB[22m[2m Γöé map:    14.52 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/zustand-_1r1RET1.js                     [39m[1m[2m  3.63 kB[22m[1m[22m[2m Γöé gzip:   1.61 kB[22m[2m Γöé map:    14.52 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/LoginPage-0FOEZ3hK.js                   [39m[1m[2m  3.73 kB[22m[1m[22m[2m Γöé gzip:   1.57 kB[22m[2m Γöé map:    14.89 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ui-5Ux2rGWC.js                          [39m[1m[2m  4.05 kB[22m[1m[22m[2m Γöé gzip:   1.51 kB[22m[2m Γöé map:    12.90 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/RiskPage-B3EPf70Y.js                    [39m[1m[2m 10.01 kB[22m[1m[22m[2m Γöé gzip:   3.24 kB[22m[2m Γöé map:    23.10 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AppShell-DLf0hRx1.js                    [39m[1m[2m 11.07 kB[22m[1m[22m[2m Γöé gzip:   3.19 kB[22m[2m Γöé map:    26.13 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/CompliancePage-C-cX8hgE.js              [39m[1m[2m 11.27 kB[22m[1m[22m[2m Γöé gzip:   3.40 kB[22m[2m Γöé map:    27.41 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ConnectorsPage-CWU0WyME.js              [39m[1m[2m 12.04 kB[22m[1m[22m[2m Γöé gzip:   3.71 kB[22m[2m Γöé map:    27.51 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/SettingsPage-bQpbBk6E.js                [39m[1m[2m 12.31 kB[22m[1m[22m[2m Γöé gzip:   3.70 kB[22m[2m Γöé map:    28.76 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/BillingPage-DnoCdDAW.js                 [39m[1m[2m 12.48 kB[22m[1m[22m[2m Γöé gzip:   4.06 kB[22m[2m Γöé map:    29.36 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/PlaybooksPage-CK69GmBa.js               [39m[1m[2m 13.34 kB[22m[1m[22m[2m Γöé gzip:   4.42 kB[22m[2m Γöé map:    28.46 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AlertDetailPage-C8xf0XEB.js             [39m[1m[2m 13.40 kB[22m[1m[22m[2m Γöé gzip:   3.74 kB[22m[2m Γöé map:    32.08 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AiSocAnalystPage-DlNGVBe9.js            [39m[1m[2m 16.68 kB[22m[1m[22m[2m Γöé gzip:   5.01 kB[22m[2m Γöé map:    35.55 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/MsspPage-DY3ibGr2.js                    [39m[1m[2m 16.76 kB[22m[1m[22m[2m Γöé gzip:   4.63 kB[22m[2m Γöé map:    40.15 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/SupplyChainPage-C_TvqEGv.js             [39m[1m[2m 17.15 kB[22m[1m[22m[2m Γöé gzip:   5.62 kB[22m[2m Γöé map:    37.94 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/SecurityValidationPage-CaZdhRG5.js      [39m[1m[2m 17.55 kB[22m[1m[22m[2m Γöé gzip:   5.19 kB[22m[2m Γöé map:    41.23 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/EnterpriseCapabilitiesPage-WZ04O325.js  [39m[1m[2m 17.85 kB[22m[1m[22m[2m Γöé gzip:   5.42 kB[22m[2m Γöé map:    40.20 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AiIntelligencePage-BJun_PPf.js          [39m[1m[2m 18.66 kB[22m[1m[22m[2m Γöé gzip:   5.73 kB[22m[2m Γöé map:    42.64 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AiCapabilitiesPage-CQ1WNhfq.js          [39m[1m[2m 19.50 kB[22m[1m[22m[2m Γöé gzip:   6.20 kB[22m[2m Γöé map:    43.57 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ThreatHuntingPage-DruyHBc_.js           [39m[1m[2m 19.72 kB[22m[1m[22m[2m Γöé gzip:   5.75 kB[22m[2m Γöé map:    46.04 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/EnterpriseSalesPage-BjtAF7Vr.js         [39m[1m[2m 20.70 kB[22m[1m[22m[2m Γöé gzip:   6.11 kB[22m[2m Γöé map:    46.70 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/ComplianceReportsPage-BWOoq3Fp.js       [39m[1m[2m 22.91 kB[22m[1m[22m[2m Γöé gzip:   6.39 kB[22m[2m Γöé map:    51.51 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/EnterpriseSetupPage-ByCegxPK.js         [39m[1m[2m 25.03 kB[22m[1m[22m[2m Γöé gzip:   6.78 kB[22m[2m Γöé map:    57.90 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/AlertsPage-UUaUrCfG.js                  [39m[1m[2m 33.59 kB[22m[1m[22m[2m Γöé gzip:   8.19 kB[22m[2m Γöé map:    85.03 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/DashboardPage-C9Bo9GYa.js               [39m[1m[2m 40.92 kB[22m[1m[22m[2m Γöé gzip:  10.87 kB[22m[2m Γöé map:   186.55 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/query-DAPcji76.js                       [39m[1m[2m 49.50 kB[22m[1m[22m[2m Γöé gzip:  15.13 kB[22m[2m Γöé map:   173.75 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/index-bvBGTxqw.js                       [39m[1m[2m 82.55 kB[22m[1m[22m[2m Γöé gzip:  28.09 kB[22m[2m Γöé map:   493.40 kB[22m
+@zonforge/web-dashboard:build: [2mdist/[22m[36massets/charts-BTHNqpks.js                      [39m[1m[33m517.94 kB[39m[22m[2m Γöé gzip: 149.03 kB[22m[2m Γöé map: 2,024.17 kB[22m
+@zonforge/web-dashboard:build: [32mΓ£ô built in 8.41s[39m
+@zonforge/mobile-app:build: Android Bundled 4458ms C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform\node_modules\expo-router\entry.js (872 modules)
+@zonforge/mobile-app:build: iOS Bundled 6498ms C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform\node_modules\expo-router\entry.js (875 modules)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 15 assets:
+@zonforge/mobile-app:build: ..\..\node_modules\@react-navigation\elements\src\assets\back-icon-mask.png (913 B)
+@zonforge/mobile-app:build: ..\..\node_modules\@react-navigation\elements\src\assets\back-icon.png (10 variations | 338 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\error.png (516 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\file.png (158 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\forward.png (250 B)
+@zonforge/mobile-app:build: ..\..\node_modules\expo-router\assets\pkg.png (429 B)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 1 bundle for android:
+@zonforge/mobile-app:build: _expo/static/js/android/entry-4a3695939f614e3abd8fe086b22da4c4.hbc (2.24 MB)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 1 bundle for ios:
+@zonforge/mobile-app:build: _expo/static/js/ios/entry-ce17387cbdfdd6db336b923fab1eeb68.hbc (2.24 MB)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: Exporting 1 file:
+@zonforge/mobile-app:build: metadata.json (1.52 kB)
+@zonforge/mobile-app:build: 
+@zonforge/mobile-app:build: App exported to: dist
+
+ Tasks:    44 successful, 44 total
+Cached:    41 cached, 44 total
+  Time:    13.884s 
+

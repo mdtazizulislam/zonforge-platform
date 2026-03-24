@@ -1,0 +1,142 @@
+=== STEP 7 NETLIFY DEPLOY ===
+[timestamp]
+2026-03-24T12:39:45.9039539-04:00
+[repo]
+C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform
+[site-id] c74ce83a-0911-4eff-8ad5-adf850203055
+[npm run build:landing]
+
+> zonforge-platform@4.6.0 build:landing
+> turbo run build --filter=@zonforge/landing-web
+
+ΓÇó turbo 2.8.19
+
+   ΓÇó Packages in scope: @zonforge/landing-web
+   ΓÇó Running build in 1 packages
+   ΓÇó Remote caching disabled
+
+@zonforge/landing-web:build: cache miss, executing 018e946cc8bc74ce
+@zonforge/landing-web:build: 
+@zonforge/landing-web:build: > @zonforge/landing-web@4.6.0 build
+@zonforge/landing-web:build: > vite build
+@zonforge/landing-web:build: 
+@zonforge/landing-web:build: [33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+@zonforge/landing-web:build: [36mvite v5.4.21 [32mbuilding for production...[36m[39m
+@zonforge/landing-web:build: transforming...
+@zonforge/landing-web:build: [32mΓ£ô[39m 4 modules transformed.
+@zonforge/landing-web:build: rendering chunks...
+@zonforge/landing-web:build: computing gzip size...
+@zonforge/landing-web:build: [2m../dist/[22m[32mdemo.html   [39m[1m[2m44.99 kB[22m[1m[22m[2m Γöé gzip: 11.42 kB[22m
+@zonforge/landing-web:build: [2m../dist/[22m[32mindex.html  [39m[1m[2m83.75 kB[22m[1m[22m[2m Γöé gzip: 17.80 kB[22m
+@zonforge/landing-web:build: [32mΓ£ô built in 188ms[39m
+
+ Tasks:    1 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    2.577s 
+
+[npx netlify-cli --version]
+netlify-cli/23.15.1 win32-x64 node-v20.19.4
+[deploy command] npx --yes netlify-cli deploy --prod --dir apps/landing-web/dist --site c74ce83a-0911-4eff-8ad5-adf850203055 --message Stripe-CTA-wiring-validation-deploy
+
+We've detected multiple projects inside your repository
+? Select the project you want to work with (Use arrow keys or type to search)
+> @zonforge/auth-utils  packages\auth-utils  --filter @zonforge/auth-utils 
+  @zonforge/config  packages\config  --filter @zonforge/config 
+  @zonforge/db-client  packages\db-client  --filter @zonforge/db-client 
+  @zonforge/event-schema  packages\event-schema  --filter @zonforge/event-schema
+ 
+  @zonforge/logger  packages\logger  --filter @zonforge/logger 
+  @zonforge/shared-types  packages\shared-types  --filter @zonforge/shared-types
+(Move up and down to reveal more choices)[8A[41D[77C[8B[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[G? Select the project you want to work with @
+> @zonforge/auth-utils  packages\auth-utils  --filter @zonforge/auth-utils 
+  @zonforge/config  packages\config  --filter @zonforge/config 
+  @zonforge/db-client  packages\db-client  --filter @zonforge/db-client 
+  @zonforge/event-schema  packages\event-schema  --filter @zonforge/event-schema
+ 
+  @zonforge/logger  packages\logger  --filter @zonforge/logger 
+  @zonforge/shared-types  packages\shared-types  --filter @zonforge/shared-types
+(Move up and down to reveal more choices)[8A[41D[44C[8B[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[G? Select the project you want to work with @
+  Searching...[1A[14D[44C[1B[2K[1A[2K[G? Select the project you want to work with @z
+  Searching...[1A[14D[45C[1B[2K[1A[2K[G? Select the project you want to work with @z
+  Searching...[1A[14D[45C[1B[2K[1A[2K[G? Select the project you want to work with @zo
+  Searching...[1A[14D[46C[1B[2K[1A[2K[G? Select the project you want to work with @zo
+  Searching...[1A[14D[46C[1B[2K[1A[2K[G? Select the project you want to work with @zon
+  Searching...[1A[14D[47C[1B[2K[1A[2K[G? Select the project you want to work with @zon
+  Searching...[1A[14D[47C[1B[2K[1A[2K[G? Select the project you want to work with @zonf
+  Searching...[1A[14D[48C[1B[2K[1A[2K[G? Select the project you want to work with @zonf
+  Searching...[1A[14D[48C[1B[2K[1A[2K[G? Select the project you want to work with @zonfo
+  Searching...[1A[14D[49C[1B[2K[1A[2K[G? Select the project you want to work with @zonfo
+  Searching...[1A[14D[49C[1B[2K[1A[2K[G? Select the project you want to work with @zonfor
+  Searching...[1A[14D[50C[1B[2K[1A[2K[G? Select the project you want to work with @zonfor
+  Searching...[1A[14D[50C[1B[2K[1A[2K[G? Select the project you want to work with @zonforg
+  Searching...[1A[14D[51C[1B[2K[1A[2K[G? Select the project you want to work with @zonforg
+  Searching...[1A[14D[51C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge
+  Searching...[1A[14D[52C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge
+  Searching...[1A[14D[52C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/
+  Searching...[1A[14D[53C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/
+  Searching...[1A[14D[53C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/a
+  Searching...[1A[14D[54C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/a
+  Searching...[1A[14D[54C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/au
+  Searching...[1A[14D[55C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/au
+  Searching...[1A[14D[55C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/aut
+  Searching...[1A[14D[56C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/aut
+  Searching...[1A[14D[56C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth
+  Searching...[1A[14D[57C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth
+  Searching...[1A[14D[57C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-
+  Searching...[1A[14D[58C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-
+  Searching...[1A[14D[58C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-u
+  Searching...[1A[14D[59C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-u
+  Searching...[1A[14D[59C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-ut
+  Searching...[1A[14D[60C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-ut
+  Searching...[1A[14D[60C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-uti
+  Searching...[1A[14D[61C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-uti
+  Searching...[1A[14D[61C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-util
+  Searching...[1A[14D[62C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-util
+  Searching...[1A[14D[62C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-utils
+  Searching...[1A[14D[63C[1B[2K[1A[2K[G? Select the project you want to work with @zonforge/auth-utils
+  Searching...[1A[14D[63C[1B[2K[1A[2K[G? Select the project you want to work with 
+ ┬╗   Error: Netlify CLI has terminated unexpectedly
+This is a problem with the Netlify CLI, not with your application.
+If you recently updated the CLI, consider reverting to an older version by running:
+
+npm install -g netlify-cli@VERSION
+
+You can use any version from https://ntl.fyi/cli-versions.
+
+Please report this problem at https://ntl.fyi/cli-error including the error details below.
+
+  No results...[1A[15D[43CTypeError: Cannot read properties of undefined (reading 'value')
+    at AutocompletePrompt.onSubmitAfterValidation (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\inquirer-autocomplete-prompt\index.js:190:28)
+    at checkValidationResult (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\inquirer-autocomplete-prompt\index.js:152:16)
+    at AutocompletePrompt.onSubmit (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\inquirer-autocomplete-prompt\index.js:167:9)
+    at Object.next (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\rxjs\dist\cjs\internal\Observable.js:54:25)
+    at ConsumerObserver.next (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\rxjs\dist\cjs\internal\Subscriber.js:113:33)
+    at Subscriber._next (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\rxjs\dist\cjs\internal\Subscriber.js:80:26)
+    at Subscriber.next (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\rxjs\dist\cjs\internal\Subscriber.js:51:18)
+    at SafeSubscriber.__tryOrUnsub (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\inquirer-autocomplete-prompt\node_modules\rxjs\internal\Subscriber.js:205:16)
+    at SafeSubscriber.next (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\inquirer-autocomplete-prompt\node_modules\rxjs\internal\Subscriber.js:143:22)
+    at TakeWhileSubscriber.nextOrComplete (C:\Users\vitor\AppData\npm\node_modules\netlify-cli\node_modules\inquirer-autocomplete-prompt\node_modules\rxjs\internal\operators\takeWhile.js:58:25)
+
+  System:
+    OS: Windows 11 10.0.26200
+    CPU: (8) x64 Intel(R) Core(TM) i7-1065G7 CPU @ 1.30GHz
+  Binaries:
+    Node: 20.19.4 - C:\nvm4w\nodejs\node.EXE
+    npm: 11.7.0 - ~\AppData\npm\npm.CMD
+  Browsers:
+    Edge: Chromium (140.0.3485.54)
+
+[1B
+[deploy retry: explicit cwd]
+ ┬╗   Error: Error while running buildThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
+[deploy retry: --filter + --no-build]
+{
+  "site_id": "c74ce83a-0911-4eff-8ad5-adf850203055",
+  "site_name": "ai-powered-cyber-threat",
+  "deploy_id": "69c2bee29b7e4b8cd88d0f14",
+  "deploy_url": "https://69c2bee29b7e4b8cd88d0f14--ai-powered-cyber-threat.netlify.app",
+  "logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/deploys/69c2bee29b7e4b8cd88d0f14",
+  "function_logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/logs/functions",
+  "edge_function_logs": "https://app.netlify.com/projects/ai-powered-cyber-threat/logs/edge-functions",
+  "url": "https://zonforge.com"
+}
