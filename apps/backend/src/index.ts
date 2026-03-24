@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { serve } from '@hono/node-server';
 import { initDatabase, getPool } from './db.js';
 import { registerUser, loginUser, verifyJWT } from './auth.js';
 import { handleCheckoutSessionCompleted, verifyWebhookSignature } from './stripe.js';
@@ -101,13 +102,13 @@ async function start() {
   try {
     await initDatabase();
 
-    const port = process.env.PORT || 3000;
-    console.log(`\n✓ ZonForge SaaS Backend starting on port ${port}\n`);
-
-    return {
+    const port = parseInt(process.env.PORT || '3000', 10);
+    serve({
       fetch: app.fetch,
-      port: parseInt(port as string),
-    };
+      port,
+    });
+
+    console.log(`\n✓ ZonForge SaaS Backend starting on port ${port}\n`);
   } catch (error) {
     console.error('✗ Failed to start:', error);
     process.exit(1);
@@ -120,9 +121,7 @@ export default app;
 export const handler = app.fetch;
 
 // Start server
-start().then(({ port }) => {
-  console.log(`✓ Server running at http://localhost:${port}`);
-}).catch((error) => {
+start().catch((error) => {
   console.error('✗ Server failed to start:', error);
   process.exit(1);
 });
