@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { getPool } from './db.js';
+import { getPool, getTenantByUserId } from './db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 
@@ -92,4 +92,9 @@ export async function getUserByEmail(email: string) {
   } catch (error) {
     return null;
   }
+}
+
+export async function getTenantIdForUser(userId: number): Promise<number | null> {
+  const tenant = await getTenantByUserId(userId);
+  return tenant?.id || null;
 }

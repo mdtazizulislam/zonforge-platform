@@ -2,8 +2,17 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { initDatabase, getPool } from './db.js';
-import { registerUser, loginUser, verifyJWT } from './auth.js';
-import { createCheckoutSessionForUser, getBillingStatusForUser, processStripeWebhookEvent, validateStripeEnvOrThrow, verifyWebhookSignature } from './stripe.js';
+import { registerUser, loginUser, verifyJWT, getTenantIdForUser } from './auth.js';
+import {
+  createCheckoutSessionForTenant,
+  getTenantBillingStatus,
+  createBillingPortalSession,
+  changeTenantPlan,
+  cancelTenantSubscription,
+  processStripeWebhookEvent,
+  validateStripeEnvOrThrow,
+  verifyWebhookSignature,
+} from './stripe.js';
 
 const app = new Hono();
 
@@ -125,7 +134,17 @@ app.post('/billing/checkout-session', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const checkout = await createCheckoutSessionForUser(userId);
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) {
+      return c.json({ error: 'User has no associated tenant' }, 400);
+    }
+
+    const { planCode } = await c.req.json();
+    if (!planCode) {
+      return c.json({ error: 'Plan code required' }, 400);
+    }
+
+    const checkout = await createCheckoutSessionForTenant(tenantId, planCode);
     return c.json({
       sessionId: checkout.sessionId,
       url: checkout.url,
@@ -142,8 +161,75 @@ app.get('/billing/status', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const status = await getBillingStatusForUser(userId);
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) {
+      return c.json({ error: 'User has no associated tenant' }, 400);
+    }
+
+    const status = await getTenantBillingStatus(tenantId);
     return c.json({ billing: status });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.post('/billing/portal', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) {
+      return c.json({ error: 'User has no associated tenant' }, 400);
+    }
+
+    const portal = await createBillingPortalSession(tenantId);
+    return c.json({ url: portal.url });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.post('/billing/change-plan', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) {
+      return c.json({ error: 'User has no associated tenant' }, 400);
+    }
+
+    const { planCode } = await c.req.json();
+    if (!planCode) {
+      return c.json({ error: 'Plan code required' }, 400);
+    }
+
+    const updated = await changeTenantPlan(tenantId, planCode);
+    return c.json({ billing: updated });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.post('/billing/cancel', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) {
+      return c.json({ error: 'User has no associated tenant' }, 400);
+    }
+
+    const cancelled = await cancelTenantSubscription(tenantId);
+    return c.json({ billing: cancelled });
   } catch (error) {
     return c.json({ error: (error as Error).message }, 400);
   }
