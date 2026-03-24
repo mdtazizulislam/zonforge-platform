@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { initDatabase, getPool } from './db.js';
 import { registerUser, loginUser, verifyJWT } from './auth.js';
-import { handleCheckoutSessionCompleted, verifyWebhookSignature } from './stripe.js';
+import { createCheckoutSessionForUser, getBillingStatusForUser, processStripeWebhookEvent, validateStripeEnvOrThrow, verifyWebhookSignature } from './stripe.js';
 
 const app = new Hono();
 
@@ -18,6 +18,21 @@ app.use('*', cors({
 app.get('/health', (c) => {
   return c.json({ status: 'ok' });
 });
+
+function requireAuthUserId(c: any): number | null {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader) {
+    return null;
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  const payload = verifyJWT(token);
+  if (!payload) {
+    return null;
+  }
+
+  return payload.userId;
+}
 
 // Auth routes
 app.post('/auth/register', async (c) => {
@@ -72,8 +87,7 @@ app.get('/api/user', async (c) => {
   return c.json({ user });
 });
 
-// Stripe webhook
-app.post('/webhook/stripe', async (c) => {
+async function handleBillingWebhook(c: any) {
   try {
     const signature = c.req.header('stripe-signature');
 
@@ -84,15 +98,53 @@ app.post('/webhook/stripe', async (c) => {
     const body = await c.req.text();
     const event = verifyWebhookSignature(body, signature);
 
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      await handleCheckoutSessionCompleted(session.id);
-      console.log(`✓ Webhook: checkout.session.completed for ${session.customer_email}`);
+    const result = await processStripeWebhookEvent(event);
+    if (result.duplicate) {
+      return c.json({ received: true, duplicate: true });
     }
 
     return c.json({ received: true });
   } catch (error) {
     console.error('✗ Webhook error:', error);
+    return c.json({ error: (error as Error).message }, 400);
+  }
+}
+
+// Stripe webhook
+app.post('/billing/webhook', handleBillingWebhook);
+
+// Keep legacy route for compatibility
+app.post('/webhook/stripe', async (c) => {
+  return handleBillingWebhook(c);
+});
+
+app.post('/billing/checkout-session', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const checkout = await createCheckoutSessionForUser(userId);
+    return c.json({
+      sessionId: checkout.sessionId,
+      url: checkout.url,
+    });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.get('/billing/status', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const status = await getBillingStatusForUser(userId);
+    return c.json({ billing: status });
+  } catch (error) {
     return c.json({ error: (error as Error).message }, 400);
   }
 });
@@ -101,6 +153,7 @@ app.post('/webhook/stripe', async (c) => {
 async function start() {
   try {
     await initDatabase();
+    validateStripeEnvOrThrow();
 
     const port = parseInt(process.env.PORT || '3000', 10);
     serve({

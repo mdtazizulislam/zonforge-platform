@@ -46,6 +46,55 @@ export async function initDatabase() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS billing_subscriptions (
+        id BIGSERIAL PRIMARY KEY,
+        owner_user_id INTEGER NOT NULL REFERENCES users(id),
+        stripe_customer_id VARCHAR(255),
+        stripe_subscription_id VARCHAR(255),
+        stripe_checkout_session_id VARCHAR(255),
+        stripe_price_id VARCHAR(255),
+        subscription_status VARCHAR(64) NOT NULL DEFAULT 'incomplete',
+        current_period_start TIMESTAMPTZ,
+        current_period_end TIMESTAMPTZ,
+        cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
+        last_webhook_event_id VARCHAR(255),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS billing_webhook_events (
+        event_id VARCHAR(255) PRIMARY KEY,
+        event_type VARCHAR(128) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_billing_owner_user
+      ON billing_subscriptions(owner_user_id)
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_billing_stripe_customer
+      ON billing_subscriptions(stripe_customer_id)
+      WHERE stripe_customer_id IS NOT NULL
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_billing_stripe_subscription
+      ON billing_subscriptions(stripe_subscription_id)
+      WHERE stripe_subscription_id IS NOT NULL
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_billing_checkout_session
+      ON billing_subscriptions(stripe_checkout_session_id)
+      WHERE stripe_checkout_session_id IS NOT NULL
+    `);
+
     console.log('✓ Database tables created.');
     await client.end();
   } catch (error) {
