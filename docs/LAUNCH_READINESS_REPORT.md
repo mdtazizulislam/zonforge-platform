@@ -226,8 +226,8 @@ All 5 scenarios verified against YAML definitions and detection rule source:
 | ID | Severity | Item | Action |
 |---|---|---|---|
 | PA-001 | HIGH | ZONFORGE_JWT_SECRET | Rotate: `openssl rand -base64 64` |
-| PA-002 | HIGH | ANTHROPIC_API_KEY | Set real key: `sk-ant-...` |
-| PA-003 | HIGH | STRIPE_SECRET_KEY | Set live key: `sk_live_...` |
+| PA-002 | HIGH | ANTHROPIC_API_KEY | Set real key: `ANTHROPIC_API_KEY_PLACEHOLDER` |
+| PA-003 | HIGH | STRIPE_SECRET_KEY | Set live key: `STRIPE_SECRET_KEY_PLACEHOLDER` |
 | PA-004 | HIGH | Database passwords | Replace `changeme_local` with strong passwords |
 | PA-005 | MEDIUM | Grafana password | Replace `admin` default |
 | PA-006 | MEDIUM | AWS credentials | Set production IAM credentials |

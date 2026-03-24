@@ -76,12 +76,12 @@ SECTION 4: EXTERNAL SERVICE VARIABLES
 
 Variable                         Status  Value                   Type
 ────────────────────────────────────────────────────────────────────────
-ANTHROPIC_API_KEY                ✅      sk-ant-REPLACE_WITH...  REQUIRED*
-ZONFORGE_ANTHROPIC_API_KEY       ✅      sk-ant-REPLACE_WITH...  REQUIRED*
+ANTHROPIC_API_KEY                ✅      ANTHROPIC_API_KEY_PLACEHOLDER  REQUIRED*
+ZONFORGE_ANTHROPIC_API_KEY       ✅      ANTHROPIC_API_KEY_PLACEHOLDER  REQUIRED*
 
-STRIPE_SECRET_KEY                ✅      sk_test_REPLACE...      REQUIRED*
+STRIPE_SECRET_KEY                ✅      STRIPE_SECRET_KEY_PLACEHOLDER      REQUIRED*
 STRIPE_PUBLISHABLE_KEY           ✅      pk_test_REPLACE...      REQUIRED*
-STRIPE_WEBHOOK_SECRET            ✅      whsec_REPLACE...        REQUIRED*
+STRIPE_WEBHOOK_SECRET            ✅      STRIPE_WEBHOOK_SECRET_PLACEHOLDER        REQUIRED*
 
 AWS_REGION                       ✅      us-east-1               REQUIRED*
 AWS_ACCESS_KEY_ID                ✅      REPLACE_WITH_YOUR_KEY   REQUIRED*
@@ -171,8 +171,8 @@ Variables requiring production change:
 Pre-launch checklist:
   [ ] Run: cp .env.example .env.local
   [ ] Set ZONFORGE_JWT_SECRET=$(openssl rand -base64 64)
-  [ ] Set ANTHROPIC_API_KEY=sk-ant-...
-  [ ] Set STRIPE_SECRET_KEY=sk_live_...
+  [ ] Set ANTHROPIC_API_KEY=ANTHROPIC_API_KEY_PLACEHOLDER
+  [ ] Set STRIPE_SECRET_KEY=STRIPE_SECRET_KEY_PLACEHOLDER
   [ ] Set AWS credentials
   [ ] Set ZONFORGE_POSTGRES_PASSWORD (random 32+ chars)
   [ ] Set GRAFANA_ADMIN_PASSWORD

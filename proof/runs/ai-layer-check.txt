@@ -16,7 +16,7 @@ Security Assistant   3022    claude-sonnet-4-6   Conversational tool-use
 Predictive Threat    3023    Statistical + DB    Time-series + pattern
 
 ANTHROPIC_API_KEY:  Configured in .env.example
-                    Placeholder: sk-ant-REPLACE_WITH_YOUR_KEY
+                    Placeholder: ANTHROPIC_API_KEY_PLACEHOLDER
                     Services gracefully degrade if not set:
                     - health endpoint returns aiReady:false
                     - returns "AI not configured" message
@@ -364,7 +364,7 @@ Statistical (2):    < 5ms execution  | No external dependency
 Algorithmic (1):    deterministic    | No external dependency
 
 ANTHROPIC_API_KEY status: placeholder in .env.example
-  → Set before launch: ANTHROPIC_API_KEY=sk-ant-YOUR_REAL_KEY
+  → Set before launch: ANTHROPIC_API_KEY=ANTHROPIC_API_KEY_PLACEHOLDER
   → Without it: behavioral AI, triage AI, benchmarks STILL WORK
   → Only AI SOC Analyst + Security Assistant degrade gracefully
 

@@ -45,9 +45,9 @@ cp .env.example .env.local
 ```bash
 # Must set before first run:
 ZONFORGE_JWT_SECRET=$(openssl rand -base64 64)
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=ANTHROPIC_API_KEY_PLACEHOLDER
 ZONFORGE_DATABASE_URL=postgresql://...
-STRIPE_SECRET_KEY=sk_live_...
+STRIPE_SECRET_KEY=STRIPE_SECRET_KEY_PLACEHOLDER
 ```
 
 ---
@@ -96,8 +96,8 @@ kubectl create secret generic zonforge-secrets \
   --namespace zonforge \
   --from-literal=database-url="postgresql://..." \
   --from-literal=jwt-secret="..." \
-  --from-literal=anthropic-api-key="sk-ant-..." \
-  --from-literal=stripe-secret="sk_live_..."
+  --from-literal=anthropic-api-key="ANTHROPIC_API_KEY_PLACEHOLDER" \
+  --from-literal=stripe-secret="STRIPE_SECRET_KEY_PLACEHOLDER"
 
 # Install chart
 helm install zonforge-sentinel ./infra/helm/charts/zonforge \

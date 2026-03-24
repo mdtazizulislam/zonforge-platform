@@ -5,9 +5,12 @@ coverage/
 *.env.local
 *.env.production
 .env
+.env.*
+!.env.example
 *.log
 .DS_Store
 *.pem
 *.key
+secrets.json
 .nyc_output/
 tmp/
