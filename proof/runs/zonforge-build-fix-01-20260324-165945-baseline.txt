@@ -1,0 +1,11 @@
+pwd:
+C:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform
+
+branch:
+main
+
+git status --short:
+ M Dockerfile
+?? proof/runs/backend-implementation-proof.txt
+?? proof/runs/zonforge-build-fix-01-20260324-165945-baseline.txt
+
