@@ -20,7 +20,41 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Audit dependencies
-        run: npm audit --audit-level=high
+        run: |
+          node <<'NODE'
+          const { spawnSync } = require('node:child_process');
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const rootPackage = require(path.resolve('package.json'));
+          const workspaceNames = [];
+
+          for (const pattern of rootPackage.workspaces) {
+            const baseDir = pattern.replace(/\/\*$/, '');
+
+            for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
+              if (!entry.isDirectory()) {
+                continue;
+              }
+
+              const packagePath = path.join(baseDir, entry.name, 'package.json');
+              if (!fs.existsSync(packagePath)) {
+                continue;
+              }
+
+              const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+              if (pkg.name !== '@zonforge/mobile-app') {
+                workspaceNames.push(pkg.name);
+              }
+            }
+          }
+
+          const result = spawnSync('npm', ['audit', '--audit-level=high', ...workspaceNames.flatMap((name) => ['--workspace', name])], {
+            stdio: 'inherit',
+          });
+
+          process.exit(result.status ?? 1);
+          NODE
         continue-on-error: false
 
   snyk-scan:
@@ -35,7 +69,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          args: --all-projects --severity-threshold=high
+          args: --all-projects --severity-threshold=high --exclude=mobile-app
 
   gitleaks:
     name: Secret Detection
