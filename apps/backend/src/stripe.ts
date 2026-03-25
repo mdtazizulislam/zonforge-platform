@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
 import { getPool, getPlanByCode, getTenantSubscription, getTenantById } from './db.js';
 
+type LegacySubscriptionStatus = 'active' | 'past_due' | 'canceled'
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16',
 });
@@ -56,6 +58,152 @@ export function validateStripeEnvOrThrow() {
 function getStripePriceIdForPlan(planCode: string): string {
   const envVar = `STRIPE_PRICE_ID_${planCode.toUpperCase()}`;
   return process.env[envVar] || '';
+}
+
+function normalizeLegacySubscriptionStatus(status: string | null | undefined): LegacySubscriptionStatus {
+  const normalized = String(status ?? '').toLowerCase()
+  if (normalized === 'active' || normalized === 'trialing') {
+    return 'active'
+  }
+  if (normalized === 'past_due' || normalized === 'incomplete' || normalized === 'unpaid') {
+    return 'past_due'
+  }
+  return 'canceled'
+}
+
+async function ensureTenantForUser(userId: number, email: string) {
+  const pool = getPool()
+  const existingTenant = await pool.query('SELECT id FROM tenants WHERE user_id = $1 LIMIT 1', [userId])
+  if (existingTenant.rows[0]?.id) {
+    return Number(existingTenant.rows[0].id)
+  }
+
+  const tenantInsert = await pool.query(
+    'INSERT INTO tenants (name, plan, user_id) VALUES ($1, $2, $3) RETURNING id',
+    [email.split('@')[0] + '-tenant', 'starter', userId],
+  )
+  return Number(tenantInsert.rows[0]?.id)
+}
+
+async function resolveOrCreateUserFromStripe(params: {
+  stripeCustomerId: string | null
+  email: string | null
+}) {
+  const pool = getPool()
+
+  if (params.stripeCustomerId) {
+    const byCustomer = await pool.query(
+      'SELECT id, email FROM users WHERE stripe_customer_id = $1 LIMIT 1',
+      [params.stripeCustomerId],
+    )
+    if (byCustomer.rows[0]) {
+      await ensureTenantForUser(Number(byCustomer.rows[0].id), String(byCustomer.rows[0].email))
+      return {
+        id: Number(byCustomer.rows[0].id),
+        email: String(byCustomer.rows[0].email),
+      }
+    }
+  }
+
+  if (params.email) {
+    const byEmail = await pool.query(
+      'SELECT id, email FROM users WHERE email = $1 LIMIT 1',
+      [params.email],
+    )
+    if (byEmail.rows[0]) {
+      if (params.stripeCustomerId) {
+        await pool.query(
+          'UPDATE users SET stripe_customer_id = $1 WHERE id = $2 AND (stripe_customer_id IS NULL OR stripe_customer_id = $1)',
+          [params.stripeCustomerId, byEmail.rows[0].id],
+        )
+      }
+      await ensureTenantForUser(Number(byEmail.rows[0].id), String(byEmail.rows[0].email))
+      return {
+        id: Number(byEmail.rows[0].id),
+        email: String(byEmail.rows[0].email),
+      }
+    }
+  }
+
+  const resolvedEmail = params.email ?? `${params.stripeCustomerId ?? 'stripe-user'}@stripe-webhook.local`
+  const inserted = await pool.query(
+    `INSERT INTO users (email, stripe_customer_id, password_hash)
+     VALUES ($1, $2, $3)
+     RETURNING id, email`,
+    [resolvedEmail, params.stripeCustomerId, 'stripe_webhook_managed_no_login'],
+  )
+
+  await ensureTenantForUser(Number(inserted.rows[0].id), String(inserted.rows[0].email))
+  return {
+    id: Number(inserted.rows[0].id),
+    email: String(inserted.rows[0].email),
+  }
+}
+
+async function syncLegacySubscriptionForUser(params: {
+  userId: number
+  stripeCustomerId: string | null
+  stripeSubscriptionId: string | null
+  planCode: string | null
+  subscriptionStatus: string
+  currentPeriodEnd: Date | null
+}) {
+  const pool = getPool()
+  const planCode = params.planCode ?? 'starter'
+  const status = normalizeLegacySubscriptionStatus(params.subscriptionStatus)
+
+  const existing = params.stripeSubscriptionId
+    ? await pool.query(
+      'SELECT id FROM subscriptions WHERE stripe_subscription_id = $1 LIMIT 1',
+      [params.stripeSubscriptionId],
+    )
+    : await pool.query(
+      'SELECT id FROM subscriptions WHERE user_id = $1 ORDER BY updated_at DESC, created_at DESC LIMIT 1',
+      [params.userId],
+    )
+
+  if (existing.rows[0]?.id) {
+    await pool.query(
+      `UPDATE subscriptions
+       SET stripe_customer_id = COALESCE($1, stripe_customer_id),
+           stripe_subscription_id = COALESCE($2, stripe_subscription_id),
+           plan = $3,
+           status = $4,
+           current_period_end = COALESCE($5, current_period_end),
+           updated_at = NOW()
+       WHERE id = $6`,
+      [
+        params.stripeCustomerId,
+        params.stripeSubscriptionId,
+        planCode,
+        status,
+        params.currentPeriodEnd,
+        existing.rows[0].id,
+      ],
+    )
+    return
+  }
+
+  await pool.query(
+    `INSERT INTO subscriptions (
+       stripe_customer_id,
+       stripe_subscription_id,
+       plan,
+       status,
+       current_period_end,
+       user_id,
+       created_at,
+       updated_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+    [
+      params.stripeCustomerId,
+      params.stripeSubscriptionId,
+      planCode,
+      status,
+      params.currentPeriodEnd,
+      params.userId,
+    ],
+  )
 }
 
 // ─────────────────────────────────────────────
@@ -292,6 +440,7 @@ function unixToDate(value: number | null | undefined): Date | null {
 
 async function upsertTenantSubscriptionFromStripe(params: {
   tenantId: number | null;
+  planCode?: string | null;
   stripeCustomerId: string;
   stripeSubscriptionId: string | null;
   stripeCheckoutSessionId: string | null;
@@ -318,23 +467,37 @@ async function upsertTenantSubscriptionFromStripe(params: {
     throw new Error(`Cannot resolve tenant for Stripe customer ${params.stripeCustomerId}`);
   }
 
-  // Find plan by Stripe price ID if provided
-  let planId = null;
-  if (params.stripePriceId) {
-    // For now, assume we can't easily look up plan by price ID without more config
-    // In production, store the mapping or query all plans
-    const allPlans = await pool.query('SELECT id FROM plans LIMIT 1');
-    if (allPlans.rows.length > 0) {
-      planId = allPlans.rows[0].id;
+  let resolvedPlanCode = params.planCode?.toLowerCase() ?? null;
+  if (!resolvedPlanCode && params.stripePriceId) {
+    const mapping = [
+      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
+      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
+      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
+      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
+    ].find(x => x.env && x.env === params.stripePriceId)
+
+    if (mapping) {
+      resolvedPlanCode = mapping.code
     }
   }
 
-  // Get existing subscription for default plan_id
+  let planId = null;
+  if (resolvedPlanCode) {
+    const planByCode = await pool.query('SELECT id FROM plans WHERE code = $1 LIMIT 1', [resolvedPlanCode]);
+    planId = planByCode.rows[0]?.id ?? null;
+  }
+
+  // Get existing subscription for fallback plan_id
   const existing = await pool.query(
     'SELECT plan_id FROM tenant_subscriptions WHERE tenant_id = $1 LIMIT 1',
     [tenantId]
   );
-  const existingPlanId = existing.rows[0]?.plan_id || planId;
+  const existingPlanId = existing.rows[0]?.plan_id ?? null;
+  const finalPlanId = planId ?? existingPlanId;
+
+  if (!finalPlanId) {
+    throw new Error(`Unable to resolve plan_id for tenant ${tenantId}`);
+  }
 
   await pool.query(
     `INSERT INTO tenant_subscriptions (
@@ -352,6 +515,7 @@ async function upsertTenantSubscriptionFromStripe(params: {
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
     ON CONFLICT (tenant_id)
     DO UPDATE SET
+      plan_id = EXCLUDED.plan_id,
       stripe_customer_id = EXCLUDED.stripe_customer_id,
       stripe_subscription_id = COALESCE(EXCLUDED.stripe_subscription_id, tenant_subscriptions.stripe_subscription_id),
       stripe_checkout_session_id = COALESCE(EXCLUDED.stripe_checkout_session_id, tenant_subscriptions.stripe_checkout_session_id),
@@ -363,7 +527,7 @@ async function upsertTenantSubscriptionFromStripe(params: {
       updated_at = NOW()`,
     [
       tenantId,
-      existingPlanId,
+      finalPlanId,
       params.stripeCustomerId,
       params.stripeSubscriptionId,
       params.stripeCheckoutSessionId,
@@ -397,16 +561,31 @@ async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout
 
   await upsertTenantSubscriptionFromStripe({
     tenantId,
+    planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
     stripeCustomerId: session.customer,
     stripeSubscriptionId: subscriptionId,
     stripeCheckoutSessionId: session.id,
     stripePriceId: session.line_items?.data[0]?.price?.id || null,
-    subscriptionStatus: 'active',
+    subscriptionStatus: 'ACTIVE',
     currentPeriodStart,
     currentPeriodEnd,
     cancelAtPeriodEnd,
     eventId,
   });
+
+  const user = await resolveOrCreateUserFromStripe({
+    stripeCustomerId: session.customer,
+    email: typeof session.customer_email === 'string' ? session.customer_email : null,
+  })
+
+  await syncLegacySubscriptionForUser({
+    userId: user.id,
+    stripeCustomerId: session.customer,
+    stripeSubscriptionId: subscriptionId,
+    planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
+    subscriptionStatus: 'active',
+    currentPeriodEnd,
+  })
 }
 
 async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Subscription) {
@@ -414,18 +593,45 @@ async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Sub
     throw new Error('Missing Stripe customer in subscription event');
   }
 
+  const user = await resolveOrCreateUserFromStripe({
+    stripeCustomerId: subscription.customer,
+    email: null,
+  })
+
+  let planCode: string | null = null
+  const priceId = subscription.items.data[0]?.price?.id ?? null
+  if (priceId) {
+    const mapping = [
+      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
+      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
+      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
+      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
+    ].find(x => x.env && x.env === priceId)
+    planCode = mapping?.code ?? null
+  }
+
   await upsertTenantSubscriptionFromStripe({
     tenantId: null,
+    planCode: null,
     stripeCustomerId: subscription.customer,
     stripeSubscriptionId: subscription.id,
     stripeCheckoutSessionId: null,
     stripePriceId: subscription.items.data[0]?.price?.id || null,
-    subscriptionStatus: subscription.status,
+    subscriptionStatus: subscription.status === 'active' ? 'ACTIVE' : subscription.status.toUpperCase(),
     currentPeriodStart: unixToDate(subscription.current_period_start),
     currentPeriodEnd: unixToDate(subscription.current_period_end),
     cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
     eventId,
   });
+
+  await syncLegacySubscriptionForUser({
+    userId: user.id,
+    stripeCustomerId: subscription.customer,
+    stripeSubscriptionId: subscription.id,
+    planCode,
+    subscriptionStatus: subscription.status,
+    currentPeriodEnd: unixToDate(subscription.current_period_end),
+  })
 }
 
 async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice) {
@@ -433,18 +639,49 @@ async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice) {
     throw new Error('Missing Stripe customer in invoice.paid event');
   }
 
+  const user = await resolveOrCreateUserFromStripe({
+    stripeCustomerId: invoice.customer,
+    email: typeof invoice.customer_email === 'string' ? invoice.customer_email : null,
+  })
+
+  let planCode: string | null = null
+  const priceId = invoice.lines.data[0]?.price?.id ?? null
+  if (priceId) {
+    const mapping = [
+      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
+      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
+      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
+      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
+    ].find(x => x.env && x.env === priceId)
+    planCode = mapping?.code ?? null
+  }
+
+  const currentPeriodEnd = invoice.lines.data[0]?.period?.end
+    ? unixToDate(invoice.lines.data[0]?.period?.end)
+    : null
+
   await upsertTenantSubscriptionFromStripe({
     tenantId: null,
+    planCode: null,
     stripeCustomerId: invoice.customer,
     stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
     stripeCheckoutSessionId: null,
     stripePriceId: invoice.lines.data[0]?.price?.id || null,
-    subscriptionStatus: 'active',
+    subscriptionStatus: 'ACTIVE',
     currentPeriodStart: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     eventId,
   });
+
+  await syncLegacySubscriptionForUser({
+    userId: user.id,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    planCode,
+    subscriptionStatus: 'active',
+    currentPeriodEnd,
+  })
 }
 
 async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice) {
@@ -452,23 +689,57 @@ async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice) {
     throw new Error('Missing Stripe customer in invoice.payment_failed event');
   }
 
+  const user = await resolveOrCreateUserFromStripe({
+    stripeCustomerId: invoice.customer,
+    email: typeof invoice.customer_email === 'string' ? invoice.customer_email : null,
+  })
+
+  let planCode: string | null = null
+  const priceId = invoice.lines.data[0]?.price?.id ?? null
+  if (priceId) {
+    const mapping = [
+      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
+      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
+      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
+      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
+    ].find(x => x.env && x.env === priceId)
+    planCode = mapping?.code ?? null
+  }
+
   await upsertTenantSubscriptionFromStripe({
     tenantId: null,
+    planCode: null,
     stripeCustomerId: invoice.customer,
     stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
     stripeCheckoutSessionId: null,
     stripePriceId: invoice.lines.data[0]?.price?.id || null,
-    subscriptionStatus: 'past_due',
+    subscriptionStatus: 'PAST_DUE',
     currentPeriodStart: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     eventId,
   });
+
+  await syncLegacySubscriptionForUser({
+    userId: user.id,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    planCode,
+    subscriptionStatus: 'past_due',
+    currentPeriodEnd: null,
+  })
 }
 
 export async function processStripeWebhookEvent(event: Stripe.Event) {
   const pool = getPool();
   const client = await pool.connect();
+
+  const eventObject = event.data.object as { customer?: string | null } | undefined
+  console.log({
+    event: event.type,
+    customer: eventObject?.customer ?? null,
+    timestamp: Date.now(),
+  })
 
   try {
     await client.query('BEGIN');
@@ -508,6 +779,7 @@ export async function processStripeWebhookEvent(event: Stripe.Event) {
         await handleInvoiceFailed(event.id, event.data.object as Stripe.Invoice);
         break;
       default:
+        console.log({ event: event.type, ignored: true, timestamp: Date.now() })
         break;
     }
 

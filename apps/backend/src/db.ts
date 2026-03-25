@@ -18,6 +18,7 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
+        stripe_customer_id VARCHAR(255),
         password_hash VARCHAR(255) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -40,10 +41,21 @@ export async function initDatabase() {
         stripe_subscription_id VARCHAR(255),
         plan VARCHAR(50) NOT NULL,
         status VARCHAR(50) NOT NULL,
+        current_period_end TIMESTAMPTZ,
         user_id INTEGER NOT NULL REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255)
+    `);
+
+    await client.query(`
+      ALTER TABLE subscriptions
+      ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ
     `);
 
     // ─── BILLING PLANS TABLE ───
@@ -97,13 +109,31 @@ export async function initDatabase() {
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         metric_code VARCHAR(100) NOT NULL,
+        metric VARCHAR(100),
         period_start TIMESTAMP NOT NULL,
         period_end TIMESTAMP NOT NULL,
+        period VARCHAR(20),
         current_value INTEGER NOT NULL DEFAULT 0,
+        value INTEGER NOT NULL DEFAULT 0,
         limit_value INTEGER,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(tenant_id, metric_code, period_start, period_end)
       )
+    `);
+
+    await client.query(`
+      ALTER TABLE usage_counters
+      ADD COLUMN IF NOT EXISTS metric VARCHAR(100)
+    `);
+
+    await client.query(`
+      ALTER TABLE usage_counters
+      ADD COLUMN IF NOT EXISTS period VARCHAR(20)
+    `);
+
+    await client.query(`
+      ALTER TABLE usage_counters
+      ADD COLUMN IF NOT EXISTS value INTEGER NOT NULL DEFAULT 0
     `);
 
     // ─── BILLING WEBHOOK EVENTS (IDEMPOTENCY) ───
@@ -164,6 +194,23 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE INDEX IF NOT EXISTS ix_users_email
+      ON users(email)
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_users_stripe_customer
+      ON users(stripe_customer_id)
+      WHERE stripe_customer_id IS NOT NULL
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ix_subscriptions_stripe_subscription
+      ON subscriptions(stripe_subscription_id)
+      WHERE stripe_subscription_id IS NOT NULL
+    `);
+
+    await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS ux_billing_stripe_customer
       ON billing_subscriptions(stripe_customer_id)
       WHERE stripe_customer_id IS NOT NULL
@@ -189,11 +236,13 @@ export async function initDatabase() {
         max_users, max_connectors, max_events_per_month, retention_days, is_active)
       VALUES 
         ('starter', 'Starter', 'For small teams getting started', 0, 0, 
-         50, 1, 50000, 30, true),
+         50, 1, 21600000, 7, true),
         ('growth', 'Growth', 'For growing security teams', 29900, 24900,
-         200, 3, 500000, 90, true),
+         500, 5, 86400000, 90, true),
         ('business', 'Business', 'For enterprise security operations', 99900, 79900,
-         1000, 10, 5000000, 365, true)
+         2000, 20, 432000000, 180, true),
+        ('enterprise', 'Enterprise', 'Contracted enterprise plan', 0, 0,
+         NULL, NULL, NULL, 365, true)
       ON CONFLICT (code) DO NOTHING
     `);
 

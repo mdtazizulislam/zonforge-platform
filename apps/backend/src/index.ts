@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
@@ -13,6 +14,14 @@ import {
   validateStripeEnvOrThrow,
   verifyWebhookSignature,
 } from './stripe.js';
+import {
+  assertFeatureAllowed,
+  assertQuota,
+  getUsageSummary,
+  incrementUsage,
+  UpgradeRequiredError,
+} from './billing/enforcement.js';
+import { isActiveUser } from './middleware/isActiveUser.js';
 
 const app = new Hono();
 
@@ -53,8 +62,31 @@ app.post('/auth/register', async (c) => {
     }
 
     const { userId, token } = await registerUser(email, password);
+    const pool = getPool();
+
+    // Ensure one tenant exists for self-serve users (additive, backward compatible).
+    const tenantRows = await pool.query('SELECT id FROM tenants WHERE user_id = $1 LIMIT 1', [userId]);
+    let tenantId = tenantRows.rows[0]?.id as number | undefined;
+
+    if (!tenantId) {
+      const tenantInsert = await pool.query(
+        'INSERT INTO tenants (name, plan, user_id) VALUES ($1, $2, $3) RETURNING id',
+        [email.split('@')[0] + '-tenant', 'starter', userId],
+      );
+      tenantId = tenantInsert.rows[0]?.id as number | undefined;
+    }
+
+    if (tenantId) {
+      const usage = await getUsageSummary(tenantId)
+      await assertQuota(tenantId, 'IDENTITIES', usage.usage.IDENTITIES, 1)
+      await incrementUsage(tenantId, 'IDENTITIES', 1)
+    }
+
     return c.json({ success: true, userId, token, redirectUrl: '/success' });
   } catch (error) {
+    if (error instanceof UpgradeRequiredError) {
+      return c.json({ error: error.toResponse() }, 402)
+    }
     return c.json({ error: (error as Error).message }, 400);
   }
 });
@@ -115,7 +147,10 @@ async function handleBillingWebhook(c: any) {
     return c.json({ received: true });
   } catch (error) {
     console.error('✗ Webhook error:', error);
-    return c.json({ error: (error as Error).message }, 400);
+    if ((error as Error).message === 'Invalid webhook signature') {
+      return c.json({ error: (error as Error).message }, 400);
+    }
+    return c.json({ error: (error as Error).message }, 500);
   }
 }
 
@@ -167,7 +202,38 @@ app.get('/billing/status', async (c) => {
     }
 
     const status = await getTenantBillingStatus(tenantId);
-    return c.json({ billing: status });
+    const usage = await getUsageSummary(tenantId);
+    return c.json({
+      billing: status,
+      plan: usage.plan,
+      statusCode: usage.status,
+      limits: usage.limits,
+      usage: usage.usage,
+    });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.get('/billing/usage', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) {
+      return c.json({ error: 'User has no associated tenant' }, 400);
+    }
+
+    const usage = await getUsageSummary(tenantId);
+    return c.json({
+      plan: usage.plan,
+      status: usage.status,
+      limits: usage.limits,
+      usage: usage.usage,
+    });
   } catch (error) {
     return c.json({ error: (error as Error).message }, 400);
   }
@@ -231,6 +297,92 @@ app.post('/billing/cancel', async (c) => {
     const cancelled = await cancelTenantSubscription(tenantId);
     return c.json({ billing: cancelled });
   } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.get('/billing/access-check', isActiveUser, async (c) => {
+  return c.json({ allowed: true, userId: requireAuthUserId(c) });
+});
+
+// Internal centralized enforcement endpoints (used by other services).
+app.post('/billing/internal/assert-quota', async (c) => {
+  try {
+    const { tenantId, metricCode, currentValue, increment } = await c.req.json() as {
+      tenantId: number
+      metricCode: 'CONNECTORS' | 'IDENTITIES' | 'EVENTS_PER_MIN'
+      currentValue: number
+      increment?: number
+    };
+
+    await assertQuota(Number(tenantId), metricCode, Number(currentValue), Number(increment ?? 1));
+    return c.json({ allowed: true });
+  } catch (error) {
+    if (error instanceof UpgradeRequiredError) {
+      return c.json({ error: error.toResponse() }, 402);
+    }
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.post('/billing/internal/assert-feature', async (c) => {
+  try {
+    const { tenantId, featureCode } = await c.req.json() as {
+      tenantId: number
+      featureCode: 'AI_ANALYSIS' | 'ADVANCED_DETECTION' | 'EXPORT_REPORT' | 'THREAT_HUNTING'
+    };
+    await assertFeatureAllowed(Number(tenantId), featureCode);
+    return c.json({ allowed: true });
+  } catch (error) {
+    if (error instanceof UpgradeRequiredError) {
+      return c.json({ error: error.toResponse() }, 402);
+    }
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.post('/billing/internal/increment-usage', async (c) => {
+  try {
+    const { tenantId, metricCode, increment } = await c.req.json() as {
+      tenantId: number
+      metricCode: 'CONNECTORS' | 'IDENTITIES' | 'EVENTS_PER_MIN'
+      increment?: number
+    };
+    const value = await incrementUsage(Number(tenantId), metricCode, Number(increment ?? 1));
+    return c.json({ ok: true, value });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.post('/api/ai/analyze', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) return c.json({ error: 'User has no associated tenant' }, 400);
+    await assertFeatureAllowed(tenantId, 'AI_ANALYSIS');
+    return c.json({ ok: true, message: 'AI analysis accepted' });
+  } catch (error) {
+    if (error instanceof UpgradeRequiredError) {
+      return c.json({ error: error.toResponse() }, 402);
+    }
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+app.post('/api/reports/export', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) return c.json({ error: 'User has no associated tenant' }, 400);
+    await assertFeatureAllowed(tenantId, 'EXPORT_REPORT');
+    return c.json({ ok: true, message: 'Export scheduled' });
+  } catch (error) {
+    if (error instanceof UpgradeRequiredError) {
+      return c.json({ error: error.toResponse() }, 402);
+    }
     return c.json({ error: (error as Error).message }, 400);
   }
 });
