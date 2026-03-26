@@ -1,0 +1,527 @@
+SERIAL: ZONFORGE-RAILWAY-BUILD-FIX-06
+Generated: 2026-03-26T14:10:40.4275356-04:00
+
+[Railway Context]
+Project: zonforge-backend
+Environment: production
+Service: zonforge-backend
+
+
+[Railway Status JSON]
+{
+  "id": "72a0e4d0-d3f6-437d-8942-e55b2db12869",
+  "name": "zonforge-backend",
+  "deletedAt": null,
+  "workspace": {
+    "name": "SafeGoPlatfrom"
+  },
+  "buckets": {
+    "edges": []
+  },
+  "environments": {
+    "edges": [
+      {
+        "node": {
+          "id": "71e8578b-08ee-4fe9-903e-d12dde1200a1",
+          "name": "production",
+          "canAccess": true,
+          "deletedAt": null,
+          "unmergedChangesCount": null,
+          "serviceInstances": {
+            "edges": [
+              {
+                "node": {
+                  "id": "00b0ff15-a87a-4b4b-9a49-9f0ea516d174",
+                  "serviceId": "513a40df-2344-442d-83e1-1a8b23165948",
+                  "serviceName": "zonforge-backend",
+                  "environmentId": "71e8578b-08ee-4fe9-903e-d12dde1200a1",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "id": "dc5e266a-8011-464d-9f79-d4ce49591e9f",
+                    "meta": {
+                      "branch": "main",
+                      "buildOnly": false,
+                      "commitAuthor": "",
+                      "commitHash": "287871457d1a3bddcb4b72ed84a0985e0a0696f3",
+                      "commitMessage": "feat: add stripe webhook billing sync",
+                      "fileServiceManifest": {},
+                      "ignoreWatchPatterns": true,
+                      "logsV2": true,
+                      "nixpacksProviders": [
+                        "node"
+                      ],
+                      "patchId": "c2784a5c-20c8-43b0-8d67-e77a2989d240",
+                      "plan": "pro",
+                      "propertyFileMapping": {},
+                      "reason": "deploy",
+                      "repo": "mdtazizulislam/zonforge-platform",
+                      "rootDirectory": null,
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": null,
+                          "builder": "DOCKERFILE",
+                          "dockerfilePath": "Dockerfile",
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "us-west2": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "volumeMounts": []
+                    },
+                    "status": "FAILED",
+                    "createdAt": "2026-03-26T17:59:11.776Z",
+                    "deploymentStopped": true
+                  },
+                  "activeDeployments": [
+                    {
+                      "id": "1ed493a4-5cc2-4845-9762-5c33c6988d45",
+                      "status": "SUCCESS",
+                      "createdAt": "2026-03-26T17:50:13.374Z",
+                      "meta": {
+                        "buildOnly": false,
+                        "configFile": "railway.json",
+                        "fileServiceManifest": {
+                          "build": {
+                            "builder": "NIXPACKS"
+                          },
+                          "deploy": {
+                            "numReplicas": 1,
+                            "startCommand": "npm start"
+                          }
+                        },
+                        "imageDigest": "sha256:bf9c4a19199223cbb982923d58f7f35fe608fb0353a9d52b625e54a714efb087",
+                        "logsV2": true,
+                        "nixpacksProviders": [
+                          "node"
+                        ],
+                        "propertyFileMapping": {
+                          "build.builder": "$.build.builder",
+                          "deploy.numReplicas": "$.deploy.numReplicas",
+                          "deploy.startCommand": "$.deploy.startCommand"
+                        },
+                        "reason": "deploy",
+                        "rootDirectory": null,
+                        "runtime": "V2",
+                        "serviceManifest": {
+                          "build": {
+                            "buildCommand": null,
+                            "buildEnvironment": null,
+                            "builder": "NIXPACKS",
+                            "dockerfilePath": null,
+                            "nixpacksConfigPath": null,
+                            "nixpacksPlan": null,
+                            "watchPatterns": []
+                          },
+                          "deploy": {
+                            "cronSchedule": null,
+                            "drainingSeconds": null,
+                            "healthcheckPath": null,
+                            "healthcheckTimeout": null,
+                            "ipv6EgressEnabled": false,
+                            "limitOverride": null,
+                            "multiRegionConfig": {
+                              "us-west2": {
+                                "numReplicas": 1
+                              }
+                            },
+                            "numReplicas": 1,
+                            "overlapSeconds": null,
+                            "preDeployCommand": null,
+                            "region": null,
+                            "registryCredentials": null,
+                            "requiredMountPath": null,
+                            "restartPolicyMaxRetries": 10,
+                            "restartPolicyType": "ON_FAILURE",
+                            "runtime": "V2",
+                            "sleepApplication": false,
+                            "startCommand": "npm start",
+                            "useLegacyStacker": false
+                          }
+                        },
+                        "volumeMounts": []
+                      }
+                    }
+                  ],
+                  "source": {
+                    "repo": "mdtazizulislam/zonforge-platform",
+                    "image": null
+                  },
+                  "domains": {
+                    "serviceDomains": [
+                      {
+                        "id": "3c38f627-155e-42cf-a9d2-176dae2bd99f",
+                        "domain": "zonforge-backend-production.up.railway.app",
+                        "targetPort": null
+                      }
+                    ],
+                    "customDomains": []
+                  },
+                  "cronSchedule": null,
+                  "nextCronRunAt": null,
+                  "startCommand": null
+                }
+              },
+              {
+                "node": {
+                  "id": "6ccbd633-4b18-498f-8d53-9f89ff12e887",
+                  "serviceId": "2254d48c-1e86-40a4-a70d-1b394795d886",
+                  "serviceName": "Postgres-Enso",
+                  "environmentId": "71e8578b-08ee-4fe9-903e-d12dde1200a1",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "id": "e04c1c48-51e7-477e-9bea-1168dfc85be3",
+                    "meta": {
+                      "image": "ghcr.io/railwayapp-templates/postgres-ssl:18",
+                      "imageDigest": "sha256:ef10460ded4b9c252f8e961afb54f87797e0d3c13f0b401696255888ef17ce90",
+                      "logsV2": true,
+                      "patchId": "7319113c-18dc-4a6b-bef0-0686ed1cb1e3",
+                      "reason": "deploy",
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": null,
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "us-west2": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": null,
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": null,
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "volumeMounts": [
+                        "/var/lib/postgresql/data"
+                      ]
+                    },
+                    "status": "SUCCESS",
+                    "createdAt": "2026-03-24T21:07:11.993Z",
+                    "deploymentStopped": false
+                  },
+                  "activeDeployments": [
+                    {
+                      "id": "e04c1c48-51e7-477e-9bea-1168dfc85be3",
+                      "status": "SUCCESS",
+                      "createdAt": "2026-03-24T21:07:11.993Z",
+                      "meta": {
+                        "image": "ghcr.io/railwayapp-templates/postgres-ssl:18",
+                        "imageDigest": "sha256:ef10460ded4b9c252f8e961afb54f87797e0d3c13f0b401696255888ef17ce90",
+                        "logsV2": true,
+                        "patchId": "7319113c-18dc-4a6b-bef0-0686ed1cb1e3",
+                        "reason": "deploy",
+                        "runtime": "V2",
+                        "serviceManifest": {
+                          "build": {
+                            "buildCommand": null,
+                            "buildEnvironment": null,
+                            "builder": "RAILPACK",
+                            "dockerfilePath": null,
+                            "nixpacksConfigPath": null,
+                            "nixpacksPlan": null,
+                            "watchPatterns": []
+                          },
+                          "deploy": {
+                            "cronSchedule": null,
+                            "drainingSeconds": null,
+                            "healthcheckPath": null,
+                            "healthcheckTimeout": null,
+                            "ipv6EgressEnabled": false,
+                            "limitOverride": null,
+                            "multiRegionConfig": {
+                              "us-west2": {
+                                "numReplicas": 1
+                              }
+                            },
+                            "numReplicas": 1,
+                            "overlapSeconds": null,
+                            "preDeployCommand": null,
+                            "region": null,
+                            "registryCredentials": null,
+                            "requiredMountPath": null,
+                            "restartPolicyMaxRetries": 10,
+                            "restartPolicyType": "ON_FAILURE",
+                            "runtime": "V2",
+                            "sleepApplication": false,
+                            "startCommand": null,
+                            "useLegacyStacker": false
+                          }
+                        },
+                        "volumeMounts": [
+                          "/var/lib/postgresql/data"
+                        ]
+                      }
+                    }
+                  ],
+                  "source": {
+                    "repo": null,
+                    "image": "ghcr.io/railwayapp-templates/postgres-ssl:18"
+                  },
+                  "domains": {
+                    "serviceDomains": [],
+                    "customDomains": []
+                  },
+                  "cronSchedule": null,
+                  "nextCronRunAt": null,
+                  "startCommand": null
+                }
+              }
+            ]
+          },
+          "volumeInstances": {
+            "edges": [
+              {
+                "node": {
+                  "serviceId": null,
+                  "mountPath": "/var/lib/postgresql/data",
+                  "environmentId": "71e8578b-08ee-4fe9-903e-d12dde1200a1",
+                  "currentSizeMB": 1108.631552,
+                  "sizeMB": 50000,
+                  "volume": {
+                    "name": "postgres-volume",
+                    "id": "a5f90e12-1648-4f01-9ae4-9548f82c2167"
+                  }
+                }
+              },
+              {
+                "node": {
+                  "serviceId": null,
+                  "mountPath": "/var/lib/postgresql/data",
+                  "environmentId": "71e8578b-08ee-4fe9-903e-d12dde1200a1",
+                  "currentSizeMB": 1109.07392,
+                  "sizeMB": 50000,
+                  "volume": {
+                    "name": "postgres-volume-VO47",
+                    "id": "9581bb10-65fc-46ce-a6df-a8f6a6801413"
+                  }
+                }
+              },
+              {
+                "node": {
+                  "serviceId": "2254d48c-1e86-40a4-a70d-1b394795d886",
+                  "mountPath": "/var/lib/postgresql/data",
+                  "environmentId": "71e8578b-08ee-4fe9-903e-d12dde1200a1",
+                  "currentSizeMB": 1124.081664,
+                  "sizeMB": 50000,
+                  "volume": {
+                    "name": "postgres-volume-0k0H",
+                    "id": "51ce2510-27ec-4296-84a0-4088afdc8f60"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "services": {
+    "edges": [
+      {
+        "node": {
+          "id": "2254d48c-1e86-40a4-a70d-1b394795d886",
+          "name": "Postgres-Enso"
+        }
+      },
+      {
+        "node": {
+          "id": "513a40df-2344-442d-83e1-1a8b23165948",
+          "name": "zonforge-backend"
+        }
+      }
+    ]
+  }
+}
+
+
+[Latest Build Logs]
+
+[35m[Region: us-west1][0m
+[35m=========================
+Using Detected Dockerfile
+=========================
+[0m
+context: 6dlm-hIPV
+[INFO] [internal] load build definition from Dockerfile
+[INFO] [internal] load build definition from Dockerfile
+[INFO] [internal] load build definition from Dockerfile
+[INFO] [internal] load build definition from Dockerfile
+[INFO] [internal] load build definition from Dockerfile
+[INFO] [internal] load metadata for docker.io/library/node:20-alpine
+[INFO] [internal] load metadata for docker.io/library/node:20-alpine
+[INFO] [internal] load .dockerignore
+[INFO] [internal] load .dockerignore
+[INFO] [internal] load .dockerignore
+[INFO] [internal] load .dockerignore
+[INFO] [deps 1/9] COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+[INFO] [internal] load build context
+[INFO] [base 2/2] WORKDIR /app
+[INFO] [runner 3/6] WORKDIR /app
+[INFO] [runner 2/6] RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 zonforge
+[INFO] [base 1/2] FROM docker.io/library/node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c
+[INFO] [deps 8/9] COPY apps//package.json apps//
+[INFO] [deps 7/9] COPY packages/event-schema/package.json packages/event-schema/
+[INFO] [deps 6/9] COPY packages/config/package.json packages/config/
+[INFO] [deps 5/9] COPY packages/logger/package.json packages/logger/
+[INFO] [deps 4/9] COPY packages/auth-utils/package.json packages/auth-utils/
+[INFO] [deps 3/9] COPY packages/db-client/package.json packages/db-client/
+[INFO] [deps 2/9] COPY packages/shared-types/package.json packages/shared-types/
+[INFO] [builder 5/6] RUN npm run build --workspaces --if-present
+[INFO] [builder 4/6] COPY apps// apps//
+[INFO] [builder 3/6] COPY packages/ packages/
+[INFO] [builder 2/6] COPY --from=deps /app/node_modules ./node_modules
+[INFO] [deps 9/9] RUN npm install --workspace=apps/${SERVICE}   --workspace=packages/shared-types   --workspace=packages/db-client   --workspace=packages/auth-utils   --workspace=packages/logger   --workspace=packages/config   --workspace=packages/event-schema   --omit=dev   --ignore-scripts
+[INFO] [runner 6/6] COPY --from=deps --chown=zonforge:nodejs /app/node_modules ./node_modules/
+[INFO] [runner 5/6] COPY --from=builder --chown=zonforge:nodejs /app/apps/backend/dist ./dist/
+[INFO] [runner 4/6] COPY --from=builder --chown=zonforge:nodejs /app/packages/*/dist ./packages/
+[INFO] [builder 6/6] RUN npm run build --workspace=apps/${SERVICE}
+[INFO] [internal] load build context
+[INFO] [base 1/2] FROM docker.io/library/node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c
+[INFO] [base 1/2] FROM docker.io/library/node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c
+[INFO] [base 1/2] FROM docker.io/library/node:20-alpine@sha256:f598378b5240225e6beab68fa9f356db1fb8efe55173e6d4d8153113bb8f333c
+[INFO] [base 2/2] WORKDIR /app
+[INFO] [internal] load build context
+[INFO] [base 2/2] WORKDIR /app
+[INFO] [runner 2/6] RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 zonforge
+[INFO] [internal] load build context
+[INFO] [deps 1/9] COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+[INFO] [deps 1/9] COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+[INFO] [deps 2/9] COPY packages/shared-types/package.json packages/shared-types/
+[INFO] [deps 3/9] COPY packages/db-client/package.json packages/db-client/
+[INFO] [deps 4/9] COPY packages/auth-utils/package.json packages/auth-utils/
+[INFO] [deps 5/9] COPY packages/logger/package.json packages/logger/
+[INFO] [deps 6/9] COPY packages/config/package.json packages/config/
+[INFO] [deps 7/9] COPY packages/event-schema/package.json packages/event-schema/
+[ERRO] [deps 8/9] COPY apps//package.json apps//
+[ERRO] [deps 1/9] COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+[ERRO] [runner 2/6] RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 zonforge
+Dockerfile:23
+-------------------
+21 |     COPY packages/config/package.json packages/config/
+22 |     COPY packages/event-schema/package.json packages/event-schema/
+23 | >>> COPY apps/${SERVICE}/package.json apps/${SERVICE}/
+24 |     RUN npm install --workspace=apps/${SERVICE} \
+25 |       --workspace=packages/shared-types \
+-------------------
+ERROR: failed to build: failed to solve: failed to compute cache key: failed to calculate checksum of ref 2s4s5yopqnsb96q4cf8atylzt::yasvzm7wonoqkvx1cj396veps: "/apps/package.json": not found
+
+
+[Dockerfile FROM lines]
+FROM node:${NODE_VERSION}-alpine AS base
+FROM base AS deps
+FROM base AS builder
+FROM node:${NODE_VERSION}-alpine AS runner
+
+[Fails Around RUN line in Dockerfile]
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 zonforge
+
+[Proven failing line from logs]
+Dockerfile:23 -> COPY apps//package.json apps//
+Observed expansion in logs: COPY apps//package.json apps//
+
+[Railway Config]
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "nixpacks"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "startCommand": "npm start"
+  }
+}
+
+
+[Backend package.json]
+{
+  "name": "@zonforge/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ZonForge SaaS Backend",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --loader tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@types/bcryptjs": "^2.4.2",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.6",
+    "@types/pg": "^8.11.6",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.3.1",
+    "hono": "^4.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.11.3",
+    "stripe": "^14.0.0",
+    "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
+
+
+[Root cause classification]
+Category: E (another proven issue)
+Reason: SERVICE is empty in build stages, causing invalid COPY path apps//package.json. The addgroup/adduser line is present in trace but not the blocking failure in this deployment.
+
+[Local Docker Validation]
+Command: docker build --build-arg SERVICE=backend -t zonforge-backend:railway-fix-06 .
+Result: ERROR: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine
+Note: Docker daemon unavailable on this machine; local container build could not be executed.
