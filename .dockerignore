@@ -1,7 +1,14 @@
 node_modules
+**/node_modules
 dist
+**/dist
 .turbo
 coverage
+**/.netlify
+**/coverage
+proof/runs/
+*.tmp
+*.cache
 *.env.local
 *.env.production
 .env

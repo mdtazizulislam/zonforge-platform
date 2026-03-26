@@ -49,10 +49,15 @@ export class SignalEmitter {
     const signalId = uuidv4()
     const now      = new Date()
 
+    // YAML-based rules use string IDs (e.g. "ZF-AUTH-001"), not UUIDs.
+    // The DB rule_id column expects UUID or NULL — pass null for non-UUID rule IDs.
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const ruleIdForDb = UUID_REGEX.test(match.ruleId) ? match.ruleId : null
+
     await getDb().insert(schema.detectionSignals).values({
       id:                  signalId,
       tenantId:            match.tenantId,
-      ruleId:              match.ruleId,
+      ruleId:              ruleIdForDb,
       detectionType:       'rule',
       entityType:          match.entityType,
       entityId:            match.entityId,

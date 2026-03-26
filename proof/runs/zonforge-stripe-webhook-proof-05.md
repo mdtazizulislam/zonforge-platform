@@ -97,7 +97,36 @@ Inactive blocked after delete:
 }
 ```
 
+## Git / Deploy State
+
+### Commit
+- Commit created: `2878714` (`feat: add stripe webhook billing sync`)
+
+### Push
+- Pushed successfully to:
+  - `origin https://github.com/mdtazizulislam/zonforge-platform.git`
+  - branch: `main`
+
+### Production endpoint probe
+- Health endpoint:
+```json
+{"status":"ok"}
+```
+
+- Webhook route with invalid signature:
+```json
+{"status":400,"body":"{\"error\":\"Invalid webhook signature\"}"}
+```
+
+Interpretation:
+- The public production route exists and rejects invalid signatures correctly.
+- This session could not prove a production DB update because the authenticated Railway CLI session is linked to a different service than the ZonForge backend endpoint named in the request.
+
 ## Deployment Blockers
 - No `apps/api` service exists in this repo; implementation was applied to `apps/backend`.
-- Railway deployment and GitHub push were not executed from this session because no Railway/GitHub credentials/session were provided here.
+- Railway CLI in this session is linked to:
+  - project: `Safego-staging`
+  - service: `SafeGo-platform`
+  - domain: `https://safego-platform-production-c179.up.railway.app`
+- Because that target does not match `https://zonforge-backend-production.up.railway.app`, I did not run `railway up` against the wrong production service.
 - Stripe dashboard screenshot cannot be produced from this environment because there is no authenticated Stripe session in the workspace.

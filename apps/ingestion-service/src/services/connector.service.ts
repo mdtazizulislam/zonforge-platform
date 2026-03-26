@@ -6,6 +6,7 @@ import { encryptionConfig } from '@zonforge/config'
 import { createLogger } from '@zonforge/logger'
 import type { ConnectorType } from '@zonforge/shared-types'
 import { validateConnector } from './connector-validator.service.js'
+import { assertQuotaViaBackend, incrementUsageViaBackend } from './plan-enforcement.client.js'
 
 const log = createLogger({ service: 'ingestion-service:connectors' })
 
@@ -35,6 +36,18 @@ export class ConnectorService {
 
   async createConnector(input: CreateConnectorInput) {
     const db = getDb()
+
+    // Centralized plan enforcement in backend (source-of-truth for SaaS limits).
+    const existingConnectors = await db.select({ id: schema.connectors.id })
+      .from(schema.connectors)
+      .where(eq(schema.connectors.tenantId, input.tenantId))
+
+    await assertQuotaViaBackend({
+      tenantId: input.tenantId,
+      metricCode: 'CONNECTORS',
+      currentValue: existingConnectors.length,
+      increment: 1,
+    })
 
     // Encrypt sensitive config
     const { encrypted, iv } = encryptJson(input.config, encryptionConfig.key)
@@ -71,6 +84,12 @@ export class ConnectorService {
 
     log.info({ tenantId: input.tenantId, connectorId: id, type: input.type },
       'Connector created')
+
+    await incrementUsageViaBackend({
+      tenantId: input.tenantId,
+      metricCode: 'CONNECTORS',
+      increment: 1,
+    })
 
     return { connectorId: id }
   }

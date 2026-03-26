@@ -245,6 +245,7 @@ function PlanCard({
 export default function BillingPage() {
   const [billingCycle, setCycle] = useState<'monthly' | 'annual'>('monthly')
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  const billingBase = import.meta.env.VITE_BILLING_API_URL ?? '/api'
 
   const { data: plansData, isLoading: plansLoading } = useQuery({
     queryKey: ['billing', 'plans'],
@@ -277,17 +278,17 @@ export default function BillingPage() {
   async function handleUpgrade(tier: string) {
     setCheckoutLoading(tier)
     try {
-      const resp = await fetch('/api/v1/billing/checkout', {
+      const resp = await fetch(`${billingBase}/billing/checkout-session`, {
         method:  'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization:  `Bearer ${localStorage.getItem('zf_access_token')}`,
         },
-        body: JSON.stringify({ planTier: tier, billingCycle }),
+        body: JSON.stringify({ planCode: tier, billingCycle }),
       })
       const data = await resp.json()
-      if (data.data?.url) {
-        window.location.href = data.data.url
+      if (data?.url) {
+        window.location.href = data.url
       }
     } catch (err) {
       console.error('Checkout failed:', err)
@@ -297,12 +298,12 @@ export default function BillingPage() {
   }
 
   async function handlePortal() {
-    const resp = await fetch('/api/v1/billing/portal', {
+    const resp = await fetch(`${billingBase}/billing/portal`, {
       method:  'POST',
       headers: { Authorization: `Bearer ${localStorage.getItem('zf_access_token')}` },
     })
     const data = await resp.json()
-    if (data.data?.url) window.location.href = data.data.url
+    if (data?.url) window.location.href = data.url
   }
 
   return (

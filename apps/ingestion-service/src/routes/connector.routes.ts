@@ -50,6 +50,12 @@ export function createConnectorRouter(service: ConnectorService) {
         })
         return ctx.json({ success: true, data: result, meta: meta(ctx) }, 201)
       } catch (err) {
+        const code = (err as { code?: string } | undefined)?.code
+        if (code === 'UPGRADE_REQUIRED') {
+          return ctx.json({ success: false,
+            error: { code: 'UPGRADE_REQUIRED', message: 'Connector quota exceeded for current plan' } }, 403)
+        }
+
         log.error({ err }, 'Create connector failed')
         return ctx.json({ success: false,
           error: { code: 'INTERNAL_ERROR', message: 'Failed to create connector' } }, 500)

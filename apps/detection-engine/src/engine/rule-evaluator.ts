@@ -181,7 +181,12 @@ export class RuleEvaluator {
     // Step 2: for each first-step match, check if subsequent steps also match
     for (const firstMatch of firstMatches) {
       const entityId    = firstMatch.actor_user_id ?? firstMatch.actor_ip ?? ''
-      const stepEndTime = new Date(firstMatch.last_time)
+      // ClickHouse returns DateTime64 as 'YYYY-MM-DD HH:MM:SS.mmm' without 'Z'.
+      // Append 'Z' so Date() parses it as UTC, not local time.
+      const lastTimeStr = firstMatch.last_time.includes('Z')
+        ? firstMatch.last_time
+        : firstMatch.last_time.replace(' ', 'T') + 'Z'
+      const stepEndTime = new Date(lastTimeStr)
       let   allStepsMet = true
       const allEventIds = [...(firstMatch.event_ids ?? [])]
 
@@ -231,7 +236,11 @@ export class RuleEvaluator {
           mitreTactics:     rule.mitre.tactics.map(t => t.id),
           mitreTechniques:  rule.mitre.techniques.map(t => t.id),
           evidenceEventIds: allEventIds.slice(0, 30),
-          firstSignalTime:  new Date(firstMatch.first_time),
+          firstSignalTime:  new Date(
+            firstMatch.first_time.includes('Z')
+              ? firstMatch.first_time
+              : firstMatch.first_time.replace(' ', 'T') + 'Z',
+          ),
           detectedAt:       new Date(),
           metadata: {
             steps_completed: steps.length,

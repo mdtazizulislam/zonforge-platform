@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
 import { useConnectors, useCreateConnector } from '@/hooks/queries'
+import { ApiError } from '@/lib/api'
 import { AppShell, PageContent } from '@/components/layout/AppShell'
 import { Badge, Button, Card, Skeleton, EmptyState } from '@/components/shared/ui'
 import {
@@ -176,6 +177,7 @@ function ConnectorCard({
 function AddConnectorModal({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [name, setName] = useState('')
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null)
   const { mutate: createConnector, isPending } = useCreateConnector()
 
   const grouped: Record<string, [string, typeof CONNECTOR_META[string]][]> = {}
@@ -188,7 +190,15 @@ function AddConnectorModal({ onClose }: { onClose: () => void }) {
     if (!selected || !name.trim()) return
     createConnector(
       { name: name.trim(), type: selected, config: {} },
-      { onSuccess: onClose },
+      {
+        onSuccess: onClose,
+        onError: (err) => {
+          const apiErr = err as ApiError
+          if (apiErr?.code === 'UPGRADE_REQUIRED') {
+            setUpgradeMessage('Upgrade required to continue adding connectors for your current plan.')
+          }
+        },
+      },
     )
   }
 
@@ -206,6 +216,18 @@ function AddConnectorModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {upgradeMessage && (
+            <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-300">Upgrade required to continue</p>
+                  <p className="text-xs text-yellow-200 mt-0.5">{upgradeMessage}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Type selection */}
           <div>
             <p className="text-sm font-semibold text-gray-300 mb-3">Select Source Type</p>

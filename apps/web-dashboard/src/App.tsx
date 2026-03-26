@@ -18,6 +18,7 @@ const PlaybooksPage     = lazy(() => import('@/pages/PlaybooksPage'))
 const AuditLogPage      = lazy(() => import('@/pages/AuditLogPage'))
 const SettingsPage      = lazy(() => import('@/pages/SettingsPage'))
 const BillingPage       = lazy(() => import('@/pages/BillingPage'))
+const BillingSuccessPage = lazy(() => import('@/pages/BillingSuccessPage'))
 const MsspPage          = lazy(() => import('@/pages/MsspPage'))
 const ThreatHuntingPage    = lazy(() => import('@/pages/ThreatHuntingPage'))
 const ComplianceReportsPage = lazy(() => import('@/pages/ComplianceReportsPage'))
@@ -244,6 +245,16 @@ const router = createBrowserRouter([
       <RequireAuth>
         <Suspense fallback={<PageLoader />}>
           <BillingPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/billing/success',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <BillingSuccessPage />
         </Suspense>
       </RequireAuth>
     ),

@@ -1,5 +1,6 @@
 import { Queue } from 'bullmq'
 import type { Redis } from 'ioredis'
+import { createHash } from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
 import { eq, and, sql } from 'drizzle-orm'
 import { getDb, schema } from '@zonforge/db-client'
@@ -9,6 +10,7 @@ import { encryptionConfig } from '@zonforge/config'
 import { createLogger, logConnectorEvent } from '@zonforge/logger'
 import { PLAN_LIMITS, type PlanTier } from '@zonforge/shared-types'
 import type { RawEventJobData } from '../queues.js'
+import { assertQuotaViaBackend, incrementUsageViaBackend } from './plan-enforcement.client.js'
 
 const log = createLogger({ service: 'ingestion-service' })
 
@@ -69,8 +71,11 @@ export class IngestionService {
     }
 
     // 2. Verify HMAC signature
+    // BUG FIX: rawBody is a string; verifyCollectorSignature calls JSON.stringify(body)
+    // internally, so we must pass the parsed object (not raw string) to match the
+    // client-side buildCollectorSignature(parsedBody, ...) payload exactly.
     const isValidSig = verifyCollectorSignature(
-      input.rawBody,
+      JSON.parse(input.rawBody),
       input.signature,
       encryptionConfig.hmacSecret,
     )
@@ -94,10 +99,16 @@ export class IngestionService {
     // 5. Update connector health
     await this.updateConnectorHealth(input.connectorId, input.tenantId, results.accepted)
 
-    // 6. Update usage counter in Redis
+    // 6. Update usage counter in Redis and centralized billing usage.
     const usageKey = RedisKeys.usageCounter(input.tenantId, 'events')
     await this.redis.incrby(usageKey, results.accepted)
     await this.redis.expireat(usageKey, this.getEndOfMonth())
+
+    await incrementUsageViaBackend({
+      tenantId: input.tenantId,
+      metricCode: 'EVENTS_PER_MIN',
+      increment: results.accepted,
+    })
 
     return results
   }
@@ -189,6 +200,24 @@ export class IngestionService {
     const current   = await this.redis.get(rateKey)
     const count     = parseInt(current ?? '0', 10)
 
+    try {
+      await assertQuotaViaBackend({
+        tenantId,
+        metricCode: 'EVENTS_PER_MIN',
+        currentValue: count,
+        increment: eventCount,
+      })
+    } catch (err) {
+      if ((err as { code?: string } | undefined)?.code === 'UPGRADE_REQUIRED') {
+        throw new IngestionError(
+          'Upgrade required for current ingestion rate',
+          'UPGRADE_REQUIRED',
+          403,
+        )
+      }
+      throw err
+    }
+
     if (count + eventCount > limits.maxEventsPerMinute) {
       throw new IngestionError(
         `Rate limit exceeded: ${limits.maxEventsPerMinute} events/minute on ${planTier} plan`,
@@ -262,7 +291,6 @@ export class IngestionService {
     }
 
     // Fallback: hash of the event content
-    const { createHash } = require('crypto')
     return createHash('sha256')
       .update(JSON.stringify(event))
       .digest('hex')

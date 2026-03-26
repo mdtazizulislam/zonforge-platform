@@ -133,13 +133,21 @@ export class RiskScoringService {
 
     // ── 2. Threat intel score ──────────────────────────────────
 
-    const tiMatches = await db.select({ id: schema.threatIntelMatches.id,
-                                         confidence: schema.threatIntelMatches.confidence })
-      .from(schema.threatIntelMatches)
-      .where(and(
-        eq(schema.threatIntelMatches.tenantId, tenantId),
-      ))
-      .limit(5)
+    let tiMatches: Array<{ id: string; confidence: number }> = []
+    try {
+      tiMatches = await db.select({
+        id: schema.threatIntelMatches.id,
+        confidence: schema.threatIntelMatches.confidence,
+      })
+        .from(schema.threatIntelMatches)
+        .where(and(
+          eq(schema.threatIntelMatches.tenantId, tenantId),
+        ))
+        .limit(5)
+    } catch (err) {
+      log.warn({ err, tenantId },
+        'Threat intel unavailable during scoreUser; continuing with baseline scoring')
+    }
 
     // Simplified: check if user's IP has threat intel hits in recent alerts
     const tiScore = tiMatches.length > 0

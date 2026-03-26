@@ -1,0 +1,19 @@
+service,port,status,startup_result,dependencies,notes
+ingestion-service,3001,RUNNING,Healthy and consuming jobs,redis clickhouse postgres auth-utils logger,Bugfixes applied for HMAC parse and crypto import
+normalization-worker,3002,RUNNING,Healthy and writing to ClickHouse,redis clickhouse config logger,Confirmed ClickHouse writes in runtime logs
+detection-engine,3003,RUNNING,Healthy with partial rule execution,redis clickhouse postgres event-schema logger,ZF-AUTH-001 proven; 5 of 20 rules have SQL/runtime errors
+correlation-engine,3004,RUNNING,Started and immediately correlated pending signals,redis postgres shared-types logger,Generated finding ACP-001 and queued alert notifications
+alert-service,3008,RUNNING,Started and consumed alert jobs,redis postgres logger config,Creates alerts with template narrative fallback when Anthropic key missing
+api-gateway,3000,NOT_STARTED,Not launched in this audit,auth-service tenant-service backend alert-service,Cannot validate dashboard API routes without it
+backend,3300,NOT_STARTED,Not launched in this audit,stripe postgres auth logger,Critical bug: registerUser creates no tenant; billing routes fail
+auth-service,3005,NOT_STARTED,Not launched in this audit,postgres redis jwt config,Not required for direct queue-based E2E proof path
+tenant-service,3006,NOT_STARTED,Not launched in this audit,postgres logger config,Not required for queue-based proof path
+risk-scoring-engine,3007,NOT_STARTED,Not launched in this audit,postgres redis clickhouse,Not validated in this run
+ai-soc-analyst,3015,NOT_STARTED,Would fail without valid ANTHROPIC_API_KEY,anthropic redis postgres,Hard throw on missing key and no fallback
+web-dashboard,5173,NOT_SERVED,Built assets present but dev/prod server not running,api-gateway auth-service,24 pages exist; runtime not validated
+mssp-console,3010,NOT_STARTED,Dist artifact is backend server not browser UI,postgres redis auth,No separate frontend validated
+zf-pg-platform,5436,RUNNING,Healthy and storing signals alerts,postgres volume network,Primary UUID schema DB used for proven flow
+zf-postgres,5432,BROKEN,Dead due to port conflict with external project,postgres volume network,No network interfaces attached at audit time
+zf-redis,6379,RUNNING,Healthy but misconfigured eviction policy,redis volume network,BullMQ durability risk because policy is allkeys-lru
+zf-clickhouse,8123,RUNNING,Healthy with required tables available,clickhouse volume network,events detection_signals user_activity_hourly ingestion_metrics created
+zf-minio,9000,RUNNING,Healthy (not functionally exercised),minio volume network,Object store not in critical tested path
