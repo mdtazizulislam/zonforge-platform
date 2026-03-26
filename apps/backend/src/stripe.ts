@@ -3,9 +3,7 @@ import { getPool, getPlanByCode, getTenantSubscription, getTenantById } from './
 
 type LegacySubscriptionStatus = 'active' | 'past_due' | 'canceled'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 // ─────────────────────────────────────────────
 // TYPE DEFINITIONS
@@ -57,7 +55,7 @@ export function validateStripeEnvOrThrow() {
 
 function getStripePriceIdForPlan(planCode: string): string {
   const envVar = `STRIPE_PRICE_ID_${planCode.toUpperCase()}`;
-  return process.env[envVar] || '';
+  return process.env[envVar] || process.env.STRIPE_PRICE_ID || '';
 }
 
 function normalizeLegacySubscriptionStatus(status: string | null | undefined): LegacySubscriptionStatus {
