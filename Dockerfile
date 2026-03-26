@@ -14,32 +14,15 @@ ENV NODE_ENV=production
 # ── Stage 2: Dependencies ─────────────────────────────────────────
 FROM base AS deps
 ARG SERVICE
-COPY package.json package-lock.json turbo.json tsconfig.base.json ./
-COPY packages/shared-types/package.json packages/shared-types/
-COPY packages/db-client/package.json packages/db-client/
-COPY packages/auth-utils/package.json packages/auth-utils/
-COPY packages/logger/package.json packages/logger/
-COPY packages/config/package.json packages/config/
-COPY packages/event-schema/package.json packages/event-schema/
-COPY apps/${SERVICE}/package.json apps/${SERVICE}/
-RUN npm install --workspace=apps/${SERVICE} \
-  --workspace=packages/shared-types \
-  --workspace=packages/db-client \
-  --workspace=packages/auth-utils \
-  --workspace=packages/logger \
-  --workspace=packages/config \
-  --workspace=packages/event-schema \
-  --omit=dev \
-  --ignore-scripts
+COPY . .
+RUN npm install --include=dev
 
 # ── Stage 3: Builder ──────────────────────────────────────────────
 FROM base AS builder
 ARG SERVICE
-COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY --from=deps /app/node_modules ./node_modules
-COPY packages/ packages/
-COPY apps/${SERVICE}/ apps/${SERVICE}/
-RUN npm run build --workspaces --if-present
+COPY . .
+RUN npm run build -- --filter=./packages/*
 RUN npm run build --workspace=apps/${SERVICE}
 
 # ── Stage 4: Runner ───────────────────────────────────────────────
