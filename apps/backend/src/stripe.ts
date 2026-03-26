@@ -47,15 +47,14 @@ function requiredEnv(name: string): string {
 
 export function validateStripeEnvOrThrow() {
   requiredEnv('STRIPE_SECRET_KEY');
+  requiredEnv('STRIPE_PRICE_ID');
   requiredEnv('STRIPE_WEBHOOK_SECRET');
   requiredEnv('STRIPE_SUCCESS_URL');
   requiredEnv('STRIPE_CANCEL_URL');
-  // Plan-specific price IDs optional; can fall back to STRIPE_PRICE_ID_* pattern
 }
 
-function getStripePriceIdForPlan(planCode: string): string {
-  const envVar = `STRIPE_PRICE_ID_${planCode.toUpperCase()}`;
-  return process.env[envVar] || '';
+function getStripePriceIdForCheckout(): string {
+  return requiredEnv('STRIPE_PRICE_ID');
 }
 
 function normalizeLegacySubscriptionStatus(status: string | null | undefined): LegacySubscriptionStatus {
@@ -239,10 +238,7 @@ export async function createCheckoutSessionForTenant(tenantId: number, planCode:
   }
 
   // Get Stripe price ID for the plan
-  const stripePriceId = getStripePriceIdForPlan(planCode);
-  if (!stripePriceId) {
-    throw new Error(`No Stripe price configured for plan: ${planCode}`);
-  }
+  const stripePriceId = getStripePriceIdForCheckout();
 
   // Create checkout session
   const session = await stripe.checkout.sessions.create({
@@ -360,7 +356,7 @@ export async function changeTenantPlan(tenantId: number, newPlanCode: string): P
     throw new Error(`Plan not found: ${newPlanCode}`);
   }
 
-  const stripePriceId = getStripePriceIdForPlan(newPlanCode);
+  const stripePriceId = getStripePriceIdForCheckout();
   if (!stripePriceId) {
     throw new Error(`No Stripe price configured for plan: ${newPlanCode}`);
   }

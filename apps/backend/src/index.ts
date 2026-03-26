@@ -53,7 +53,7 @@ function requireAuthUserId(c: any): number | null {
 }
 
 // Auth routes
-app.post('/auth/register', async (c) => {
+const handleRegister = async (c: any) => {
   try {
     const { email, password } = await c.req.json();
 
@@ -89,7 +89,10 @@ app.post('/auth/register', async (c) => {
     }
     return c.json({ error: (error as Error).message }, 400);
   }
-});
+};
+
+app.post('/auth/register', handleRegister);
+app.post('/auth/signup', handleRegister);
 
 app.post('/auth/login', async (c) => {
   try {

@@ -4,15 +4,54 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+pool.on('connect', () => {
+  console.log('✓ PostgreSQL pool connection ready.');
+});
+
+pool.on('error', (error) => {
+  console.error('✗ PostgreSQL pool error:', error);
+});
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function initDatabase() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
+  const maxRetries = Number(process.env.DB_CONNECT_MAX_RETRIES || 5);
+  const retryDelayMs = Number(process.env.DB_CONNECT_RETRY_MS || 2000);
+  let client: Client | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+    client = new Client({
+      connectionString: process.env.DATABASE_URL,
+    });
+
+    try {
+      console.log(`DB connect attempt ${attempt}/${maxRetries}...`);
+      await client.connect();
+      console.log('✓ Connected to database.');
+      break;
+    } catch (error) {
+      console.error(`✗ DB connect attempt ${attempt}/${maxRetries} failed:`, error);
+      try {
+        await client.end();
+      } catch {
+        // Ignore cleanup errors during retry.
+      }
+
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      await sleep(retryDelayMs);
+    }
+  }
+
+  if (!client) {
+    throw new Error('Database client not initialized.');
+  }
 
   try {
-    await client.connect();
-    console.log('✓ Connected to database.');
-
     // Create tables
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
