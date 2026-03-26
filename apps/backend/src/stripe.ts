@@ -55,7 +55,7 @@ export function validateStripeEnvOrThrow() {
 
 function getStripePriceIdForPlan(planCode: string): string {
   const envVar = `STRIPE_PRICE_ID_${planCode.toUpperCase()}`;
-  return process.env[envVar] || process.env.STRIPE_PRICE_ID || '';
+  return process.env[envVar] || '';
 }
 
 function normalizeLegacySubscriptionStatus(status: string | null | undefined): LegacySubscriptionStatus {
