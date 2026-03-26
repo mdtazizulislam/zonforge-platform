@@ -525,3 +525,9 @@ Reason: SERVICE is empty in build stages, causing invalid COPY path apps//packag
 Command: docker build --build-arg SERVICE=backend -t zonforge-backend:railway-fix-06 .
 Result: ERROR: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine
 Note: Docker daemon unavailable on this machine; local container build could not be executed.
+
+[Post-fix Railway build attempt from root Dockerfile]
+Command: railway up .\\zonforge-platform --path-as-root -p 72a0e4d0-d3f6-437d-8942-e55b2db12869 -s zonforge-backend -e production -c
+Result: moved past apps// COPY failure; now fails at workspace TypeScript compile in packages/auth-utils and packages/db-client.
+Key evidence: COPY apps/backend/package.json apps/backend/ appears in build logs; previous failing apps// path no longer appears.
+
