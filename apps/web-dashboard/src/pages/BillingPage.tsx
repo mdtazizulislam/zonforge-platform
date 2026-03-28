@@ -38,10 +38,10 @@ interface UsageData {
   identitiesMonitor: number
   eventsThisMonth:   number
   planLimits: {
-    maxConnectors:  number
-    maxIdentities:  number
+    maxConnectors:  number | string
+    maxIdentities:  number | string
     retentionDays:  number
-    maxCustomRules: number
+    maxCustomRules: number | string
   }
   planTier: string
   usagePct: {
@@ -77,30 +77,32 @@ function toPlanInfo(plan: BillingPlan): PlanInfo {
 
 function toUsageDataFromStatus(status: Awaited<ReturnType<typeof api.billingApi.status>> | undefined): UsageData | undefined {
   if (!status) return undefined
+  const maxConnectors = status.billing?.limits?.maxConnectors
+  const maxUsers = status.billing?.limits?.maxUsers
+  const connectorLimit = typeof maxConnectors === 'number' ? maxConnectors : 'unlimited'
+  const identityLimit = typeof maxUsers === 'number' ? maxUsers : 'unlimited'
+
+  const connectorPct = typeof connectorLimit === 'number' && connectorLimit > 0
+    ? Math.min(100, Math.round((Number(status.usage?.CONNECTORS ?? 0) / connectorLimit) * 100))
+    : 0
+  const identityPct = typeof identityLimit === 'number' && identityLimit > 0
+    ? Math.min(100, Math.round((Number(status.usage?.IDENTITIES ?? 0) / identityLimit) * 100))
+    : 0
+
   return {
     connectorsActive: Number(status.usage?.CONNECTORS ?? 0),
     identitiesMonitor: Number(status.usage?.IDENTITIES ?? 0),
     eventsThisMonth: Number(status.usage?.EVENTS_PER_MIN ?? 0),
     planLimits: {
-      maxConnectors: Number(status.billing?.limits?.maxConnectors ?? 0),
-      maxIdentities: Number(status.billing?.limits?.maxUsers ?? 0),
+      maxConnectors: connectorLimit,
+      maxIdentities: identityLimit,
       retentionDays: Number(status.billing?.limits?.retentionDays ?? 0),
-      maxCustomRules: 999999,
+      maxCustomRules: 'unlimited',
     },
     planTier: status.plan ?? 'starter',
     usagePct: {
-      connectors: Math.min(
-        100,
-        Number(status.billing?.limits?.maxConnectors)
-          ? Math.round((Number(status.usage?.CONNECTORS ?? 0) / Number(status.billing?.limits?.maxConnectors ?? 1)) * 100)
-          : 0,
-      ),
-      identities: Math.min(
-        100,
-        Number(status.billing?.limits?.maxUsers)
-          ? Math.round((Number(status.usage?.IDENTITIES ?? 0) / Number(status.billing?.limits?.maxUsers ?? 1)) * 100)
-          : 0,
-      ),
+      connectors: connectorPct,
+      identities: identityPct,
     },
   }
 }
