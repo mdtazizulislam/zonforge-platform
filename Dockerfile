@@ -14,6 +14,9 @@ ENV NODE_ENV=production
 # ── Stage 2: Dependencies ─────────────────────────────────────────
 FROM base AS deps
 ARG SERVICE
+# Fast-fail if SERVICE is empty — prevents silent apps//package.json errors
+RUN test -n "${SERVICE}" || \
+    (echo "BUILD ERROR: SERVICE build arg is required. Use --build-arg SERVICE=<appname>" >&2 && exit 1)
 COPY . .
 RUN npm install --include=dev
 
