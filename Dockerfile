@@ -13,6 +13,10 @@ ENV NODE_ENV=production
 
 # ── Stage 2: Dependencies ─────────────────────────────────────────
 FROM base AS deps
+ARG SERVICE
+# Fast-fail if SERVICE is empty — prevents silent apps//package.json errors
+RUN test -n "${SERVICE}" || \
+  (echo "BUILD ERROR: SERVICE build arg is required. Use --build-arg SERVICE=<appname>" >&2 && exit 1)
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY packages/shared-types/package.json packages/shared-types/
 COPY packages/db-client/package.json packages/db-client/
@@ -33,6 +37,7 @@ RUN npm install --workspace=apps/${SERVICE} \
 
 # ── Stage 3: Builder ──────────────────────────────────────────────
 FROM base AS builder
+ARG SERVICE
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY packages/ packages/
