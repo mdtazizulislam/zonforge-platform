@@ -215,6 +215,55 @@ app.get('/billing/status', async (c) => {
   }
 });
 
+// GET /billing/subscription — detailed subscription object (09.6)
+app.get('/billing/subscription', async (c) => {
+  try {
+    const userId = requireAuthUserId(c);
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const tenantId = await getTenantIdForUser(userId);
+    if (!tenantId) return c.json({ error: 'User has no associated tenant' }, 400);
+    const subscription = await getTenantBillingStatus(tenantId);
+    if (!subscription) return c.json({ subscription: null, eligible_for_checkout: true });
+    return c.json({
+      subscription: {
+        tenantId: subscription.tenantId,
+        planCode: subscription.planCode,
+        planName: subscription.planName,
+        status: subscription.subscriptionStatus,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        hasStripeCustomer: Boolean(subscription.stripeCustomerId),
+        limits: subscription.limits,
+      },
+      eligible_for_checkout: !subscription.stripeSubscriptionId || subscription.subscriptionStatus === 'none',
+    });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
+// GET /billing/plans — plan catalog source-of-truth (09.6)
+app.get('/billing/plans', async (c) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT code, name, description,
+              monthly_price_cents, annual_price_cents,
+              max_users, max_connectors, max_events_per_month,
+              retention_days,
+              (stripe_monthly_price_id IS NOT NULL) AS has_stripe_monthly,
+              (stripe_annual_price_id IS NOT NULL) AS has_stripe_annual
+       FROM plans
+       WHERE is_active = true
+       ORDER BY monthly_price_cents ASC`
+    );
+    return c.json({ plans: result.rows });
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
 app.get('/billing/usage', async (c) => {
   try {
     const userId = requireAuthUserId(c);

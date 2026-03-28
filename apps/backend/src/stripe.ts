@@ -262,8 +262,21 @@ export async function createCheckoutSessionForTenant(tenantId: number, planCode:
     metadata: {
       tenantId: String(tenantId),
       planCode,
+      userId: String(tenant.user_id),
+      environment: process.env.NODE_ENV ?? 'production',
     },
   });
+
+  // Record stripe_customer → tenant mapping (idempotent)
+  await pool.query(
+    `INSERT INTO stripe_customers (tenant_id, user_id, stripe_customer_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (stripe_customer_id) DO UPDATE SET
+       tenant_id = EXCLUDED.tenant_id,
+       user_id = EXCLUDED.user_id,
+       updated_at = NOW()`,
+    [tenantId, tenant.user_id, stripeCustomerId],
+  );
 
   // Upsert tenant subscription record
   await pool.query(
@@ -284,6 +297,15 @@ export async function createCheckoutSessionForTenant(tenantId: number, planCode:
       updated_at = NOW()`,
     [tenantId, plan.id, stripeCustomerId, session.id, 'checkout_created']
   );
+
+  console.log(JSON.stringify({
+    event: 'billing_checkout_created',
+    sessionId: session.id,
+    tenantId,
+    planCode,
+    environment: process.env.NODE_ENV ?? 'production',
+    timestamp: Date.now(),
+  }));
 
   return {
     sessionId: session.id,
@@ -450,6 +472,7 @@ async function upsertTenantSubscriptionFromStripe(params: {
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   eventId: string;
+  rawEventJson?: Record<string, unknown>;
 }) {
   const pool = getPool();
 
@@ -511,8 +534,10 @@ async function upsertTenantSubscriptionFromStripe(params: {
       current_period_end,
       cancel_at_period_end,
       last_webhook_event_id,
+      stripe_price_id,
+      raw_latest_event_json,
       updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
     ON CONFLICT (tenant_id)
     DO UPDATE SET
       plan_id = EXCLUDED.plan_id,
@@ -524,6 +549,8 @@ async function upsertTenantSubscriptionFromStripe(params: {
       current_period_end = COALESCE(EXCLUDED.current_period_end, tenant_subscriptions.current_period_end),
       cancel_at_period_end = EXCLUDED.cancel_at_period_end,
       last_webhook_event_id = EXCLUDED.last_webhook_event_id,
+      stripe_price_id = COALESCE(EXCLUDED.stripe_price_id, tenant_subscriptions.stripe_price_id),
+      raw_latest_event_json = EXCLUDED.raw_latest_event_json,
       updated_at = NOW()`,
     [
       tenantId,
@@ -536,11 +563,37 @@ async function upsertTenantSubscriptionFromStripe(params: {
       params.currentPeriodEnd,
       params.cancelAtPeriodEnd,
       params.eventId,
+      params.stripePriceId,
+      params.rawEventJson ? JSON.stringify(params.rawEventJson) : null,
     ]
   );
+
+  // ─── PLAN ACTIVATION LOGIC (09.5) ───
+  // Mirror subscription status into tenants.plan for fast plan-based queries
+  const upperStatus = params.subscriptionStatus.toUpperCase();
+  if ((upperStatus === 'ACTIVE' || upperStatus === 'TRIALING') && resolvedPlanCode) {
+    await pool.query('UPDATE tenants SET plan = $1 WHERE id = $2', [resolvedPlanCode, tenantId]);
+    console.log(JSON.stringify({
+      event: 'plan_activated',
+      tenantId,
+      planCode: resolvedPlanCode,
+      status: params.subscriptionStatus,
+      timestamp: Date.now(),
+    }));
+  } else if (upperStatus === 'CANCELED') {
+    await pool.query('UPDATE tenants SET plan = $1 WHERE id = $2', ['starter', tenantId]);
+    console.log(JSON.stringify({
+      event: 'plan_downgraded',
+      tenantId,
+      reason: 'subscription_canceled',
+      downgradedTo: 'starter',
+      timestamp: Date.now(),
+    }));
+  }
+  // PAST_DUE: keep existing plan — grace period (no downgrade)
 }
 
-async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout.Session, rawEvent?: Stripe.Event) {
   if (!session.customer || typeof session.customer !== 'string') {
     throw new Error('Missing Stripe customer in checkout session');
   }
@@ -571,7 +624,15 @@ async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout
     currentPeriodEnd,
     cancelAtPeriodEnd,
     eventId,
+    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
   });
+
+  console.log(JSON.stringify({
+    event: 'webhook_checkout_completed',
+    sessionId: session.id,
+    tenantId,
+    timestamp: Date.now(),
+  }));
 
   const user = await resolveOrCreateUserFromStripe({
     stripeCustomerId: session.customer,
@@ -588,7 +649,7 @@ async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout
   })
 }
 
-async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Subscription) {
+async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Subscription, rawEvent?: Stripe.Event) {
   if (!subscription.customer || typeof subscription.customer !== 'string') {
     throw new Error('Missing Stripe customer in subscription event');
   }
@@ -610,6 +671,8 @@ async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Sub
     planCode = mapping?.code ?? null
   }
 
+  const subStatus = subscription.status === 'active' ? 'ACTIVE' : subscription.status.toUpperCase();
+
   await upsertTenantSubscriptionFromStripe({
     tenantId: null,
     planCode: null,
@@ -617,12 +680,22 @@ async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Sub
     stripeSubscriptionId: subscription.id,
     stripeCheckoutSessionId: null,
     stripePriceId: subscription.items.data[0]?.price?.id || null,
-    subscriptionStatus: subscription.status === 'active' ? 'ACTIVE' : subscription.status.toUpperCase(),
+    subscriptionStatus: subStatus,
     currentPeriodStart: unixToDate(subscription.current_period_start),
     currentPeriodEnd: unixToDate(subscription.current_period_end),
     cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
     eventId,
+    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
   });
+
+  console.log(JSON.stringify({
+    event: 'webhook_subscription_updated',
+    subscriptionId: subscription.id,
+    status: subStatus,
+    planCode,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    timestamp: Date.now(),
+  }));
 
   await syncLegacySubscriptionForUser({
     userId: user.id,
@@ -634,7 +707,7 @@ async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Sub
   })
 }
 
-async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice) {
+async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice, rawEvent?: Stripe.Event) {
   if (!invoice.customer || typeof invoice.customer !== 'string') {
     throw new Error('Missing Stripe customer in invoice.paid event');
   }
@@ -672,7 +745,15 @@ async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice) {
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     eventId,
+    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
   });
+
+  console.log(JSON.stringify({
+    event: 'webhook_invoice_paid',
+    invoiceId: invoice.id,
+    planCode,
+    timestamp: Date.now(),
+  }));
 
   await syncLegacySubscriptionForUser({
     userId: user.id,
@@ -684,7 +765,7 @@ async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice) {
   })
 }
 
-async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice) {
+async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice, rawEvent?: Stripe.Event) {
   if (!invoice.customer || typeof invoice.customer !== 'string') {
     throw new Error('Missing Stripe customer in invoice.payment_failed event');
   }
@@ -718,7 +799,16 @@ async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice) {
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
     eventId,
+    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
   });
+
+  console.log(JSON.stringify({
+    event: 'webhook_invoice_payment_failed',
+    invoiceId: invoice.id,
+    planCode,
+    gracePeriod: true,
+    timestamp: Date.now(),
+  }));
 
   await syncLegacySubscriptionForUser({
     userId: user.id,
@@ -734,26 +824,19 @@ export async function processStripeWebhookEvent(event: Stripe.Event) {
   const pool = getPool();
   const client = await pool.connect();
 
-  const eventObject = event.data.object as { customer?: string | null } | undefined
-  console.log({
-    event: event.type,
-    customer: eventObject?.customer ?? null,
-    timestamp: Date.now(),
-  })
-
   try {
     await client.query('BEGIN');
-
     const insertEvent = await client.query(
-      'INSERT INTO billing_webhook_events (event_id, event_type) VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING RETURNING event_id',
-      [event.id, event.type]
+      `INSERT INTO billing_webhook_events (event_id, event_type, status, processed_at, payload_json)
+       VALUES ($1, $2, 'processed', NOW(), $3)
+       ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
+      [event.id, event.type, JSON.stringify(event)]
     );
-
     if (insertEvent.rows.length === 0) {
       await client.query('ROLLBACK');
+      console.log(JSON.stringify({ event: 'webhook_duplicate_ignored', eventId: event.id, type: event.type, timestamp: Date.now() }));
       return { processed: false, duplicate: true };
     }
-
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
@@ -762,24 +845,27 @@ export async function processStripeWebhookEvent(event: Stripe.Event) {
     client.release();
   }
 
+  console.log(JSON.stringify({ event: 'webhook_received', eventId: event.id, type: event.type, timestamp: Date.now() }));
+
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(event.id, event.data.object as Stripe.Checkout.Session);
+        await handleCheckoutCompleted(event.id, event.data.object as Stripe.Checkout.Session, event);
         break;
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        await handleSubscriptionEvent(event.id, event.data.object as Stripe.Subscription);
+        await handleSubscriptionEvent(event.id, event.data.object as Stripe.Subscription, event);
         break;
       case 'invoice.paid':
-        await handleInvoicePaid(event.id, event.data.object as Stripe.Invoice);
+      case 'invoice.payment_succeeded':
+        await handleInvoicePaid(event.id, event.data.object as Stripe.Invoice, event);
         break;
       case 'invoice.payment_failed':
-        await handleInvoiceFailed(event.id, event.data.object as Stripe.Invoice);
+        await handleInvoiceFailed(event.id, event.data.object as Stripe.Invoice, event);
         break;
       default:
-        console.log({ event: event.type, ignored: true, timestamp: Date.now() })
+        console.log(JSON.stringify({ event: 'webhook_event_ignored', type: event.type, timestamp: Date.now() }));
         break;
     }
 
@@ -787,10 +873,14 @@ export async function processStripeWebhookEvent(event: Stripe.Event) {
   } catch (error) {
     const cleanupClient = await pool.connect();
     try {
-      await cleanupClient.query('DELETE FROM billing_webhook_events WHERE event_id = $1', [event.id]);
+      await cleanupClient.query(
+        `UPDATE billing_webhook_events SET status = 'failed', error_message = $1 WHERE event_id = $2`,
+        [(error as Error).message?.slice(0, 500) ?? 'unknown', event.id]
+      );
     } finally {
       cleanupClient.release();
     }
+    console.error(JSON.stringify({ event: 'webhook_processing_error', eventId: event.id, type: event.type, error: (error as Error).message, timestamp: Date.now() }));
     throw error;
   }
 }
