@@ -267,6 +267,32 @@ export async function initDatabase() {
       WHERE stripe_checkout_session_id IS NOT NULL
     `);
 
+    // ─── STRIPE CUSTOMERS EXPLICIT MAPPING TABLE (09.2) ───
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS stripe_customers (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        stripe_customer_id VARCHAR(255) NOT NULL UNIQUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_stripe_customers_tenant ON stripe_customers(tenant_id) WHERE tenant_id IS NOT NULL`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_stripe_customers_user ON stripe_customers(user_id) WHERE user_id IS NOT NULL`);
+
+    // ─── BILLING WEBHOOK EVENTS ENHANCEMENTS (09.2) ───
+    await client.query(`ALTER TABLE billing_webhook_events ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'processed'`);
+    await client.query(`ALTER TABLE billing_webhook_events ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE billing_webhook_events ADD COLUMN IF NOT EXISTS error_message TEXT`);
+    await client.query(`ALTER TABLE billing_webhook_events ADD COLUMN IF NOT EXISTS payload_json JSONB`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_webhook_events_type ON billing_webhook_events(event_type)`);
+
+    // ─── TENANT SUBSCRIPTIONS ENHANCEMENTS (09.2) ───
+    await client.query(`ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`);
+    await client.query(`ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS raw_latest_event_json JSONB`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_tenant_subscriptions_status ON tenant_subscriptions(subscription_status)`);
+
     console.log('✓ Database tables created.');
 
     // ─── SEED PLANS ───
