@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Suspense, lazy } from 'react'
 import { useAuthStore } from '@/stores/auth.store'
@@ -19,6 +19,7 @@ const AuditLogPage      = lazy(() => import('@/pages/AuditLogPage'))
 const SettingsPage      = lazy(() => import('@/pages/SettingsPage'))
 const BillingPage       = lazy(() => import('@/pages/BillingPage'))
 const BillingSuccessPage = lazy(() => import('@/pages/BillingSuccessPage'))
+const BillingCancelPage = lazy(() => import('@/pages/BillingCancelPage'))
 const MsspPage          = lazy(() => import('@/pages/MsspPage'))
 const ThreatHuntingPage    = lazy(() => import('@/pages/ThreatHuntingPage'))
 const ComplianceReportsPage = lazy(() => import('@/pages/ComplianceReportsPage'))
@@ -37,7 +38,11 @@ const EnterpriseSalesPage        = lazy(() => import('@/pages/EnterpriseSalesPag
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isLoggedIn = useAuthStore(s => s.isLoggedIn)
-  if (!isLoggedIn) return <Navigate to="/login" replace />
+  const location = useLocation()
+  if (!isLoggedIn) {
+    const next = `${location.pathname}${location.search}`
+    return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />
+  }
   return <>{children}</>
 }
 
@@ -255,6 +260,16 @@ const router = createBrowserRouter([
       <RequireAuth>
         <Suspense fallback={<PageLoader />}>
           <BillingSuccessPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/billing/cancel',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <BillingCancelPage />
         </Suspense>
       </RequireAuth>
     ),

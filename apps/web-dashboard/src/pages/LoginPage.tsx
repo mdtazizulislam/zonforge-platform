@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation } from 'wouter'
-import { api, tokenStorage, type LoginResult } from '@/lib/api'
+import { api, tokenStorage, type CurrentUser } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { Spinner } from '@/components/ui'
 
@@ -8,6 +8,7 @@ export function LoginPage() {
   const [, navigate]  = useLocation()
   const setUser       = useAuthStore(s => s.setUser)
 
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [totp,     setTotp]     = useState('')
@@ -15,24 +16,39 @@ export function LoginPage() {
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
 
+  function toUser(userId: number, userEmail: string): CurrentUser {
+    return {
+      id: String(userId),
+      email: userEmail,
+      name: userEmail.split('@')[0] ?? 'user',
+      role: 'owner',
+      tenantId: '',
+      mfaEnabled: false,
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
     try {
-      const result = await api.auth.login(email, password, needsMfa ? totp : undefined)
-
-      if (result.requiresMfa) {
-        setNeedsMfa(true)
-        setLoading(false)
+      if (mode === 'signup') {
+        const result = await api.billingAuth.signup(email, password)
+        tokenStorage.set(result.token)
+        setUser(toUser(result.userId, email))
+        navigate('/billing')
         return
       }
 
-      tokenStorage.set(result.accessToken)
-      tokenStorage.setRefresh(result.refreshToken)
-      setUser(result.user)
-      navigate('/')
+      const result = await api.billingAuth.login(email, password)
+
+      tokenStorage.set(result.token)
+      setUser(toUser(result.userId, email))
+
+      const params = new URLSearchParams(window.location.search)
+      const next = params.get('next')
+      navigate(next || '/billing')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -59,11 +75,15 @@ export function LoginPage() {
         {/* Card */}
         <div className="card p-6 shadow-2xl shadow-black/50">
           <h2 className="text-sm font-semibold text-gray-300 mb-5">
-            {needsMfa ? 'Two-Factor Authentication' : 'Sign in to your account'}
+            {mode === 'signup'
+              ? 'Create your account'
+              : needsMfa
+              ? 'Two-Factor Authentication'
+              : 'Sign in to your account'}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!needsMfa ? (
+            {mode === 'signup' || !needsMfa ? (
               <>
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Email</label>
@@ -87,7 +107,7 @@ export function LoginPage() {
                     placeholder="••••••••••••"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    autoComplete="current-password"
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                   />
                 </div>
               </>
@@ -125,8 +145,21 @@ export function LoginPage() {
               className="btn-primary w-full justify-center"
             >
               {loading ? <Spinner size="sm" /> : null}
-              {needsMfa ? 'Verify' : 'Sign In'}
+              {mode === 'signup' ? 'Create Account' : needsMfa ? 'Verify' : 'Sign In'}
             </button>
+
+            {!needsMfa && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode(mode === 'login' ? 'signup' : 'login')
+                  setError(null)
+                }}
+                className="btn-ghost w-full justify-center text-gray-500"
+              >
+                {mode === 'login' ? 'Need an account? Sign up' : 'Already have an account? Sign in'}
+              </button>
+            )}
 
             {needsMfa && (
               <button

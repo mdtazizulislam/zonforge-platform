@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
 import { AppShell, PageContent } from '@/components/layout/AppShell'
-import { Badge, Button, Card, Skeleton } from '@/components/shared/ui'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { Badge, Button, Card } from '@/components/shared/ui'
+import { useQuery } from '@tanstack/react-query'
+import { api, ApiError, type BillingPlan } from '@/lib/api'
+import { useLocation } from 'wouter'
 import {
   CreditCard, Zap, CheckCircle2, ArrowRight, TrendingUp,
-  Shield, Clock, Database, Users, Wifi, ChevronRight,
+  Shield, Database, Users, Wifi, ChevronRight,
   AlertTriangle, Star, ExternalLink,
 } from 'lucide-react'
 
@@ -15,8 +16,8 @@ import {
 // ─────────────────────────────────────────────
 
 interface PlanInfo {
-  tier:              string
-  displayName:       string
+  tier: string
+  displayName: string
   description:       string
   monthlyPriceCents: number
   annualPriceCents:  number
@@ -46,6 +47,61 @@ interface UsageData {
   usagePct: {
     connectors:  number
     identities:  number
+  }
+}
+
+function toPlanInfo(plan: BillingPlan): PlanInfo {
+  return {
+    tier: plan.code,
+    displayName: plan.name,
+    description: plan.description ?? '',
+    monthlyPriceCents: plan.monthly_price_cents,
+    annualPriceCents: plan.annual_price_cents,
+    trialDays: 0,
+    highlighted: plan.code === 'growth',
+    limits: {
+      identities: plan.max_users ?? 'unlimited',
+      connectors: plan.max_connectors ?? 'unlimited',
+      eventsPerMin: plan.max_events_per_month ?? 'unlimited',
+      retentionDays: plan.retention_days,
+      customRules: 'unlimited',
+    },
+    features: [
+      `Up to ${plan.max_users ?? 'unlimited'} identities`,
+      `Up to ${plan.max_connectors ?? 'unlimited'} connectors`,
+      `Retention ${plan.retention_days} days`,
+      `${plan.has_stripe_monthly ? 'Stripe checkout enabled' : 'Contact sales flow'}`,
+    ],
+  }
+}
+
+function toUsageDataFromStatus(status: Awaited<ReturnType<typeof api.billingApi.status>> | undefined): UsageData | undefined {
+  if (!status) return undefined
+  return {
+    connectorsActive: Number(status.usage?.CONNECTORS ?? 0),
+    identitiesMonitor: Number(status.usage?.IDENTITIES ?? 0),
+    eventsThisMonth: Number(status.usage?.EVENTS_PER_MIN ?? 0),
+    planLimits: {
+      maxConnectors: Number(status.billing?.limits?.maxConnectors ?? 0),
+      maxIdentities: Number(status.billing?.limits?.maxUsers ?? 0),
+      retentionDays: Number(status.billing?.limits?.retentionDays ?? 0),
+      maxCustomRules: 999999,
+    },
+    planTier: status.plan ?? 'starter',
+    usagePct: {
+      connectors: Math.min(
+        100,
+        Number(status.billing?.limits?.maxConnectors)
+          ? Math.round((Number(status.usage?.CONNECTORS ?? 0) / Number(status.billing?.limits?.maxConnectors ?? 1)) * 100)
+          : 0,
+      ),
+      identities: Math.min(
+        100,
+        Number(status.billing?.limits?.maxUsers)
+          ? Math.round((Number(status.usage?.IDENTITIES ?? 0) / Number(status.billing?.limits?.maxUsers ?? 1)) * 100)
+          : 0,
+      ),
+    },
   }
 }
 
@@ -102,12 +158,13 @@ function UsageMeter({
 // ─────────────────────────────────────────────
 
 function PlanCard({
-  plan, currentTier, billingCycle, onSelect,
+  plan, currentTier, billingCycle, onSelect, isLoading,
 }: {
   plan:         PlanInfo
   currentTier:  string
   billingCycle: 'monthly' | 'annual'
   onSelect:     (tier: string) => void
+  isLoading?:   boolean
 }) {
   const isCurrent   = plan.tier === currentTier
   const isFree      = plan.monthlyPriceCents === 0
@@ -224,14 +281,16 @@ function PlanCard({
       ) : (
         <button
           onClick={() => onSelect(plan.tier)}
+          disabled={Boolean(isLoading)}
           className={clsx(
             'w-full py-2.5 rounded-xl text-sm font-semibold transition-all',
             plan.highlighted
               ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20'
               : 'border border-gray-700 text-gray-300 hover:border-blue-500 hover:text-blue-400',
+            isLoading && 'opacity-60 cursor-not-allowed',
           )}
         >
-          {isFree ? 'Start Free' : `Upgrade to ${plan.displayName}`}
+          {isLoading ? 'Loading...' : isFree ? 'Start Free' : `Upgrade to ${plan.displayName}`}
         </button>
       )}
     </div>
@@ -243,72 +302,76 @@ function PlanCard({
 // ─────────────────────────────────────────────
 
 export default function BillingPage() {
+  const [, navigate] = useLocation()
   const [billingCycle, setCycle] = useState<'monthly' | 'annual'>('monthly')
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
-  const billingBase = import.meta.env.VITE_BILLING_API_URL ?? '/api'
+  const [billingError, setBillingError] = useState<string | null>(null)
 
   const { data: plansData, isLoading: plansLoading } = useQuery({
     queryKey: ['billing', 'plans'],
-    queryFn:  () => api.getPlans ? api.getPlans() : fetch('/api/v1/billing/plans').then(r => r.json()),
+    queryFn:  () => api.billingApi.plans(),
     staleTime: 60 * 60_000,
   })
 
-  const { data: usageData, isLoading: usageLoading } = useQuery({
-    queryKey: ['billing', 'usage'],
-    queryFn:  () => api.billing?.usage ? api.billing.usage() : fetch('/api/v1/billing/usage', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('zf_access_token')}` },
-    }).then(r => r.json()),
+  const { data: statusData, isLoading: usageLoading } = useQuery({
+    queryKey: ['billing', 'status'],
+    queryFn:  () => api.billingApi.status(),
     staleTime: 5 * 60_000,
   })
 
   const { data: subData, isLoading: subLoading } = useQuery({
     queryKey: ['billing', 'subscription'],
-    queryFn:  () => fetch('/api/v1/billing/subscription', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('zf_access_token')}` },
-    }).then(r => r.json()),
+    queryFn:  () => api.billingApi.subscription(),
     staleTime: 5 * 60_000,
   })
 
-  const plans: PlanInfo[] = plansData?.data ?? []
-  const usage: UsageData  = usageData?.data
-  const sub               = subData?.data
+  const plans: PlanInfo[] = (plansData?.plans ?? []).map(toPlanInfo)
+  const usage: UsageData | undefined = toUsageDataFromStatus(statusData)
+  const sub = subData?.subscription
 
   const currentTier = usage?.planTier ?? 'starter'
 
   async function handleUpgrade(tier: string) {
+    setBillingError(null)
     setCheckoutLoading(tier)
     try {
-      const resp = await fetch(`${billingBase}/billing/checkout-session`, {
-        method:  'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization:  `Bearer ${localStorage.getItem('zf_access_token')}`,
-        },
-        body: JSON.stringify({ planCode: tier, billingCycle }),
-      })
-      const data = await resp.json()
+      const data = await api.billingApi.checkoutSession(tier)
       if (data?.url) {
         window.location.href = data.url
+      } else {
+        setBillingError('Checkout URL was not returned by the backend.')
       }
     } catch (err) {
-      console.error('Checkout failed:', err)
+      const message = err instanceof Error ? err.message : 'Checkout failed'
+      setBillingError(message)
+      if (err instanceof ApiError && err.status === 401) {
+        navigate('/login')
+      }
     } finally {
       setCheckoutLoading(null)
     }
   }
 
   async function handlePortal() {
-    const resp = await fetch(`${billingBase}/billing/portal`, {
-      method:  'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('zf_access_token')}` },
-    })
-    const data = await resp.json()
-    if (data?.url) window.location.href = data.url
+    setBillingError(null)
+    try {
+      const data = await api.billingApi.portal()
+      if (data?.url) {
+        window.location.href = data.url
+      }
+    } catch (err) {
+      setBillingError(err instanceof Error ? err.message : 'Failed to open billing portal')
+    }
   }
 
   return (
     <AppShell title="Plan & Billing">
       <PageContent>
+        {billingError && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+            <p className="text-xs text-red-400">{billingError}</p>
+          </div>
+        )}
 
         {/* ── Current plan + subscription info ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
@@ -319,7 +382,7 @@ export default function BillingPage() {
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-sm font-semibold text-gray-300">Current Plan</h3>
-                  {sub?.status === 'trialing' && (
+                  {sub?.status?.toLowerCase() === 'trialing' && (
                     <Badge variant="warning" size="xs">Trial</Badge>
                   )}
                 </div>
@@ -327,13 +390,7 @@ export default function BillingPage() {
                   {usageLoading ? <span className="opacity-0">—</span>
                    : currentTier.charAt(0).toUpperCase() + currentTier.slice(1)}
                 </p>
-                {sub?.trialEndsAt && new Date(sub.trialEndsAt) > new Date() && (
-                  <p className="text-sm text-yellow-400 mt-1 flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" />
-                    Trial ends {new Date(sub.trialEndsAt).toLocaleDateString()}
-                  </p>
-                )}
-                {sub?.currentPeriodEnd && sub.status !== 'trialing' && (
+                {sub?.currentPeriodEnd && sub.status?.toLowerCase() !== 'trialing' && (
                   <p className="text-xs text-gray-600 mt-1">
                     {sub.cancelAtPeriodEnd ? 'Cancels' : 'Renews'}{' '}
                     {new Date(sub.currentPeriodEnd).toLocaleDateString()}
@@ -467,6 +524,7 @@ export default function BillingPage() {
                   currentTier={currentTier}
                   billingCycle={billingCycle}
                   onSelect={handleUpgrade}
+                  isLoading={checkoutLoading === plan.tier}
                 />
               ))}
             </div>

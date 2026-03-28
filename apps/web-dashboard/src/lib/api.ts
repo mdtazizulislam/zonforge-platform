@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
+const BILLING_BASE_URL = import.meta.env.VITE_BILLING_API_URL ?? BASE_URL
 
 // ── API error ────────────────────────────────
 
@@ -105,11 +106,74 @@ async function attemptRefresh(): Promise<boolean> {
   }
 }
 
+// Plain JSON fetch wrapper used by zonforge-backend billing/auth endpoints
+// that do not return { success, data } envelopes.
+async function billingFetch<T>(
+  path: string,
+  options: RequestInit = {},
+  requireAuth = true,
+): Promise<T> {
+  const token = tokenStorage.get()
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> ?? {}),
+  }
+
+  if (requireAuth && token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const resp = await fetch(`${BILLING_BASE_URL}${path}`, { ...options, headers })
+  const json = await resp.json().catch(() => ({})) as Record<string, unknown>
+
+  if (!resp.ok) {
+    const message = typeof json.error === 'string'
+      ? json.error
+      : typeof json.message === 'string'
+      ? json.message
+      : `HTTP ${resp.status}`
+    throw new ApiError('BILLING_API_ERROR', message, resp.status)
+  }
+
+  return json as T
+}
+
 // ─────────────────────────────────────────────
 // TYPED API METHODS
 // ─────────────────────────────────────────────
 
 export const api = {
+
+  // ── Billing/Auth backend contract (Serial 10) ─────────────────────────
+
+  billingAuth: {
+    signup: (email: string, password: string) =>
+      billingFetch<BillingSignupResponse>('/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }, false),
+    login: (email: string, password: string) =>
+      billingFetch<BillingLoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }, false),
+  },
+
+  billingApi: {
+    plans: () =>
+      billingFetch<BillingPlansResponse>('/billing/plans', { method: 'GET' }, false),
+    subscription: () =>
+      billingFetch<BillingSubscriptionResponse>('/billing/subscription'),
+    status: () =>
+      billingFetch<BillingStatusResponse>('/billing/status'),
+    checkoutSession: (planCode: string) =>
+      billingFetch<BillingCheckoutSessionResponse>('/billing/checkout-session', {
+        method: 'POST',
+        body: JSON.stringify({ planCode }),
+      }),
+    portal: () =>
+      billingFetch<BillingPortalResponse>('/billing/portal', { method: 'POST' }),
+  },
 
   // ── Auth ──────────────────────────────────
 
@@ -517,4 +581,89 @@ export interface Subscription {
   currentPeriodStart: string
   currentPeriodEnd:   string
   trialEndsAt:        string | null
+}
+
+export interface BillingSignupResponse {
+  success: boolean
+  userId: number
+  token: string
+  redirectUrl?: string
+}
+
+export interface BillingLoginResponse {
+  success: boolean
+  userId: number
+  token: string
+}
+
+export interface BillingPlan {
+  code: string
+  name: string
+  description: string | null
+  monthly_price_cents: number
+  annual_price_cents: number
+  max_users: number | null
+  max_connectors: number | null
+  max_events_per_month: number | null
+  retention_days: number
+  has_stripe_monthly: boolean
+  has_stripe_annual: boolean
+}
+
+export interface BillingPlansResponse {
+  plans: BillingPlan[]
+}
+
+export interface BillingSubscriptionResponse {
+  subscription: {
+    tenantId: number
+    planCode: string | null
+    planName: string | null
+    status: string
+    currentPeriodStart: string | null
+    currentPeriodEnd: string | null
+    cancelAtPeriodEnd: boolean
+    hasStripeCustomer: boolean
+    limits: {
+      maxUsers: number | null
+      maxConnectors: number | null
+      maxEventsPerMonth: number | null
+      retentionDays: number | null
+    } | null
+  } | null
+  eligible_for_checkout: boolean
+}
+
+export interface BillingStatusResponse {
+  billing: {
+    tenantId: number
+    tenantName: string
+    planCode: string | null
+    planName: string | null
+    subscriptionStatus: string
+    currentPeriodStart: string | null
+    currentPeriodEnd: string | null
+    cancelAtPeriodEnd: boolean
+    stripeCustomerId: string | null
+    stripeSubscriptionId: string | null
+    limits: {
+      maxUsers: number | null
+      maxConnectors: number | null
+      maxEventsPerMonth: number | null
+      retentionDays: number | null
+    } | null
+  } | null
+  plan: string
+  statusCode: string
+  limits: Record<string, number | string | boolean>
+  usage: Record<string, number>
+}
+
+export interface BillingCheckoutSessionResponse {
+  sessionId: string
+  url: string | null
+}
+
+export interface BillingPortalResponse {
+  url: string
 }
