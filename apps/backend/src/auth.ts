@@ -3,10 +3,15 @@ import bcrypt from 'bcryptjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { getPool, getTenantByUserId } from './db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET is required');
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is required');
+  }
+  return secret;
 }
+
+const JWT_SECRET = getJwtSecret();
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '15m';
 const REFRESH_TOKEN_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
 
@@ -50,11 +55,22 @@ export function createAccessToken(payload: Omit<JWTPayload, 'tokenType'>): strin
 
 export function verifyJWT(token: string): JWTPayload | null {
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    if (payload.tokenType !== 'access') {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (!decoded || typeof decoded !== 'object') {
       return null;
     }
-    return payload;
+
+    const payload = decoded as jwt.JwtPayload;
+    if (payload.tokenType !== 'access' || typeof payload.userId !== 'number' || typeof payload.email !== 'string' || typeof payload.sessionId !== 'string') {
+      return null;
+    }
+
+    return {
+      userId: payload.userId,
+      email: payload.email,
+      tokenType: 'access',
+      sessionId: payload.sessionId,
+    };
   } catch (error) {
     return null;
   }
