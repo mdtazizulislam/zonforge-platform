@@ -42,7 +42,7 @@ function accessTokenTtlSeconds(): number {
 }
 
 export function createAccessToken(payload: Omit<JWTPayload, 'tokenType'>): string {
-  return jwt.sign({ ...payload, tokenType: 'access' }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+  return jwt.sign({ ...payload, tokenType: 'access' }, JWT_SECRET, { expiresIn: accessTokenTtlSeconds() });
 }
 
 export function verifyJWT(token: string): JWTPayload | null {
