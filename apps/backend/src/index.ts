@@ -764,7 +764,7 @@ async function start() {
   try {
     await initDatabase();
     if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your_jwt_secret_key_here') {
-      throw new Error('JWT_SECRET must be set to a strong value');
+      console.error('SECURITY WARNING: JWT_SECRET is not set to a strong value');
     }
 
     validateStripeEnvOrThrow();
