@@ -1,3 +1,46 @@
-/login  /login.html  200
-/signup /signup.html 200
-/*      /index.html   200
+# ── React SPA app routes ──────────────────────────────────────────────────────
+# All authenticated-app routes are served by the React SPA (landing/app/index.html)
+# Netlify internally rewrites (200) so browser URL stays intact for React Router.
+/login               /app/index.html  200
+/dashboard           /app/index.html  200
+/alerts              /app/index.html  200
+/alerts/*            /app/index.html  200
+/risk                /app/index.html  200
+/risk/*              /app/index.html  200
+/connectors          /app/index.html  200
+/connectors/*        /app/index.html  200
+/compliance          /app/index.html  200
+/compliance/*        /app/index.html  200
+/compliance-reports  /app/index.html  200
+/compliance-reports/* /app/index.html 200
+/playbooks           /app/index.html  200
+/playbooks/*         /app/index.html  200
+/audit               /app/index.html  200
+/audit/*             /app/index.html  200
+/settings            /app/index.html  200
+/settings/*          /app/index.html  200
+/billing             /app/index.html  200
+/billing/*           /app/index.html  200
+/mssp                /app/index.html  200
+/mssp/*              /app/index.html  200
+/threat-hunting      /app/index.html  200
+/threat-hunting/*    /app/index.html  200
+/security-validation /app/index.html  200
+/security-validation/* /app/index.html 200
+/ai-soc-analyst      /app/index.html  200
+/ai-soc-analyst/*    /app/index.html  200
+/ai-intelligence     /app/index.html  200
+/ai-intelligence/*   /app/index.html  200
+/ai-capabilities     /app/index.html  200
+/ai-capabilities/*   /app/index.html  200
+/enterprise          /app/index.html  200
+/enterprise/*        /app/index.html  200
+/enterprise-sales    /app/index.html  200
+/enterprise-sales/*  /app/index.html  200
+/enterprise-setup    /app/index.html  200
+/enterprise-setup/*  /app/index.html  200
+/supply-chain        /app/index.html  200
+/supply-chain/*      /app/index.html  200
+# ── Marketing static pages ────────────────────────────────────────────────────
+/signup              /signup.html     200
+/*                   /index.html      200

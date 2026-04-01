@@ -1,8 +1,13 @@
 # ZonForge Sentinel — Netlify Configuration
-# Landing page + Interactive Demo
+# Landing page + React SPA (web-dashboard)
 
 [build]
   publish = "."
+  command = "cd ../apps/web-dashboard && npm install --legacy-peer-deps && npx vite build"
+
+[build.environment]
+  VITE_API_URL = "https://api.zonforge.com"
+  NODE_VERSION = "20"
 
 # Security headers
 [[headers]]
@@ -19,22 +24,13 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# SPA fallback
-[[redirects]]
-  from   = "/login"
-  to     = "/login.html"
-  status = 200
+# SPA routes — handled by _redirects (which takes precedence over toml rules)
+# Keeping toml redirects minimal to avoid conflicts with _redirects file
 
 [[redirects]]
   from   = "/signup"
   to     = "/signup.html"
   status = 200
-
-[[redirects]]
-  from   = "/app/*"
-  to     = "https://app.zonforge.com/:splat"
-  status = 301
-  force  = true
 
 [[redirects]]
   from   = "/*"

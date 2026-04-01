@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { useLocation } from 'wouter'
+import { useNavigate } from 'react-router-dom'
 import { api, tokenStorage, type LoginResult } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 import { Spinner } from '@/components/ui'
 
 export function LoginPage() {
-  const [, navigate]  = useLocation()
-  const setUser       = useAuthStore(s => s.setUser)
+  const navigate = useNavigate()
+  const setUser  = useAuthStore(s => s.setUser)
 
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -32,7 +32,7 @@ export function LoginPage() {
       tokenStorage.set(result.accessToken)
       tokenStorage.setRefresh(result.refreshToken)
       setUser(result.user)
-      navigate('/')
+      navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
