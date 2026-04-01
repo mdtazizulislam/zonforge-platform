@@ -634,6 +634,61 @@ app.get(`${API_PREFIX}/onboarding/get-started`, async (c) => {
   return c.json({ tenant_id: tenantId, steps, first_action: steps[0] });
 });
 
+app.get(`${API_PREFIX}/growth/proof`, async (c) => {
+  try {
+    const pool = getPool();
+    const emailFilter = c.req.query('email');
+    const whereSql = emailFilter ? 'WHERE to_email = $1' : '';
+
+    const emailEvents = emailFilter
+      ? await pool.query(
+        `SELECT id, to_email, email_type, status, created_at
+         FROM email_events
+         ${whereSql}
+         ORDER BY id DESC
+         LIMIT 20`,
+        [emailFilter],
+      )
+      : await pool.query(
+        `SELECT id, to_email, email_type, status, created_at
+         FROM email_events
+         ORDER BY id DESC
+         LIMIT 20`,
+      );
+
+    const conversionEvents = await pool.query(
+      `SELECT id, event_name, user_id, tenant_id, source, created_at
+       FROM conversion_events
+       ORDER BY id DESC
+       LIMIT 50`,
+    );
+
+    const analyticsEvents = await pool.query(
+      `SELECT id, event_name, page_path, source, created_at
+       FROM analytics_events
+       ORDER BY id DESC
+       LIMIT 50`,
+    );
+
+    const supportEvents = await pool.query(
+      `SELECT id, email, topic, status, created_at
+       FROM support_requests
+       ORDER BY id DESC
+       LIMIT 20`,
+    );
+
+    return c.json({
+      emails: emailEvents.rows,
+      conversions: conversionEvents.rows,
+      analytics: analyticsEvents.rows,
+      support: supportEvents.rows,
+    });
+  } catch (error) {
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
 // Protected route example
 app.get(`${API_PREFIX}/users`, async (c) => {
   const authHeader = c.req.header('Authorization');
