@@ -349,6 +349,8 @@ app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
         currentPeriodStart: subscription.currentPeriodStart,
         currentPeriodEnd: subscription.currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        stripeCustomerId: subscription.stripeCustomerId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
         hasStripeCustomer: Boolean(subscription.stripeCustomerId),
         limits: subscription.limits,
       },
