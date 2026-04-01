@@ -1,5 +1,7 @@
 import Stripe from 'stripe';
 import { getPool, getPlanByCode, getTenantSubscription, getTenantById } from './db.js';
+import { sendProductEmail } from './email.js';
+import { trackConversionEvent } from './growth.js';
 
 type LegacySubscriptionStatus = 'active' | 'past_due' | 'canceled'
 
@@ -815,6 +817,31 @@ async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout
     subscriptionStatus: 'active',
     currentPeriodEnd,
   })
+
+  if (typeof session.customer_email === 'string' && session.customer_email) {
+    await sendProductEmail({
+      toEmail: session.customer_email,
+      emailType: 'payment_success',
+      subject: 'Payment successful - ZonForge subscription is active',
+      payload: {
+        planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
+        billingInterval: typeof session.metadata?.billingInterval === 'string' ? session.metadata.billingInterval : null,
+        sessionId: session.id,
+      },
+    });
+  }
+
+  await trackConversionEvent({
+    eventName: 'checkout_completed',
+    userId: user.id,
+    tenantId,
+    sessionId: session.id,
+    source: 'stripe_webhook',
+    metadata: {
+      planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
+      billingInterval: typeof session.metadata?.billingInterval === 'string' ? session.metadata.billingInterval : null,
+    },
+  });
 }
 
 async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Subscription, rawEvent?: Stripe.Event) {
@@ -1016,6 +1043,19 @@ async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice, raw
     subscriptionStatus: 'past_due',
     currentPeriodEnd: null,
   })
+
+  if (typeof invoice.customer_email === 'string' && invoice.customer_email) {
+    await sendProductEmail({
+      toEmail: invoice.customer_email,
+      emailType: 'payment_failed',
+      subject: 'Payment failed - action required',
+      payload: {
+        invoiceId: invoice.id,
+        planCode,
+        stripeCustomerId: invoice.customer,
+      },
+    });
+  }
 }
 
 export async function processStripeWebhookEvent(event: Stripe.Event) {

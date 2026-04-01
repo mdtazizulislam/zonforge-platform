@@ -116,6 +116,31 @@
             margin-top: 15px;
             font-size: 14px;
         }
+
+        .status-card {
+            text-align: left;
+            background: #f7f8fb;
+            border: 1px solid #e6e8ef;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .usage-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .usage-box {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 12px;
+            color: #4b5563;
+        }
         
         .secondary-link:hover {
             text-decoration: underline;
@@ -133,9 +158,21 @@
             Welcome to ZonForge. Your security platform is ready to go.
         </p>
         
-        <div class="email-note">
+        <div class="email-note" id="email-note">
             <strong>Check your email</strong><br>
             We've sent you a confirmation email with your login credentials and next steps.
+        </div>
+
+        <div class="status-card">
+            <strong>Account status</strong>
+            <div id="verify-status" style="margin-top:6px;color:#6b7280;">Email verification pending.</div>
+            <div style="margin-top:10px;color:#111827;font-size:14px;">Current plan: Starter trial · Upgrade any time from dashboard billing.</div>
+            <div class="usage-grid">
+              <div class="usage-box">Connectors: 0/1</div>
+              <div class="usage-box">Identities: 0/50</div>
+              <div class="usage-box">Events/min: 0/500</div>
+            </div>
+            <a href="/pricing" class="cta-button" style="margin-top:12px;padding:10px 18px;font-size:14px;">Upgrade Plan</a>
         </div>
         
         <div class="next-steps">
@@ -153,17 +190,44 @@
     </div>
     
     <script>
+        const API_BASE = 'https://api.zonforge.com';
+
         // Display email from URL if available
         const params = new URLSearchParams(window.location.search);
         const email = params.get('email');
-        
+        const verifyToken = params.get('verify_token');
+
         if (email) {
-            const emailNote = document.querySelector('.email-note');
+            const emailNote = document.getElementById('email-note');
             emailNote.innerHTML = `<strong>Confirmation sent to:</strong><br><code>${email}</code><br><br>Check your inbox for the confirmation email.`;
         }
-        
+
+        async function verifyEmailIfTokenPresent() {
+            if (!verifyToken) {
+                return;
+            }
+
+            const statusEl = document.getElementById('verify-status');
+            statusEl.textContent = 'Verifying your email...';
+
+            try {
+                const response = await fetch(`${API_BASE}/v1/auth/verify-email?token=${encodeURIComponent(verifyToken)}`);
+                if (!response.ok) {
+                    throw new Error('verification failed');
+                }
+
+                statusEl.textContent = 'Email verified. Your onboarding is now unlocked.';
+                statusEl.style.color = '#16a34a';
+            } catch {
+                statusEl.textContent = 'Verification link is invalid or expired. Use resend confirmation below.';
+                statusEl.style.color = '#d97706';
+            }
+        }
+
+        verifyEmailIfTokenPresent();
+
         function checkEmail() {
-            alert('Open your email client or check your spam folder. Add noreply@zonforge.com to your contacts.');
+            alert('Open your inbox and spam folder, then click the verification link. If expired, contact support@zonforge.com.');
         }
     </script>
 </body>

@@ -20,6 +20,7 @@ export async function initDatabase() {
         email VARCHAR(255) UNIQUE NOT NULL,
         stripe_customer_id VARCHAR(255),
         password_hash VARCHAR(255) NOT NULL,
+        email_verified_at TIMESTAMPTZ,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -180,6 +181,83 @@ export async function initDatabase() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(128) UNIQUE NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        consumed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_events (
+        id BIGSERIAL PRIMARY KEY,
+        to_email VARCHAR(255) NOT NULL,
+        email_type VARCHAR(64) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'queued',
+        payload_json JSONB,
+        provider_response TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS conversion_events (
+        id BIGSERIAL PRIMARY KEY,
+        event_name VARCHAR(64) NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        session_id VARCHAR(128),
+        source VARCHAR(64) NOT NULL DEFAULT 'backend',
+        metadata_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id BIGSERIAL PRIMARY KEY,
+        event_name VARCHAR(128) NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        page_path VARCHAR(512),
+        source VARCHAR(64) NOT NULL DEFAULT 'web',
+        metadata_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS support_requests (
+        id BIGSERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        topic VARCHAR(120) NOT NULL,
+        message TEXT NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'open',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS error_reports (
+        id BIGSERIAL PRIMARY KEY,
+        message TEXT NOT NULL,
+        page_path VARCHAR(512),
+        stack TEXT,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        metadata_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     // ─── LEGACY BILLING_SUBSCRIPTIONS (USER-BASED, FOR BACKWARD COMPAT) ───
     await client.query(`
       CREATE TABLE IF NOT EXISTS billing_subscriptions (
@@ -287,6 +365,10 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_event_type ON billing_audit_logs(event_type, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_user ON auth_refresh_tokens(user_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_family ON auth_refresh_tokens(token_family, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_email_events_type ON email_events(email_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_conversion_events_name ON conversion_events(event_name, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_analytics_events_name ON analytics_events(event_name, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_support_requests_status ON support_requests(status, created_at DESC)`);
 
     // ─── TENANT SUBSCRIPTIONS ENHANCEMENTS (09.2) ───
     await client.query(`ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`);

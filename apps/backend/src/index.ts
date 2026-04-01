@@ -35,6 +35,16 @@ import {
   sendError,
   validateProductionSecurityConfig,
 } from './security.js';
+import {
+  consumeEmailVerificationToken,
+  createEmailVerificationToken,
+  getConversionFunnelSummary,
+  storeErrorReport,
+  storeSupportRequest,
+  trackAnalyticsEvent,
+  trackConversionEvent,
+} from './growth.js';
+import { sendProductEmail } from './email.js';
 
 const app = new Hono();
 const API_PREFIX = '/v1';
@@ -230,6 +240,18 @@ async function handleCheckoutRequest(c: any) {
     source: 'api_checkout',
   });
 
+  await trackConversionEvent({
+    eventName: 'checkout_started',
+    userId,
+    tenantId,
+    sessionId: checkout.sessionId,
+    source: 'billing_api',
+    metadata: {
+      planId,
+      billingCycle,
+    },
+  });
+
   return c.json({
     plan_id: planId,
     billing_cycle: billingCycle,
@@ -282,6 +304,34 @@ app.post(`${API_PREFIX}/auth/register`, async (c) => {
       payload: { email, clientIp },
     });
 
+    await trackConversionEvent({
+      eventName: 'signup',
+      userId,
+      tenantId: tenantId ?? null,
+      source: 'auth_api',
+      metadata: { emailDomain: email.split('@')[1] ?? null },
+    });
+
+    const verificationToken = await createEmailVerificationToken(userId);
+    const verificationUrl = `https://zonforge.com/success.html?verify_token=${verificationToken}`;
+
+    await sendProductEmail({
+      toEmail: email,
+      emailType: 'verification',
+      subject: 'Verify your ZonForge email',
+      payload: { verificationUrl, userId },
+    });
+
+    await sendProductEmail({
+      toEmail: email,
+      emailType: 'welcome',
+      subject: 'Welcome to ZonForge Sentinel',
+      payload: {
+        firstActionUrl: 'https://zonforge.com/#demo',
+        onboarding: ['connect_source', 'run_first_detection', 'invite_team'],
+      },
+    });
+
     return c.json({
       success: true,
       userId,
@@ -322,6 +372,14 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
       tenantId,
       source: 'auth',
       payload: { email, clientIp },
+    });
+
+    await trackConversionEvent({
+      eventName: 'login',
+      userId,
+      tenantId,
+      source: 'auth_api',
+      metadata: { emailDomain: email.split('@')[1] ?? null },
     });
 
     return c.json({
@@ -405,6 +463,175 @@ app.post(`${API_PREFIX}/auth/logout`, async (c) => {
   } catch {
     return sendError(c, 400, 'logout_failed', 'Could not complete logout.');
   }
+});
+
+app.get(`${API_PREFIX}/auth/verify-email`, async (c) => {
+  try {
+    const token = c.req.query('token')?.trim();
+    if (!token) {
+      return sendError(c, 400, 'verification_token_required', 'Verification token is required.');
+    }
+
+    const userId = await consumeEmailVerificationToken(token);
+    if (!userId) {
+      return sendError(c, 400, 'invalid_verification_token', 'Verification token is invalid or expired.');
+    }
+
+    return c.json({ success: true, userId });
+  } catch (error) {
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.post(`${API_PREFIX}/support/contact`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const email = assertValidEmail(body.email);
+    const topic = typeof body.topic === 'string' && body.topic.trim() ? body.topic.trim() : 'general';
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+
+    if (!name || !message) {
+      return sendError(c, 400, 'invalid_support_request', 'name and message are required.');
+    }
+
+    const userId = requireAuthUserId(c);
+    const tenantId = userId ? await getTenantIdForUser(userId) : null;
+
+    const supportRecord = await storeSupportRequest({
+      name,
+      email,
+      topic,
+      message,
+      userId,
+      tenantId,
+    });
+
+    await sendProductEmail({
+      toEmail: email,
+      emailType: 'support_received',
+      subject: 'ZonForge support request received',
+      payload: {
+        supportId: supportRecord.id,
+        topic,
+      },
+    });
+
+    await writeAuditLog({
+      eventType: 'support.contact_created',
+      message: 'Support request submitted',
+      userId,
+      tenantId,
+      source: 'support',
+      payload: {
+        supportId: supportRecord.id,
+        topic,
+      },
+    });
+
+    return c.json({ success: true, support_id: supportRecord.id, created_at: supportRecord.created_at });
+  } catch (error) {
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.post(`${API_PREFIX}/support/error-report`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    if (!message) {
+      return sendError(c, 400, 'invalid_error_report', 'message is required.');
+    }
+
+    const userId = requireAuthUserId(c);
+    const tenantId = userId ? await getTenantIdForUser(userId) : null;
+
+    await storeErrorReport({
+      message,
+      pagePath: typeof body.page_path === 'string' ? body.page_path : null,
+      stack: typeof body.stack === 'string' ? body.stack : null,
+      userId,
+      tenantId,
+      metadata: typeof body.metadata === 'object' && body.metadata ? body.metadata : null,
+    });
+
+    return c.json({ success: true });
+  } catch (error) {
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.post(`${API_PREFIX}/analytics/track`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const eventName = typeof body.event === 'string' ? body.event.trim() : '';
+    if (!eventName) {
+      return sendError(c, 400, 'event_required', 'event is required.');
+    }
+
+    const userId = requireAuthUserId(c);
+    const tenantId = userId ? await getTenantIdForUser(userId) : null;
+
+    await trackAnalyticsEvent({
+      eventName,
+      userId,
+      tenantId,
+      pagePath: typeof body.page_path === 'string' ? body.page_path : c.req.path,
+      source: typeof body.source === 'string' ? body.source : 'landing',
+      metadata: typeof body.metadata === 'object' && body.metadata ? body.metadata : null,
+    });
+
+    return c.json({ success: true });
+  } catch (error) {
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.get(`${API_PREFIX}/analytics/funnel`, async (c) => {
+  try {
+    const hoursRaw = c.req.query('hours');
+    const hours = Number(hoursRaw ?? '24');
+    const summary = await getConversionFunnelSummary(Number.isFinite(hours) && hours > 0 ? hours : 24);
+
+    const dropoffSignupToCheckout = summary.signup > 0
+      ? Number((((summary.signup - summary.checkout_started) / summary.signup) * 100).toFixed(2))
+      : 0;
+    const dropoffCheckoutToPaid = summary.checkout_started > 0
+      ? Number((((summary.checkout_started - summary.checkout_completed) / summary.checkout_started) * 100).toFixed(2))
+      : 0;
+
+    return c.json({
+      hours: Number.isFinite(hours) && hours > 0 ? hours : 24,
+      funnel: summary,
+      dropoff: {
+        signup_to_checkout_started_percent: dropoffSignupToCheckout,
+        checkout_started_to_completed_percent: dropoffCheckoutToPaid,
+      },
+    });
+  } catch (error) {
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.get(`${API_PREFIX}/onboarding/get-started`, async (c) => {
+  const userId = requireAuthUserId(c);
+  if (!userId) {
+    return sendError(c, 401, 'unauthorized', 'Unauthorized');
+  }
+
+  const tenantId = await getTenantIdForUser(userId);
+  const steps = [
+    { id: 'connect_source', title: 'Connect your first data source', path: '/connectors', done: false },
+    { id: 'run_detection', title: 'Run first threat detection', path: '/detections', done: false },
+    { id: 'invite_team', title: 'Invite one teammate', path: '/settings/team', done: false },
+  ];
+
+  return c.json({ tenant_id: tenantId, steps, first_action: steps[0] });
 });
 
 // Protected route example

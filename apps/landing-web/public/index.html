@@ -1274,6 +1274,9 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
     <div class="section-tag">Pricing</div>
     <h2 class="section-title">Simple. Transparent. No Surprises.</h2>
     <p class="section-sub">Start free. Scale as you grow. Replace your $400K SIEM for under $1,000/month.</p>
+    <div style="margin-top:18px;margin-bottom:10px;padding:10px 14px;border:1px solid rgba(34,197,94,0.3);border-radius:8px;background:rgba(34,197,94,0.08);font-size:13px;color:var(--light);">
+      Limited launch offer: annual plans include 20% discount and a 14-day guided onboarding sprint.
+    </div>
 
     <div class="price-toggle">
       <span class="pt-label">Monthly</span>
@@ -1435,10 +1438,22 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
         <a href="mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo" class="btn-primary" data-starter-checkout>Start Now</a>
       </div>
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;">
-        <div class="section-tag" style="margin-bottom:14px;">Demo Access</div>
-        <h3 style="font-size:28px;margin-bottom:10px;">Live product demo</h3>
-        <p style="font-size:14px;color:var(--text);margin-bottom:16px;">Open the interactive dashboard demo with sample alerts and AI investigation flow.</p>
-        <a href="/demo.html" class="btn-primary">Open Demo</a>
+        <div class="section-tag" style="margin-bottom:14px;">Support</div>
+        <h3 style="font-size:28px;margin-bottom:10px;">Need help now?</h3>
+        <p style="font-size:14px;color:var(--text);margin-bottom:16px;">Send a support request directly from the product site. We log every issue and email confirmation immediately.</p>
+        <form id="support-form" style="display:flex;flex-direction:column;gap:10px;">
+          <input id="support-name" type="text" placeholder="Name" style="padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--bright);" required>
+          <input id="support-email" type="email" placeholder="Work email" style="padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--bright);" required>
+          <select id="support-topic" style="padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--bright);">
+            <option value="onboarding">Onboarding</option>
+            <option value="billing">Billing</option>
+            <option value="technical">Technical issue</option>
+            <option value="sales">Sales</option>
+          </select>
+          <textarea id="support-message" placeholder="Describe your issue" style="padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--bright);min-height:80px;" required></textarea>
+          <button class="btn-primary" type="submit" style="justify-content:center;">Send support request</button>
+          <div id="support-status" style="font-size:12px;color:var(--dim);"></div>
+        </form>
       </div>
     </div>
   </div>
@@ -1478,7 +1493,7 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
         <div class="footer-col-title">Resources</div>
         <a href="#" class="footer-link">Documentation</a>
         <a href="#" class="footer-link">API Reference</a>
-        <a href="#" class="footer-link">Status Page</a>
+        <a href="/status.html" class="footer-link">Status Page</a>
         <a href="#" class="footer-link">MSSP Program</a>
         <a href="mailto:support@zonforge.com?subject=ZonForge%20Support" class="footer-link">support@zonforge.com</a>
       </div>
@@ -1486,9 +1501,9 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
     <div class="footer-bottom">
       <div class="footer-copy">© 2026 ZonForge Inc. All rights reserved. Built with ♥ for security teams.</div>
       <div class="footer-legal">
-        <a href="#">Privacy Policy</a>
-        <a href="#">Terms of Service</a>
-        <a href="#">Cookie Policy</a>
+        <a href="/privacy.html">Privacy Policy</a>
+        <a href="/terms.html">Terms of Service</a>
+        <a href="/status.html">Status</a>
         <a href="#">DPA</a>
       </div>
     </div>
@@ -1496,8 +1511,31 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
 </footer>
 
 <script>
+const API_BASE = 'https://api.zonforge.com';
 const STRIPE_PAYMENT_LINK = 'https://buy.stripe.com/3cIeVe1BL1GWbKk37H2cg00';
 const STARTER_CHECKOUT_FALLBACK_URL = 'mailto:support@zonforge.com?subject=Activate%20ZonForge%20Starter%20Plan%20-%20%2449%2Fmo';
+
+function trackEvent(eventName, metadata = {}) {
+  const body = {
+    event: eventName,
+    source: 'landing',
+    page_path: window.location.pathname,
+    metadata,
+  };
+
+  try {
+    navigator.sendBeacon(
+      `${API_BASE}/v1/analytics/track`,
+      new Blob([JSON.stringify(body)], { type: 'application/json' }),
+    );
+  } catch {
+    fetch(`${API_BASE}/v1/analytics/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => null);
+  }
+}
 
 function bindStarterCheckoutLinks() {
   const checkoutUrl = STRIPE_PAYMENT_LINK || STARTER_CHECKOUT_FALLBACK_URL;
@@ -1505,6 +1543,10 @@ function bindStarterCheckoutLinks() {
 
   document.querySelectorAll('[data-starter-checkout]').forEach((link) => {
     link.setAttribute('href', checkoutUrl);
+
+    link.addEventListener('click', () => {
+      trackEvent('checkout_started', { plan: 'starter', source: 'landing_cta' });
+    });
 
     if (usesStripeCheckout) {
       link.setAttribute('target', '_blank');
@@ -1546,6 +1588,8 @@ if (leadForm) {
   leadForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
+    trackEvent('onboarding_demo_requested', { source: 'lead_form' });
+
     const btn = leadForm.querySelector('.df-submit');
     const originalLabel = btn.textContent;
     const formData = new FormData(leadForm);
@@ -1570,15 +1614,56 @@ if (leadForm) {
       leadStatus.style.color = '#22c55e';
       leadStatus.textContent = '✓ Request received. Our team will contact you at support@zonforge.com within 2 hours.';
       btn.textContent = '✓ Request Received';
+      trackEvent('onboarding_demo_submit_success', { source: 'lead_form' });
     } catch (error) {
       leadStatus.style.display = 'block';
       leadStatus.style.color = '#f59e0b';
       leadStatus.textContent = 'Submission could not be completed. Email support@zonforge.com and we will set you up manually.';
       btn.disabled = false;
       btn.textContent = originalLabel;
+      trackEvent('onboarding_demo_submit_failed', { source: 'lead_form' });
     }
   });
 }
+
+const supportForm = document.getElementById('support-form');
+const supportStatus = document.getElementById('support-status');
+
+if (supportForm) {
+  supportForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      name: document.getElementById('support-name').value,
+      email: document.getElementById('support-email').value,
+      topic: document.getElementById('support-topic').value,
+      message: document.getElementById('support-message').value,
+    };
+
+    try {
+      const response = await fetch(`${API_BASE}/v1/support/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Support request failed');
+      }
+
+      supportForm.reset();
+      supportStatus.style.color = '#22c55e';
+      supportStatus.textContent = 'Support request submitted. Check your email for confirmation.';
+      trackEvent('support_request_submitted', { topic: payload.topic });
+    } catch {
+      supportStatus.style.color = '#f59e0b';
+      supportStatus.textContent = 'Unable to submit right now. Email support@zonforge.com directly.';
+      trackEvent('support_request_failed', { topic: payload.topic });
+    }
+  });
+}
+
+trackEvent('page_view', { page: window.location.pathname });
 
 // ── Scroll-based nav highlight ───────────────────────────────────
 window.addEventListener('scroll', () => {
