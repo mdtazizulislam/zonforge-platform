@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { initDatabase, getPool } from './db.js';
-import { registerUser, loginUser, verifyJWT, getTenantIdForUser } from './auth.js';
+import { registerUser, loginUser, verifyJWT, getTenantIdForUser, rotateRefreshToken, revokeRefreshToken } from './auth.js';
 import {
   createCheckoutSessionForTenant,
   getTenantBillingStatus,
@@ -22,42 +22,106 @@ import {
   UpgradeRequiredError,
 } from './billing/enforcement.js';
 import { isActiveUser } from './middleware/isActiveUser.js';
+import {
+  AppError,
+  assertCheckoutNotSpam,
+  assertValidEmail,
+  assertValidPassword,
+  assertValidPlanId,
+  authBillingRateLimitMiddleware,
+  getClientIp,
+  recordMonitoringSignal,
+  requestContextMiddleware,
+  sendError,
+  validateProductionSecurityConfig,
+} from './security.js';
 
 const app = new Hono();
 const API_PREFIX = '/v1';
 
+function normalizeAppError(error: unknown): AppError {
+  if (error instanceof AppError) {
+    return error;
+  }
+
+  if (error instanceof UpgradeRequiredError) {
+    return new AppError(402, 'upgrade_required', error.message, error.toResponse());
+  }
+
+  return new AppError(500, 'internal_error', 'Internal Server Error');
+}
+
+async function writeAuditLog(input: {
+  eventType: string;
+  message: string;
+  userId?: number | null;
+  tenantId?: number | null;
+  source?: string;
+  payload?: Record<string, unknown> | null;
+}) {
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO billing_audit_logs (
+      tenant_id,
+      user_id,
+      event_type,
+      source,
+      message,
+      payload_json
+    ) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [
+      input.tenantId ?? null,
+      input.userId ?? null,
+      input.eventType,
+      input.source ?? 'backend',
+      input.message,
+      input.payload ? JSON.stringify(input.payload) : null,
+    ],
+  );
+}
+
 app.onError((error, c) => {
-  console.error('Unhandled application error:', error);
-  return c.json({ error: 'Internal Server Error' }, 500);
+  const normalized = normalizeAppError(error);
+  if (normalized.status >= 500) {
+    recordMonitoringSignal('5xx_spike', {
+      path: c.req.path,
+      method: c.req.method,
+    }).catch(() => null);
+  }
+
+  if (normalized.status >= 500) {
+    console.error('Unhandled application error:', error);
+  }
+
+  return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
 });
+
+app.use('*', requestContextMiddleware);
 
 app.use('*', async (c, next) => {
   const start = Date.now();
   await next();
   const durationMs = Date.now() - start;
+
+  if (c.res.status >= 500) {
+    recordMonitoringSignal('5xx_spike', {
+      path: c.req.path,
+      method: c.req.method,
+      status: c.res.status,
+    }).catch(() => null);
+  }
+
   console.log(`${c.req.method} ${c.req.path} -> ${c.res.status} (${durationMs}ms)`);
 });
+
+app.use(`${API_PREFIX}/auth/*`, authBillingRateLimitMiddleware);
+app.use(`${API_PREFIX}/billing/*`, authBillingRateLimitMiddleware);
 
 // Enable CORS
 app.use('*', cors({
   origin: (origin) => {
-    const allowedOrigins = new Set([
-      'https://zonforge.com',
-      'https://www.zonforge.com',
-      'http://localhost:3000',
-      'http://localhost:4000',
-      'http://localhost:4173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:4000',
-      'http://127.0.0.1:4173',
-    ]);
-
-    if (!origin) {
+    if (!origin || origin === 'https://zonforge.com') {
       return 'https://zonforge.com';
-    }
-
-    if (allowedOrigins.has(origin) || origin.endsWith('.netlify.app')) {
-      return origin;
     }
 
     return 'https://zonforge.com';
@@ -82,7 +146,7 @@ function requireAuthUserId(c: any): number | null {
     return null;
   }
 
-  const token = authHeader.replace('Bearer ', '');
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
   const payload = verifyJWT(token);
   if (!payload) {
     return null;
@@ -121,15 +185,11 @@ function normalizeCheckoutRequest(body: Record<string, unknown>) {
   const rawPlanId = body.plan_id ?? body.planId ?? body.planCode ?? body.plan ?? null;
   const rawBillingCycle = body.billing_cycle ?? body.billingCycle ?? 'monthly';
 
-  const planId = typeof rawPlanId === 'string' ? rawPlanId.trim().toLowerCase() : '';
+  const planId = assertValidPlanId(rawPlanId);
   const billingCycle = typeof rawBillingCycle === 'string' ? rawBillingCycle.trim().toLowerCase() : 'monthly';
 
-  if (!planId) {
-    throw new Error('plan_id required');
-  }
-
   if (billingCycle !== 'monthly' && billingCycle !== 'annual') {
-    throw new Error('billing_cycle must be monthly or annual');
+    throw new AppError(400, 'invalid_billing_cycle', 'billing_cycle must be monthly or annual');
   }
 
   return {
@@ -141,23 +201,24 @@ function normalizeCheckoutRequest(body: Record<string, unknown>) {
 async function handleCheckoutRequest(c: any) {
   const userId = requireAuthUserId(c);
   if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401);
+    return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
 
   const tenantId = await getTenantIdForUser(userId);
   if (!tenantId) {
-    return c.json({ error: 'User has no associated tenant' }, 400);
+    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
   }
 
   const body = await c.req.json();
   const { planId, billingCycle } = normalizeCheckoutRequest(body);
+  assertCheckoutNotSpam(userId, `${planId}:${billingCycle}`);
 
   if (planId === 'starter') {
-    return c.json({ error: 'Starter plan does not require checkout' }, 400);
+    return sendError(c, 400, 'starter_checkout_forbidden', 'Starter plan does not require checkout');
   }
 
   if (planId === 'enterprise' || planId === 'mssp') {
-    return c.json({ error: 'This plan requires sales assistance' }, 400);
+    return sendError(c, 400, 'sales_required', 'This plan requires sales assistance');
   }
 
   const origin = resolveFrontendOrigin(c);
@@ -182,13 +243,16 @@ async function handleCheckoutRequest(c: any) {
 // Auth routes
 app.post(`${API_PREFIX}/auth/register`, async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const body = await c.req.json();
+    const email = assertValidEmail(body.email);
+    const password = assertValidPassword(body.password);
+    const clientIp = getClientIp(c);
+    const userAgent = c.req.header('user-agent') ?? null;
 
-    if (!email || !password) {
-      return c.json({ error: 'Email and password required' }, 400);
-    }
-
-    const { userId, token } = await registerUser(email, password);
+    const { userId, tokens } = await registerUser(email, password, {
+      ip: clientIp,
+      userAgent,
+    });
     const pool = getPool();
 
     // Ensure one tenant exists for self-serve users (additive, backward compatible).
@@ -209,27 +273,137 @@ app.post(`${API_PREFIX}/auth/register`, async (c) => {
       await incrementUsage(tenantId, 'IDENTITIES', 1)
     }
 
-    return c.json({ success: true, userId, token, redirectUrl: '/success' });
+    await writeAuditLog({
+      eventType: 'auth.register',
+      message: 'User registered',
+      userId,
+      tenantId: tenantId ?? null,
+      source: 'auth',
+      payload: { email, clientIp },
+    });
+
+    return c.json({
+      success: true,
+      userId,
+      token: tokens.accessToken,
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+      expires_in: tokens.expiresInSeconds,
+      refresh_expires_at: tokens.refreshExpiresAt,
+      redirectUrl: '/success',
+    });
   } catch (error) {
-    if (error instanceof UpgradeRequiredError) {
-      return c.json({ error: error.toResponse() }, 402)
-    }
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
 app.post(`${API_PREFIX}/auth/login`, async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const body = await c.req.json();
+    const email = assertValidEmail(body.email);
+    const password = typeof body.password === 'string' ? body.password : '';
+    if (!password) {
+      return sendError(c, 400, 'invalid_password', 'Password is required.');
+    }
+    const clientIp = getClientIp(c);
+    const userAgent = c.req.header('user-agent') ?? null;
 
-    if (!email || !password) {
-      return c.json({ error: 'Email and password required' }, 400);
+    const { userId, tokens } = await loginUser(email, password, {
+      ip: clientIp,
+      userAgent,
+    });
+
+    const tenantId = await getTenantIdForUser(userId);
+    await writeAuditLog({
+      eventType: 'auth.login',
+      message: 'User login successful',
+      userId,
+      tenantId,
+      source: 'auth',
+      payload: { email, clientIp },
+    });
+
+    return c.json({
+      success: true,
+      userId,
+      token: tokens.accessToken,
+      access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken,
+      expires_in: tokens.expiresInSeconds,
+      refresh_expires_at: tokens.refreshExpiresAt,
+    });
+  } catch (error) {
+    const normalized = normalizeAppError(error);
+
+    if ((error as Error).message === 'Invalid credentials') {
+      await writeAuditLog({
+        eventType: 'auth.login_failed',
+        message: 'Failed login attempt',
+        source: 'auth',
+        payload: {
+          ip: getClientIp(c),
+        },
+      });
+
+      await recordMonitoringSignal('failed_login', {
+        path: c.req.path,
+        ip: getClientIp(c),
+      });
+
+      return sendError(c, 401, 'invalid_credentials', 'Invalid email or password.');
     }
 
-    const { userId, token } = await loginUser(email, password);
-    return c.json({ success: true, userId, token });
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.post(`${API_PREFIX}/auth/refresh`, async (c) => {
+  try {
+    const body = await c.req.json();
+    const refreshToken = typeof body.refresh_token === 'string' ? body.refresh_token.trim() : '';
+    if (!refreshToken) {
+      return sendError(c, 400, 'refresh_token_required', 'refresh_token is required');
+    }
+
+    const rotated = await rotateRefreshToken(refreshToken, {
+      ip: getClientIp(c),
+      userAgent: c.req.header('user-agent') ?? null,
+    });
+
+    await writeAuditLog({
+      eventType: 'auth.refresh',
+      message: 'Access token refreshed',
+      userId: rotated.userId,
+      tenantId: await getTenantIdForUser(rotated.userId),
+      source: 'auth',
+      payload: { ip: getClientIp(c) },
+    });
+
+    return c.json({
+      success: true,
+      token: rotated.tokens.accessToken,
+      access_token: rotated.tokens.accessToken,
+      refresh_token: rotated.tokens.refreshToken,
+      expires_in: rotated.tokens.expiresInSeconds,
+      refresh_expires_at: rotated.tokens.refreshExpiresAt,
+    });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    return sendError(c, 401, 'invalid_refresh_token', 'Refresh token is invalid or expired.');
+  }
+});
+
+app.post(`${API_PREFIX}/auth/logout`, async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const refreshToken = typeof body.refresh_token === 'string' ? body.refresh_token.trim() : '';
+    if (refreshToken) {
+      await revokeRefreshToken(refreshToken);
+    }
+
+    return c.json({ success: true });
+  } catch {
+    return sendError(c, 400, 'logout_failed', 'Could not complete logout.');
   }
 });
 
@@ -238,14 +412,14 @@ app.get(`${API_PREFIX}/users`, async (c) => {
   const authHeader = c.req.header('Authorization');
 
   if (!authHeader) {
-    return c.json({ error: 'Unauthorized' }, 401);
+    return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
 
-  const token = authHeader.replace('Bearer ', '');
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
   const payload = verifyJWT(token);
 
   if (!payload) {
-    return c.json({ error: 'Invalid token' }, 401);
+    return sendError(c, 401, 'invalid_token', 'Invalid token');
   }
 
   const pool = getPool();
@@ -260,7 +434,11 @@ async function handleBillingWebhook(c: any) {
     const signature = c.req.header('stripe-signature');
 
     if (!signature) {
-      return c.json({ error: 'No signature' }, 400);
+      await recordMonitoringSignal('webhook_failure', {
+        reason: 'missing_signature',
+        path: c.req.path,
+      });
+      return sendError(c, 400, 'missing_signature', 'No signature');
     }
 
     const body = await c.req.text();
@@ -273,11 +451,16 @@ async function handleBillingWebhook(c: any) {
 
     return c.json({ received: true });
   } catch (error) {
+    await recordMonitoringSignal('webhook_failure', {
+      reason: (error as Error).message,
+      path: c.req.path,
+    });
+
     console.error('✗ Webhook error:', error);
     if ((error as Error).message === 'Invalid webhook signature') {
-      return c.json({ error: (error as Error).message }, 400);
+      return sendError(c, 400, 'invalid_webhook_signature', 'Invalid webhook signature');
     }
-    return c.json({ error: (error as Error).message }, 500);
+    return sendError(c, 500, 'webhook_processing_failed', 'Webhook processing failed');
   }
 }
 
@@ -293,7 +476,8 @@ app.post(`${API_PREFIX}/billing/checkout`, async (c) => {
   try {
     return await handleCheckoutRequest(c);
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -301,7 +485,8 @@ app.post(`${API_PREFIX}/billing/checkout-session`, async (c) => {
   try {
     return await handleCheckoutRequest(c);
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -309,12 +494,12 @@ app.get(`${API_PREFIX}/billing/status`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
 
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) {
-      return c.json({ error: 'User has no associated tenant' }, 400);
+      return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     }
 
     const status = await getTenantBillingStatus(tenantId);
@@ -327,7 +512,8 @@ app.get(`${API_PREFIX}/billing/status`, async (c) => {
       usage: usage.usage,
     });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -335,9 +521,9 @@ app.get(`${API_PREFIX}/billing/status`, async (c) => {
 app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!userId) return sendError(c, 401, 'unauthorized', 'Unauthorized');
     const tenantId = await getTenantIdForUser(userId);
-    if (!tenantId) return c.json({ error: 'User has no associated tenant' }, 400);
+    if (!tenantId) return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     const subscription = await getTenantBillingStatus(tenantId);
     if (!subscription) return c.json({ subscription: null, eligible_for_checkout: true });
     return c.json({
@@ -357,7 +543,8 @@ app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
       eligible_for_checkout: !subscription.stripeSubscriptionId || subscription.subscriptionStatus === 'none',
     });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -378,7 +565,8 @@ app.get(`${API_PREFIX}/billing/plans`, async (c) => {
     );
     return c.json({ plans: result.rows });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -386,12 +574,12 @@ app.get(`${API_PREFIX}/billing/usage`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
 
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) {
-      return c.json({ error: 'User has no associated tenant' }, 400);
+      return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     }
 
     const usage = await getUsageSummary(tenantId);
@@ -402,7 +590,8 @@ app.get(`${API_PREFIX}/billing/usage`, async (c) => {
       usage: usage.usage,
     });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -410,18 +599,19 @@ app.post(`${API_PREFIX}/billing/portal`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
 
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) {
-      return c.json({ error: 'User has no associated tenant' }, 400);
+      return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     }
 
     const portal = await createBillingPortalSession(tenantId);
     return c.json({ url: portal.url });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -429,23 +619,30 @@ app.post(`${API_PREFIX}/billing/change-plan`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
 
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) {
-      return c.json({ error: 'User has no associated tenant' }, 400);
+      return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     }
 
-    const { planCode } = await c.req.json();
-    if (!planCode) {
-      return c.json({ error: 'Plan code required' }, 400);
-    }
+    const body = await c.req.json();
+    const planCode = assertValidPlanId(body.planCode ?? body.plan_id);
 
     const updated = await changeTenantPlan(tenantId, planCode);
+    await writeAuditLog({
+      eventType: 'billing.plan_change',
+      message: `Plan changed to ${planCode}`,
+      userId,
+      tenantId,
+      source: 'billing',
+      payload: { planCode },
+    });
     return c.json({ billing: updated });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -453,18 +650,26 @@ app.post(`${API_PREFIX}/billing/cancel`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
 
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) {
-      return c.json({ error: 'User has no associated tenant' }, 400);
+      return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     }
 
     const cancelled = await cancelTenantSubscription(tenantId);
+    await writeAuditLog({
+      eventType: 'billing.plan_cancel',
+      message: 'Subscription cancellation requested',
+      userId,
+      tenantId,
+      source: 'billing',
+    });
     return c.json({ billing: cancelled });
   } catch (error) {
-    return c.json({ error: (error as Error).message }, 400);
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });
 
@@ -558,7 +763,12 @@ app.post(`${API_PREFIX}/reports/export`, async (c) => {
 async function start() {
   try {
     await initDatabase();
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'your_jwt_secret_key_here') {
+      throw new Error('JWT_SECRET must be set to a strong value');
+    }
+
     validateStripeEnvOrThrow();
+    validateProductionSecurityConfig();
 
     const port = parseInt(process.env.PORT || '3000', 10);
     serve({

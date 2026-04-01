@@ -163,6 +163,23 @@ export async function initDatabase() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(128) NOT NULL UNIQUE,
+        token_family UUID NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        rotated_from_id BIGINT REFERENCES auth_refresh_tokens(id) ON DELETE SET NULL,
+        revoked_at TIMESTAMPTZ,
+        revoked_reason VARCHAR(64),
+        last_used_at TIMESTAMPTZ,
+        created_ip VARCHAR(128),
+        user_agent TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     // ─── LEGACY BILLING_SUBSCRIPTIONS (USER-BASED, FOR BACKWARD COMPAT) ───
     await client.query(`
       CREATE TABLE IF NOT EXISTS billing_subscriptions (
@@ -268,6 +285,8 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_webhook_events_type ON billing_webhook_events(event_type)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_tenant ON billing_audit_logs(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_event_type ON billing_audit_logs(event_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_user ON auth_refresh_tokens(user_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_family ON auth_refresh_tokens(token_family, created_at DESC)`);
 
     // ─── TENANT SUBSCRIPTIONS ENHANCEMENTS (09.2) ───
     await client.query(`ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`);
