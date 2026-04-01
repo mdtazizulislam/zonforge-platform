@@ -1273,6 +1273,7 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
     <div class="section-tag">Pricing</div>
     <h2 class="section-title">Simple. Transparent. No Surprises.</h2>
     <p class="section-sub">Start free. Scale as you grow. Replace your $400K SIEM for under $1,000/month.</p>
+    <div id="pricing-notice" style="display:none;max-width:860px;margin:0 auto 24px;padding:14px 18px;border-radius:16px;border:1px solid var(--border);background:rgba(9,22,35,0.92);"></div>
 
     <div class="price-toggle">
       <span class="pt-label">Monthly</span>
@@ -1288,7 +1289,7 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
         <div class="pc-plan">Starter</div>
         <div class="pc-price">$0<span class="pc-price-mo"> forever</span></div>
         <p class="pc-desc">Solo analysts and small teams exploring AI-powered detection.</p>
-        <button class="pc-btn" onclick="window.location='#demo'">Start Free</button>
+        <button class="pc-btn" onclick="startStarterSignup()">Start Free</button>
         <div class="pc-features">
           <div class="pc-feature">1 Connector (M365 or AWS)</div>
           <div class="pc-feature">50 identities monitored</div>
@@ -1307,7 +1308,7 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
         <div class="pc-plan">Growth</div>
         <div class="pc-price" id="growth-price">$299<span class="pc-price-mo">/mo</span></div>
         <p class="pc-desc">Growing security teams that need real AI-powered coverage.</p>
-        <button class="pc-btn" onclick="window.location='#demo'">Start 30-Day Trial</button>
+        <button class="pc-btn" onclick="startCheckout('growth')">Start Growth</button>
         <div class="pc-features">
           <div class="pc-feature">3 Connectors</div>
           <div class="pc-feature">200 identities</div>
@@ -1329,7 +1330,7 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
         <div class="pc-plan">Business</div>
         <div class="pc-price" id="business-price">$999<span class="pc-price-mo">/mo</span></div>
         <p class="pc-desc">Full AI SOC suite for serious security operations teams.</p>
-        <button class="pc-btn featured" onclick="window.location='#demo'">Start 30-Day Trial</button>
+        <button class="pc-btn featured" onclick="startCheckout('business')">Upgrade to Business</button>
         <div class="pc-features">
           <div class="pc-feature">10 Connectors</div>
           <div class="pc-feature">1,000 identities</div>
@@ -1350,7 +1351,7 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
         <div class="pc-plan">Enterprise</div>
         <div class="pc-price">Custom</div>
         <p class="pc-desc">Large organizations with strict compliance and scale requirements.</p>
-        <button class="pc-btn" onclick="window.location='#demo'">Talk to Sales</button>
+        <button class="pc-btn" onclick="openSalesContact('enterprise')">Talk to Sales</button>
         <div class="pc-features">
           <div class="pc-feature">Unlimited everything</div>
           <div class="pc-feature">365-day retention</div>
@@ -1489,6 +1490,9 @@ footer{border-top:1px solid var(--border);padding:60px 0 40px;}
 </footer>
 
 <script>
+const API_BASE = (localStorage.getItem('zonforge_api_base') || window.ZONFORGE_API_BASE || 'https://api.zonforge.com').replace(/\/$/, '');
+const TOKEN_KEY = 'zonforge_access_token';
+
 // ── Billing toggle ──────────────────────────────────────────────
 let isAnnual = false;
 function toggleBilling() {
@@ -1502,6 +1506,93 @@ function toggleBilling() {
     ? '$799<span class="pc-price-mo">/mo</span>'
     : '$999<span class="pc-price-mo">/mo</span>';
   document.getElementById('savings-badge').textContent = isAnnual ? '✓ 20% Applied' : 'Save 20%';
+}
+
+function showPricingNotice(text, type) {
+  const notice = document.getElementById('pricing-notice');
+  notice.style.display = 'block';
+  notice.style.borderColor = type === 'ok' ? 'rgba(34,197,94,0.35)' : type === 'err' ? 'rgba(239,68,68,0.35)' : 'rgba(0,212,255,0.25)';
+  notice.style.color = type === 'ok' ? '#86efac' : type === 'err' ? '#fca5a5' : 'var(--bright)';
+  notice.textContent = text;
+}
+
+function getBillingCycle() {
+  return isAnnual ? 'annual' : 'monthly';
+}
+
+function buildCheckoutRedirect(planId) {
+  const params = new URLSearchParams({
+    checkout_plan: planId,
+    billing_cycle: getBillingCycle(),
+    next: '/dashboard',
+  });
+  return `/signup?${params.toString()}`;
+}
+
+function startStarterSignup() {
+  window.location.href = '/signup?next=/dashboard';
+}
+
+function openSalesContact(planId) {
+  const subject = encodeURIComponent(`ZonForge ${planId} plan inquiry`);
+  window.location.href = `mailto:support@zonforge.com?subject=${subject}`;
+}
+
+async function startCheckout(planId) {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    window.location.href = buildCheckoutRedirect(planId);
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/billing/checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        plan_id: planId,
+        billing_cycle: getBillingCycle(),
+      }),
+    });
+
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      if (resp.status === 401 || resp.status === 403) {
+        localStorage.removeItem(TOKEN_KEY);
+        window.location.href = `/login?checkout_plan=${encodeURIComponent(planId)}&billing_cycle=${encodeURIComponent(getBillingCycle())}&next=/dashboard`;
+        return;
+      }
+
+      showPricingNotice(payload?.error || `Checkout failed (${resp.status})`, 'err');
+      document.getElementById('pricing').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    const sessionUrl = payload?.session_url || payload?.url;
+    if (!sessionUrl) {
+      showPricingNotice('Checkout session initialized but no redirect URL was returned.', 'err');
+      return;
+    }
+
+    window.location.href = sessionUrl;
+  } catch (err) {
+    showPricingNotice(err instanceof Error ? err.message : 'Could not start checkout.', 'err');
+  }
+}
+
+function applyPricingRouteState() {
+  const params = new URLSearchParams(window.location.search);
+  if (window.location.pathname === '/pricing' || params.get('payment') === 'cancelled') {
+    document.getElementById('pricing').scrollIntoView({ behavior: 'auto', block: 'start' });
+  }
+
+  if (params.get('payment') === 'cancelled') {
+    showPricingNotice('Checkout was cancelled. You can retry your upgrade at any time.', 'info');
+  }
 }
 
 // ── Demo form submit ─────────────────────────────────────────────
@@ -1532,6 +1623,7 @@ const observer = new IntersectionObserver((entries) => {
   });
 }, observerOpts);
 document.querySelectorAll('.feat-card, .price-card, .arch-box').forEach(el => observer.observe(el));
+applyPricingRouteState();
 </script>
 </body>
 </html>

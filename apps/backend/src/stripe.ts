@@ -35,6 +35,14 @@ export interface CheckoutSessionResponse {
   url: string | null;
 }
 
+export interface CheckoutSessionOptions {
+  billingInterval?: 'monthly' | 'annual';
+  successUrl?: string;
+  cancelUrl?: string;
+  actorUserId?: number;
+  source?: string;
+}
+
 // ─────────────────────────────────────────────
 // ENVIRONMENT & VALIDATION
 // ─────────────────────────────────────────────
@@ -50,14 +58,85 @@ function requiredEnv(name: string): string {
 export function validateStripeEnvOrThrow() {
   requiredEnv('STRIPE_SECRET_KEY');
   requiredEnv('STRIPE_WEBHOOK_SECRET');
-  requiredEnv('STRIPE_SUCCESS_URL');
-  requiredEnv('STRIPE_CANCEL_URL');
   // Plan-specific price IDs optional; can fall back to STRIPE_PRICE_ID_* pattern
 }
 
-function getStripePriceIdForPlan(planCode: string): string {
-  const envVar = `STRIPE_PRICE_ID_${planCode.toUpperCase()}`;
-  return process.env[envVar] || '';
+function getStripePriceIdForPlan(planCode: string, billingInterval: 'monthly' | 'annual' = 'monthly'): string {
+  const normalizedPlanCode = planCode.toUpperCase();
+  const intervalSpecific = process.env[`STRIPE_PRICE_ID_${normalizedPlanCode}_${billingInterval.toUpperCase()}`];
+  const monthlyFallback = billingInterval === 'monthly'
+    ? process.env[`STRIPE_PRICE_ID_${normalizedPlanCode}`]
+    : '';
+
+  if (intervalSpecific) {
+    return intervalSpecific;
+  }
+
+  if (monthlyFallback) {
+    return monthlyFallback;
+  }
+
+  if (billingInterval === 'monthly' && planCode === 'growth') {
+    return process.env['STRIPE_PRICE_ID'] || '';
+  }
+
+  return '';
+}
+
+function withCheckoutSessionId(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}');
+    return parsed.toString();
+  } catch {
+    return url.includes('?')
+      ? `${url}&session_id={CHECKOUT_SESSION_ID}`
+      : `${url}?session_id={CHECKOUT_SESSION_ID}`;
+  }
+}
+
+async function writeBillingAuditLog(input: {
+  tenantId?: number | null;
+  userId?: number | null;
+  eventType: string;
+  planCode?: string | null;
+  billingInterval?: string | null;
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+  stripeCheckoutSessionId?: string | null;
+  source?: string;
+  message?: string | null;
+  payload?: Record<string, unknown> | null;
+}) {
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO billing_audit_logs (
+      tenant_id,
+      user_id,
+      event_type,
+      plan_code,
+      billing_interval,
+      stripe_customer_id,
+      stripe_subscription_id,
+      stripe_checkout_session_id,
+      source,
+      message,
+      payload_json
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [
+      input.tenantId ?? null,
+      input.userId ?? null,
+      input.eventType,
+      input.planCode ?? null,
+      input.billingInterval ?? null,
+      input.stripeCustomerId ?? null,
+      input.stripeSubscriptionId ?? null,
+      input.stripeCheckoutSessionId ?? null,
+      input.source ?? 'backend',
+      input.message ?? null,
+      input.payload ? JSON.stringify(input.payload) : null,
+    ],
+  );
 }
 
 function normalizeLegacySubscriptionStatus(status: string | null | undefined): LegacySubscriptionStatus {
@@ -210,8 +289,13 @@ async function syncLegacySubscriptionForUser(params: {
 // CHECKOUT & SUBSCRIPTION MANAGEMENT
 // ─────────────────────────────────────────────
 
-export async function createCheckoutSessionForTenant(tenantId: number, planCode: string): Promise<CheckoutSessionResponse> {
+export async function createCheckoutSessionForTenant(
+  tenantId: number,
+  planCode: string,
+  options: CheckoutSessionOptions = {},
+): Promise<CheckoutSessionResponse> {
   const pool = getPool();
+  const billingInterval = options.billingInterval ?? 'monthly';
 
   // Verify tenant exists
   const tenant = await getTenantById(tenantId);
@@ -241,10 +325,13 @@ export async function createCheckoutSessionForTenant(tenantId: number, planCode:
   }
 
   // Get Stripe price ID for the plan
-  const stripePriceId = getStripePriceIdForPlan(planCode);
+  const stripePriceId = getStripePriceIdForPlan(planCode, billingInterval);
   if (!stripePriceId) {
-    throw new Error(`No Stripe price configured for plan: ${planCode}`);
+    throw new Error(`No Stripe price configured for plan: ${planCode} (${billingInterval})`);
   }
+
+  const successUrl = options.successUrl || process.env.STRIPE_SUCCESS_URL || 'https://zonforge.com/dashboard?payment=success';
+  const cancelUrl = options.cancelUrl || process.env.STRIPE_CANCEL_URL || 'https://zonforge.com/pricing?payment=cancelled';
 
   // Create checkout session
   const session = await stripe.checkout.sessions.create({
@@ -256,14 +343,23 @@ export async function createCheckoutSessionForTenant(tenantId: number, planCode:
         quantity: 1,
       },
     ],
-    success_url: requiredEnv('STRIPE_SUCCESS_URL'),
-    cancel_url: requiredEnv('STRIPE_CANCEL_URL'),
+    success_url: withCheckoutSessionId(successUrl),
+    cancel_url: cancelUrl,
     client_reference_id: String(tenantId),
     metadata: {
       tenantId: String(tenantId),
       planCode,
+      billingInterval,
       userId: String(tenant.user_id),
       environment: process.env.NODE_ENV ?? 'production',
+    },
+    subscription_data: {
+      metadata: {
+        tenantId: String(tenantId),
+        planCode,
+        billingInterval,
+        userId: String(tenant.user_id),
+      },
     },
   });
 
@@ -285,17 +381,19 @@ export async function createCheckoutSessionForTenant(tenantId: number, planCode:
       plan_id,
       stripe_customer_id,
       stripe_checkout_session_id,
+      billing_interval,
       subscription_status,
       updated_at
-    ) VALUES ($1, $2, $3, $4, $5, NOW())
+    ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
     ON CONFLICT (tenant_id)
     DO UPDATE SET
       plan_id = EXCLUDED.plan_id,
       stripe_customer_id = EXCLUDED.stripe_customer_id,
       stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
+      billing_interval = EXCLUDED.billing_interval,
       subscription_status = EXCLUDED.subscription_status,
       updated_at = NOW()`,
-    [tenantId, plan.id, stripeCustomerId, session.id, 'checkout_created']
+    [tenantId, plan.id, stripeCustomerId, session.id, billingInterval, 'checkout_created']
   );
 
   console.log(JSON.stringify({
@@ -303,9 +401,30 @@ export async function createCheckoutSessionForTenant(tenantId: number, planCode:
     sessionId: session.id,
     tenantId,
     planCode,
+    billingInterval,
     environment: process.env.NODE_ENV ?? 'production',
     timestamp: Date.now(),
   }));
+
+  await writeBillingAuditLog({
+    tenantId,
+    userId: options.actorUserId ?? tenant.user_id,
+    eventType: 'billing.checkout_created',
+    planCode,
+    billingInterval,
+    stripeCustomerId,
+    stripeCheckoutSessionId: session.id,
+    source: options.source ?? 'backend',
+    message: `Checkout created for ${planCode} (${billingInterval})`,
+    payload: {
+      tenantId,
+      planCode,
+      billingInterval,
+      successUrl,
+      cancelUrl,
+      sessionId: session.id,
+    },
+  });
 
   return {
     sessionId: session.id,
@@ -580,6 +699,20 @@ async function upsertTenantSubscriptionFromStripe(params: {
       status: params.subscriptionStatus,
       timestamp: Date.now(),
     }));
+    await writeBillingAuditLog({
+      tenantId,
+      eventType: 'billing.plan_activated',
+      planCode: resolvedPlanCode,
+      stripeCustomerId: params.stripeCustomerId,
+      stripeSubscriptionId: params.stripeSubscriptionId,
+      stripeCheckoutSessionId: params.stripeCheckoutSessionId,
+      source: 'stripe_webhook',
+      message: `Plan activated: ${resolvedPlanCode}`,
+      payload: {
+        eventId: params.eventId,
+        status: params.subscriptionStatus,
+      },
+    });
   } else if (upperStatus === 'CANCELED') {
     await pool.query('UPDATE tenants SET plan = $1 WHERE id = $2', ['starter', tenantId]);
     console.log(JSON.stringify({
@@ -589,6 +722,20 @@ async function upsertTenantSubscriptionFromStripe(params: {
       downgradedTo: 'starter',
       timestamp: Date.now(),
     }));
+    await writeBillingAuditLog({
+      tenantId,
+      eventType: 'billing.plan_downgraded',
+      planCode: 'starter',
+      stripeCustomerId: params.stripeCustomerId,
+      stripeSubscriptionId: params.stripeSubscriptionId,
+      stripeCheckoutSessionId: params.stripeCheckoutSessionId,
+      source: 'stripe_webhook',
+      message: 'Subscription canceled; tenant downgraded to starter',
+      payload: {
+        eventId: params.eventId,
+        status: params.subscriptionStatus,
+      },
+    });
   }
   // PAST_DUE: keep existing plan — grace period (no downgrade)
 }
@@ -633,6 +780,19 @@ async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout
     tenantId,
     timestamp: Date.now(),
   }));
+
+  await writeBillingAuditLog({
+    tenantId,
+    eventType: 'billing.checkout_completed',
+    planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
+    billingInterval: typeof session.metadata?.billingInterval === 'string' ? session.metadata.billingInterval : null,
+    stripeCustomerId: session.customer,
+    stripeSubscriptionId: subscriptionId,
+    stripeCheckoutSessionId: session.id,
+    source: 'stripe_webhook',
+    message: 'Stripe checkout session completed',
+    payload: rawEvent as unknown as Record<string, unknown> | null,
+  });
 
   const user = await resolveOrCreateUserFromStripe({
     stripeCustomerId: session.customer,
@@ -697,6 +857,16 @@ async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Sub
     timestamp: Date.now(),
   }));
 
+  await writeBillingAuditLog({
+    eventType: 'billing.subscription_updated',
+    planCode,
+    stripeCustomerId: subscription.customer,
+    stripeSubscriptionId: subscription.id,
+    source: 'stripe_webhook',
+    message: `Subscription updated: ${subStatus}`,
+    payload: rawEvent as unknown as Record<string, unknown> | null,
+  });
+
   await syncLegacySubscriptionForUser({
     userId: user.id,
     stripeCustomerId: subscription.customer,
@@ -755,6 +925,16 @@ async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice, rawEv
     timestamp: Date.now(),
   }));
 
+  await writeBillingAuditLog({
+    eventType: 'billing.invoice_paid',
+    planCode,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    source: 'stripe_webhook',
+    message: 'Invoice paid',
+    payload: rawEvent as unknown as Record<string, unknown> | null,
+  });
+
   await syncLegacySubscriptionForUser({
     userId: user.id,
     stripeCustomerId: invoice.customer,
@@ -809,6 +989,16 @@ async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice, raw
     gracePeriod: true,
     timestamp: Date.now(),
   }));
+
+  await writeBillingAuditLog({
+    eventType: 'billing.payment_failed',
+    planCode,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    source: 'stripe_webhook',
+    message: 'Invoice payment failed',
+    payload: rawEvent as unknown as Record<string, unknown> | null,
+  });
 
   await syncLegacySubscriptionForUser({
     userId: user.id,

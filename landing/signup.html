@@ -34,11 +34,54 @@ small,a{color:#8daec4}
 
 <script>
 const API_BASE = (localStorage.getItem('zonforge_api_base') || window.ZONFORGE_API_BASE || 'https://api.zonforge.com').replace(/\/$/, '');
+const TOKEN_KEY = 'zonforge_access_token';
+const params = new URLSearchParams(window.location.search);
+const checkoutPlan = params.get('checkout_plan');
+const billingCycle = params.get('billing_cycle') === 'annual' ? 'annual' : 'monthly';
+const nextPath = params.get('next') || '/dashboard';
+
+const loginLink = document.querySelector('a[href="/login"]');
+if (loginLink && window.location.search) {
+  loginLink.href = `/login${window.location.search}`;
+}
 
 function showNotice(text, type) {
   const notice = document.getElementById('notice');
   notice.className = `notice ${type}`;
   notice.textContent = text;
+}
+
+async function resumeCheckout(token) {
+  if (!checkoutPlan || !token) {
+    return false;
+  }
+
+  showNotice('Account created. Starting secure checkout...', 'ok');
+  const resp = await fetch(`${API_BASE}/v1/billing/checkout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: 'include',
+    body: JSON.stringify({
+      plan_id: checkoutPlan,
+      billing_cycle: billingCycle,
+    }),
+  });
+
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(payload?.error || `Checkout failed (${resp.status})`);
+  }
+
+  const sessionUrl = payload?.session_url || payload?.url;
+  if (!sessionUrl) {
+    throw new Error('Checkout session URL was missing from the response.');
+  }
+
+  window.location.href = sessionUrl;
+  return true;
 }
 
 document.getElementById('signup-form').addEventListener('submit', async (e) => {
@@ -60,7 +103,17 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
       return;
     }
 
-    showNotice('Account creation request succeeded. You can sign in now.', 'ok');
+    const token = payload?.access_token || payload?.token || payload?.data?.accessToken;
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    }
+
+    if (await resumeCheckout(token)) {
+      return;
+    }
+
+    showNotice('Account created successfully. Redirecting...', 'ok');
+    setTimeout(() => { window.location.href = nextPath; }, 500);
   } catch (err) {
     showNotice(err instanceof Error ? err.message : 'Request failed', 'err');
   }

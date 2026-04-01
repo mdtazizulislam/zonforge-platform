@@ -91,6 +91,94 @@ function requireAuthUserId(c: any): number | null {
   return payload.userId;
 }
 
+function resolveFrontendOrigin(c: any): string {
+  const candidates = [
+    c.req.header('origin'),
+    c.req.header('referer'),
+    process.env.ZONFORGE_PUBLIC_APP_URL,
+    'https://zonforge.com',
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.origin;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return 'https://zonforge.com';
+}
+
+function normalizeCheckoutRequest(body: Record<string, unknown>) {
+  const rawPlanId = body.plan_id ?? body.planId ?? body.planCode ?? body.plan ?? null;
+  const rawBillingCycle = body.billing_cycle ?? body.billingCycle ?? 'monthly';
+
+  const planId = typeof rawPlanId === 'string' ? rawPlanId.trim().toLowerCase() : '';
+  const billingCycle = typeof rawBillingCycle === 'string' ? rawBillingCycle.trim().toLowerCase() : 'monthly';
+
+  if (!planId) {
+    throw new Error('plan_id required');
+  }
+
+  if (billingCycle !== 'monthly' && billingCycle !== 'annual') {
+    throw new Error('billing_cycle must be monthly or annual');
+  }
+
+  return {
+    planId,
+    billingCycle: billingCycle as 'monthly' | 'annual',
+  };
+}
+
+async function handleCheckoutRequest(c: any) {
+  const userId = requireAuthUserId(c);
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const tenantId = await getTenantIdForUser(userId);
+  if (!tenantId) {
+    return c.json({ error: 'User has no associated tenant' }, 400);
+  }
+
+  const body = await c.req.json();
+  const { planId, billingCycle } = normalizeCheckoutRequest(body);
+
+  if (planId === 'starter') {
+    return c.json({ error: 'Starter plan does not require checkout' }, 400);
+  }
+
+  if (planId === 'enterprise' || planId === 'mssp') {
+    return c.json({ error: 'This plan requires sales assistance' }, 400);
+  }
+
+  const origin = resolveFrontendOrigin(c);
+  const checkout = await createCheckoutSessionForTenant(tenantId, planId, {
+    billingInterval: billingCycle,
+    successUrl: `${origin}/dashboard?payment=success`,
+    cancelUrl: `${origin}/pricing?payment=cancelled`,
+    actorUserId: userId,
+    source: 'api_checkout',
+  });
+
+  return c.json({
+    plan_id: planId,
+    billing_cycle: billingCycle,
+    session_id: checkout.sessionId,
+    session_url: checkout.url,
+    sessionId: checkout.sessionId,
+    url: checkout.url,
+  });
+}
+
 // Auth routes
 app.post(`${API_PREFIX}/auth/register`, async (c) => {
   try {
@@ -201,28 +289,17 @@ app.post(`${API_PREFIX}/webhook/stripe`, async (c) => {
   return handleBillingWebhook(c);
 });
 
+app.post(`${API_PREFIX}/billing/checkout`, async (c) => {
+  try {
+    return await handleCheckoutRequest(c);
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
+  }
+});
+
 app.post(`${API_PREFIX}/billing/checkout-session`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
-    if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    const tenantId = await getTenantIdForUser(userId);
-    if (!tenantId) {
-      return c.json({ error: 'User has no associated tenant' }, 400);
-    }
-
-    const { planCode } = await c.req.json();
-    if (!planCode) {
-      return c.json({ error: 'Plan code required' }, 400);
-    }
-
-    const checkout = await createCheckoutSessionForTenant(tenantId, planCode);
-    return c.json({
-      sessionId: checkout.sessionId,
-      url: checkout.url,
-    });
+    return await handleCheckoutRequest(c);
   } catch (error) {
     return c.json({ error: (error as Error).message }, 400);
   }

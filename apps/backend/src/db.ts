@@ -145,6 +145,24 @@ export async function initDatabase() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS billing_audit_logs (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        event_type VARCHAR(128) NOT NULL,
+        plan_code VARCHAR(64),
+        billing_interval VARCHAR(20),
+        stripe_customer_id VARCHAR(255),
+        stripe_subscription_id VARCHAR(255),
+        stripe_checkout_session_id VARCHAR(255),
+        source VARCHAR(64) NOT NULL DEFAULT 'backend',
+        message TEXT,
+        payload_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     // ─── LEGACY BILLING_SUBSCRIPTIONS (USER-BASED, FOR BACKWARD COMPAT) ───
     await client.query(`
       CREATE TABLE IF NOT EXISTS billing_subscriptions (
@@ -248,6 +266,8 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE billing_webhook_events ADD COLUMN IF NOT EXISTS error_message TEXT`);
     await client.query(`ALTER TABLE billing_webhook_events ADD COLUMN IF NOT EXISTS payload_json JSONB`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_webhook_events_type ON billing_webhook_events(event_type)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_tenant ON billing_audit_logs(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_event_type ON billing_audit_logs(event_type, created_at DESC)`);
 
     // ─── TENANT SUBSCRIPTIONS ENHANCEMENTS (09.2) ───
     await client.query(`ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`);
@@ -271,6 +291,40 @@ export async function initDatabase() {
          NULL, NULL, NULL, 365, true)
       ON CONFLICT (code) DO NOTHING
     `);
+
+    const planStripeConfig = [
+      {
+        code: 'growth',
+        monthly: process.env.STRIPE_PRICE_ID_GROWTH ?? process.env.STRIPE_PRICE_ID ?? null,
+        annual: process.env.STRIPE_PRICE_ID_GROWTH_ANNUAL ?? null,
+      },
+      {
+        code: 'business',
+        monthly: process.env.STRIPE_PRICE_ID_BUSINESS ?? null,
+        annual: process.env.STRIPE_PRICE_ID_BUSINESS_ANNUAL ?? null,
+      },
+      {
+        code: 'enterprise',
+        monthly: process.env.STRIPE_PRICE_ID_ENTERPRISE ?? null,
+        annual: process.env.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL ?? null,
+      },
+      {
+        code: 'mssp',
+        monthly: process.env.STRIPE_PRICE_ID_MSSP ?? null,
+        annual: process.env.STRIPE_PRICE_ID_MSSP_ANNUAL ?? null,
+      },
+    ];
+
+    for (const config of planStripeConfig) {
+      await client.query(
+        `UPDATE plans
+         SET stripe_monthly_price_id = COALESCE($1, stripe_monthly_price_id),
+             stripe_annual_price_id = COALESCE($2, stripe_annual_price_id),
+             updated_at = NOW()
+         WHERE code = $3`,
+        [config.monthly, config.annual, config.code],
+      );
+    }
 
     console.log('✓ Default plans seeded.');
     await client.end();
