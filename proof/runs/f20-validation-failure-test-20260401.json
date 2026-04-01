@@ -1,0 +1,6 @@
+{
+  "invalidEmailStatus": 400,
+  "invalidEmailBody": "{\"error\":{\"code\":\"invalid_email\",\"message\":\"Email format is invalid.\",\"status\":400,\"request_id\":\"1775011186839-7a2e3f06ec\",\"details\":null}}",
+  "invalidPasswordStatus": 400,
+  "invalidPasswordBody": "{\"error\":{\"code\":\"invalid_password\",\"message\":\"Password must be between 12 and 128 characters.\",\"status\":400,\"request_id\":\"1775011187108-0e1f8f1b9c\",\"details\":null}}"
+}

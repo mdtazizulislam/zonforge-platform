@@ -1,0 +1,19 @@
+{
+  "attempts": 12,
+  "statuses": [
+    429,
+    429,
+    429,
+    429,
+    429,
+    429,
+    429,
+    429,
+    429,
+    429,
+    429,
+    429
+  ],
+  "first429Attempt": 1,
+  "sample429": "{\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Too many requests. Please try again later.\",\"status\":429,\"request_id\":\"1775011162837-2c293d5fbc\",\"details\":null}}"
+}

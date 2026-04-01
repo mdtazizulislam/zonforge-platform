@@ -1,0 +1,8 @@
+apps/backend/src/index.ts:86:    recordMonitoringSignal('5xx_spike', {
+apps/backend/src/index.ts:107:    recordMonitoringSignal('5xx_spike', {
+apps/backend/src/index.ts:349:      await recordMonitoringSignal('failed_login', {
+apps/backend/src/index.ts:437:      await recordMonitoringSignal('webhook_failure', {
+apps/backend/src/index.ts:454:    await recordMonitoringSignal('webhook_failure', {
+apps/backend/src/security.ts:28:  fiveXxPerMinute: Number(process.env.MONITOR_5XX_THRESHOLD ?? 25),
+apps/backend/src/security.ts:29:  failedLoginsPerMinute: Number(process.env.MONITOR_FAILED_LOGIN_THRESHOLD ?? 10),
+apps/backend/src/security.ts:30:  webhookFailuresPerMinute: Number(process.env.MONITOR_WEBHOOK_FAILURE_THRESHOLD ?? 3),

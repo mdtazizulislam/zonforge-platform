@@ -1,0 +1,8 @@
+{
+  "email": "serial03-token1775011178@example.com",
+  "accessTokenTtlSeconds": 900,
+  "firstRefreshStatus": 200,
+  "oldRefreshReuseStatus": 401,
+  "oldRefreshReuseBody": "{\"error\":{\"code\":\"invalid_refresh_token\",\"message\":\"Refresh token is invalid or expired.\",\"status\":401,\"request_id\":\"1775011210821-ee530e5e5d\",\"details\":null}}",
+  "refreshRotated": true
+}

@@ -1,0 +1,32 @@
+=== AUTH LOGIN EVENTS ===
+    event_type     | source |        message        | user_id |       created_at       
+-------------------+--------+-----------------------+---------+------------------------
+ auth.login        | auth   | User login successful | 27      | 2026-04-01T02:42:21+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:28+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:28+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:27+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:27+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:27+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:27+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:27+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:26+00
+ auth.login_failed | auth   | Failed login attempt  |         | 2026-04-01T02:40:26+00
+(10 rows)
+
+=== BILLING/WEBHOOK EVENTS ===
+          event_type          |     source     |                message                | tenant_id |                              coalesce                              |           coalesce           |       created_at       
+------------------------------+----------------+---------------------------------------+-----------+--------------------------------------------------------------------+------------------------------+------------------------
+ billing.checkout_created     | api_checkout   | Checkout created for growth (monthly) | 22        | cs_test_a1XSHeM6P3OwXWkaNdvHkxRd8KZfD1jhrxDne79sK0xByXmkplgs0MDhFz |                              | 2026-04-01T02:07:33+00
+ billing.invoice_paid         | stripe_webhook | Invoice paid                          |           |                                                                    | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:58+00
+ billing.plan_activated       | stripe_webhook | Plan activated: growth                | 20        |                                                                    | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:58+00
+ billing.invoice_paid         | stripe_webhook | Invoice paid                          |           |                                                                    | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:58+00
+ billing.plan_activated       | stripe_webhook | Plan activated: growth                | 20        |                                                                    | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:58+00
+ billing.subscription_updated | stripe_webhook | Subscription updated: INCOMPLETE      |           |                                                                    | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:57+00
+ billing.plan_activated       | stripe_webhook | Plan activated: growth                | 20        | cs_test_a1luXZyWsm8fcFPaT7VrM7Djl0UxxE7z7dwKSK1IqizpZ8yulV60MIRf34 | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:57+00
+ billing.plan_activated       | stripe_webhook | Plan activated: growth                | 20        |                                                                    | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:57+00
+ billing.subscription_updated | stripe_webhook | Subscription updated: ACTIVE          |           |                                                                    | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:57+00
+ billing.checkout_completed   | stripe_webhook | Stripe checkout session completed     | 20        | cs_test_a1luXZyWsm8fcFPaT7VrM7Djl0UxxE7z7dwKSK1IqizpZ8yulV60MIRf34 | sub_1THEAELaQWYtXe3Twu8wbnaV | 2026-04-01T02:05:57+00
+ billing.checkout_created     | api_checkout   | Checkout created for growth (monthly) | 20        | cs_test_a1luXZyWsm8fcFPaT7VrM7Djl0UxxE7z7dwKSK1IqizpZ8yulV60MIRf34 |                              | 2026-04-01T02:05:30+00
+ billing.subscription_updated | stripe_webhook | Subscription updated: INCOMPLETE      |           |                                                                    | sub_1THE4ALaQWYtXe3Ty69LnBbp | 2026-04-01T01:59:40+00
+(12 rows)
+

@@ -1,0 +1,10 @@
+{
+  "evilOriginStatus": 200,
+  "evilAllowOrigin": [
+    "https://zonforge.com"
+  ],
+  "goodOriginStatus": 200,
+  "goodAllowOrigin": [
+    "https://zonforge.com"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "statuses": [
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    401,
+    429,
+    429
+  ],
+  "first429Attempt": 9,
+  "sampleBefore429": "{\"error\":{\"code\":\"unauthorized\",\"message\":\"Unauthorized\",\"status\":401,\"request_id\":\"1775011177659-156c8f402c\",\"details\":null}}",
+  "sample429": "{\"error\":{\"code\":\"rate_limit_exceeded\",\"message\":\"Too many requests. Please try again later.\",\"status\":429,\"request_id\":\"1775011179874-00a7ba5ae0\",\"details\":null}}"
+}

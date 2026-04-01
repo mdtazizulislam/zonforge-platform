@@ -1,0 +1,8 @@
+{
+  "railwayEnvironment": "production",
+  "publicDomain": "api.zonforge.com",
+  "stripeSuccessUrl": "https://zonforge.com/dashboard?payment=success",
+  "stripeCancelUrl": "https://zonforge.com/pricing?payment=cancelled",
+  "hasStripeSecretKey": true,
+  "hasStripeWebhookSecret": true
+}
