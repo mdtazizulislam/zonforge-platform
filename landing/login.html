@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In - ZonForge</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:520px;margin:40px auto;padding:0 16px;background:#020b12;color:#ddeeff}
+label{display:block;margin:12px 0 6px}
+input{width:100%;padding:10px;border:1px solid #0f2236;border-radius:6px;background:#07141f;color:#ddeeff}
+button{margin-top:16px;padding:10px 14px;border:1px solid #00d4ff;border-radius:6px;background:#0b2a3a;color:#00d4ff;cursor:pointer}
+.notice{margin-top:12px;padding:10px;border-radius:6px;display:none}
+.notice.ok{display:block;background:#123a22;border:1px solid #22c55e;color:#86efac}
+.notice.err{display:block;background:#3a1616;border:1px solid #ef4444;color:#fca5a5}
+small,a{color:#8daec4}
+</style>
+</head>
+<body>
+  <h1>Sign In</h1>
+  <p>Authenticate against production API.</p>
+
+  <form id="login-form">
+    <label for="email">Email</label>
+    <input id="email" type="email" required placeholder="you@company.com" />
+
+    <label for="password">Password</label>
+    <input id="password" type="password" required placeholder="********" />
+
+    <button type="submit">Sign In</button>
+    <div id="notice" class="notice"></div>
+  </form>
+
+  <p><small>No account yet? <a href="/signup">Create Account</a></small></p>
+
+<script>
+const API_BASE = (localStorage.getItem('zonforge_api_base') || window.ZONFORGE_API_BASE || 'https://api.zonforge.com').replace(/\/$/, '');
+
+function showNotice(text, type) {
+  const notice = document.getElementById('notice');
+  notice.className = `notice ${type}`;
+  notice.textContent = text;
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  try {
+    const resp = await fetch(`${API_BASE}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password }),
+    });
+
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      showNotice(payload?.error || payload?.detail || `Login failed (${resp.status})`, 'err');
+      return;
+    }
+
+    const token = payload?.access_token || payload?.token || payload?.data?.accessToken;
+    if (token) {
+      localStorage.setItem('zonforge_access_token', token);
+    }
+    showNotice('Login request succeeded.', 'ok');
+  } catch (err) {
+    showNotice(err instanceof Error ? err.message : 'Request failed', 'err');
+  }
+});
+</script>
+</body>
+</html>
