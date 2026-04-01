@@ -1,0 +1,6 @@
+
+> zonforge-platform@4.6.0 security:jwt-guard
+> node scripts/security/jwt-secret-guard.cjs
+
+[jwt-secret-guard] PASS: No JWT secret fallback/default regressions detected.
+[jwt-secret-guard] Scanned 3 file(s).

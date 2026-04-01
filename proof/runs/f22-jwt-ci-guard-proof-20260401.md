@@ -46,6 +46,9 @@ Result:
 - Output includes:
   - `FAILED: JWT secret regression risk detected.`
   - rule hits for fallback/default pattern and placeholder literal
+- Raw output artifacts:
+  - `proof/runs/f22-jwt-guard-fail-output-20260401.txt`
+  - `proof/runs/f22-jwt-guard-fail-output-20260401.exitcode.txt`
 
 ### B) Passing proof on current main code (expected pass)
 
@@ -56,6 +59,10 @@ Result:
 - Output:
   - `[jwt-secret-guard] PASS: No JWT secret fallback/default regressions detected.`
   - `[jwt-secret-guard] Scanned 3 file(s).`
+- Exit code: `0`
+- Raw output artifacts:
+  - `proof/runs/f22-jwt-guard-pass-output-20260401.txt`
+  - `proof/runs/f22-jwt-guard-pass-output-20260401.exitcode.txt`
 
 ## Notes
 
