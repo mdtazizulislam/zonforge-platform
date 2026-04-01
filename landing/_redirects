@@ -44,4 +44,7 @@
 # ── Marketing static pages ────────────────────────────────────────────────────
 /signup              /signup.html     200
 /pricing             /index.html      200
+# ── Backend API proxy — must be BEFORE the wildcard ─────────────────────────
+# Netlify proxies /api/* → api.zonforge.com so SPA fetch('/api/...') calls work
+/api/*               https://api.zonforge.com/:splat  200
 /*                   /index.html      200
