@@ -25,6 +25,17 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
 
 # SPA routes — handled by _redirects (which takes precedence over toml rules)
+
+# API proxy — forwards /api/* to the live backend (used by SPA pages with hardcoded /api/ paths)
+[[redirects]]
+  from   = "/api/*"
+  to     = "https://api.zonforge.com/:splat"
+  status = 200
+  force  = true
+
+  [redirects.headers]
+    X-Forwarded-Host = "zonforge.com"
+
 [[redirects]]
   from   = "/signup"
   to     = "/signup.html"
