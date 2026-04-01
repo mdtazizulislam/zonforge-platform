@@ -22,6 +22,30 @@ Security guidance for local development and repository hygiene.
 - Use PR review for security-relevant changes.
 - Keep dependency versions reviewed and patched.
 
+## CI Rule: JWT Secret Regression Guard
+
+Pull requests run a deterministic JWT guard to prevent reintroducing unsafe secret handling in backend production code.
+
+- Guard command: `npm run security:jwt-guard`
+- Script: `scripts/security/jwt-secret-guard.cjs`
+- Primary target files:
+	- `apps/backend/src/auth.ts`
+	- `apps/backend/src/index.ts`
+	- Related backend security/config files
+
+The check fails if backend source includes:
+
+- Fallback/default patterns like `process.env.JWT_SECRET || '...'`
+- Hardcoded JWT secret assignments
+- Placeholder/weak secret literals used in production code
+- Production minimum-length checks below 64 characters
+
+How to fix violations:
+
+1. Read JWT secrets from environment only.
+2. Remove hardcoded and placeholder secret values from production source.
+3. Keep production JWT minimum-length validation at 64 or higher.
+
 ## Runtime Security Considerations
 
 - Validate auth middleware coverage for gateway and service endpoints.
