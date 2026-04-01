@@ -24,17 +24,56 @@ import {
 import { isActiveUser } from './middleware/isActiveUser.js';
 
 const app = new Hono();
+const API_PREFIX = '/v1';
+
+app.onError((error, c) => {
+  console.error('Unhandled application error:', error);
+  return c.json({ error: 'Internal Server Error' }, 500);
+});
+
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  await next();
+  const durationMs = Date.now() - start;
+  console.log(`${c.req.method} ${c.req.path} -> ${c.res.status} (${durationMs}ms)`);
+});
 
 // Enable CORS
 app.use('*', cors({
-  origin: '*',
+  origin: (origin) => {
+    const allowedOrigins = new Set([
+      'https://zonforge.com',
+      'https://www.zonforge.com',
+      'http://localhost:3000',
+      'http://localhost:4000',
+      'http://localhost:4173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:4000',
+      'http://127.0.0.1:4173',
+    ]);
+
+    if (!origin) {
+      return 'https://zonforge.com';
+    }
+
+    if (allowedOrigins.has(origin) || origin.endsWith('.netlify.app')) {
+      return origin;
+    }
+
+    return 'https://zonforge.com';
+  },
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
+
+app.get('/', (c) => {
+  return c.json({ status: 'ok', service: 'zonforge-backend' });
+});
 
 // Health check
 app.get('/health', (c) => {
-  return c.json({ status: 'ok' });
+  return c.json({ status: 'healthy' });
 });
 
 function requireAuthUserId(c: any): number | null {
@@ -53,7 +92,7 @@ function requireAuthUserId(c: any): number | null {
 }
 
 // Auth routes
-app.post('/auth/register', async (c) => {
+app.post(`${API_PREFIX}/auth/register`, async (c) => {
   try {
     const { email, password } = await c.req.json();
 
@@ -91,7 +130,7 @@ app.post('/auth/register', async (c) => {
   }
 });
 
-app.post('/auth/login', async (c) => {
+app.post(`${API_PREFIX}/auth/login`, async (c) => {
   try {
     const { email, password } = await c.req.json();
 
@@ -107,7 +146,7 @@ app.post('/auth/login', async (c) => {
 });
 
 // Protected route example
-app.get('/api/user', async (c) => {
+app.get(`${API_PREFIX}/users`, async (c) => {
   const authHeader = c.req.header('Authorization');
 
   if (!authHeader) {
@@ -155,14 +194,14 @@ async function handleBillingWebhook(c: any) {
 }
 
 // Stripe webhook
-app.post('/billing/webhook', handleBillingWebhook);
+app.post(`${API_PREFIX}/billing/webhook`, handleBillingWebhook);
 
 // Keep legacy route for compatibility
-app.post('/webhook/stripe', async (c) => {
+app.post(`${API_PREFIX}/webhook/stripe`, async (c) => {
   return handleBillingWebhook(c);
 });
 
-app.post('/billing/checkout-session', async (c) => {
+app.post(`${API_PREFIX}/billing/checkout-session`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
@@ -189,7 +228,7 @@ app.post('/billing/checkout-session', async (c) => {
   }
 });
 
-app.get('/billing/status', async (c) => {
+app.get(`${API_PREFIX}/billing/status`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
@@ -216,7 +255,7 @@ app.get('/billing/status', async (c) => {
 });
 
 // GET /billing/subscription — detailed subscription object (09.6)
-app.get('/billing/subscription', async (c) => {
+app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
@@ -244,7 +283,7 @@ app.get('/billing/subscription', async (c) => {
 });
 
 // GET /billing/plans — plan catalog source-of-truth (09.6)
-app.get('/billing/plans', async (c) => {
+app.get(`${API_PREFIX}/billing/plans`, async (c) => {
   try {
     const pool = getPool();
     const result = await pool.query(
@@ -264,7 +303,7 @@ app.get('/billing/plans', async (c) => {
   }
 });
 
-app.get('/billing/usage', async (c) => {
+app.get(`${API_PREFIX}/billing/usage`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
@@ -288,7 +327,7 @@ app.get('/billing/usage', async (c) => {
   }
 });
 
-app.post('/billing/portal', async (c) => {
+app.post(`${API_PREFIX}/billing/portal`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
@@ -307,7 +346,7 @@ app.post('/billing/portal', async (c) => {
   }
 });
 
-app.post('/billing/change-plan', async (c) => {
+app.post(`${API_PREFIX}/billing/change-plan`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
@@ -331,7 +370,7 @@ app.post('/billing/change-plan', async (c) => {
   }
 });
 
-app.post('/billing/cancel', async (c) => {
+app.post(`${API_PREFIX}/billing/cancel`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) {
@@ -350,12 +389,12 @@ app.post('/billing/cancel', async (c) => {
   }
 });
 
-app.get('/billing/access-check', isActiveUser, async (c) => {
+app.get(`${API_PREFIX}/billing/access-check`, isActiveUser, async (c) => {
   return c.json({ allowed: true, userId: requireAuthUserId(c) });
 });
 
 // Internal centralized enforcement endpoints (used by other services).
-app.post('/billing/internal/assert-quota', async (c) => {
+app.post(`${API_PREFIX}/billing/internal/assert-quota`, async (c) => {
   try {
     const { tenantId, metricCode, currentValue, increment } = await c.req.json() as {
       tenantId: number
@@ -374,7 +413,7 @@ app.post('/billing/internal/assert-quota', async (c) => {
   }
 });
 
-app.post('/billing/internal/assert-feature', async (c) => {
+app.post(`${API_PREFIX}/billing/internal/assert-feature`, async (c) => {
   try {
     const { tenantId, featureCode } = await c.req.json() as {
       tenantId: number
@@ -390,7 +429,7 @@ app.post('/billing/internal/assert-feature', async (c) => {
   }
 });
 
-app.post('/billing/internal/increment-usage', async (c) => {
+app.post(`${API_PREFIX}/billing/internal/increment-usage`, async (c) => {
   try {
     const { tenantId, metricCode, increment } = await c.req.json() as {
       tenantId: number
@@ -404,7 +443,7 @@ app.post('/billing/internal/increment-usage', async (c) => {
   }
 });
 
-app.post('/api/ai/analyze', async (c) => {
+app.post(`${API_PREFIX}/ai/analyze`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
@@ -420,7 +459,7 @@ app.post('/api/ai/analyze', async (c) => {
   }
 });
 
-app.post('/api/reports/export', async (c) => {
+app.post(`${API_PREFIX}/reports/export`, async (c) => {
   try {
     const userId = requireAuthUserId(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
