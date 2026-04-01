@@ -86,9 +86,17 @@ function getStripePriceIdForPlan(planCode: string, billingInterval: 'monthly' | 
 function withCheckoutSessionId(url: string): string {
   try {
     const parsed = new URL(url);
-    parsed.searchParams.set('session_id', '{CHECKOUT_SESSION_ID}');
-    return parsed.toString();
+    if (parsed.searchParams.has('session_id')) {
+      return url;
+    }
+
+    const query = parsed.search ? `${parsed.search}&session_id={CHECKOUT_SESSION_ID}` : '?session_id={CHECKOUT_SESSION_ID}';
+    return `${parsed.origin}${parsed.pathname}${query}${parsed.hash}`;
   } catch {
+    if (url.includes('session_id=')) {
+      return url;
+    }
+
     return url.includes('?')
       ? `${url}&session_id={CHECKOUT_SESSION_ID}`
       : `${url}?session_id={CHECKOUT_SESSION_ID}`;
