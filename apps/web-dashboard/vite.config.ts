@@ -4,6 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/app/',
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
     // Prefer TypeScript sources over stray compiled `.js` files co-located in `src/`.
@@ -20,12 +21,14 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir:    '../../landing/app',
+    emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor:   ['react', 'react-dom', 'wouter'],
+          vendor:   ['react', 'react-dom'],
+          router:   ['react-router-dom'],
           query:    ['@tanstack/react-query'],
           charts:   ['recharts'],
           zustand:  ['zustand'],
