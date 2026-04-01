@@ -1,4 +1,4 @@
 [build]
-  base = "apps/landing-web"
-  command = "npm run build"
-  publish = "dist"
+  base = "landing"
+  command = "echo static landing deploy"
+  publish = "."
