@@ -31,6 +31,137 @@ export const tokenStorage = {
   setRefresh:   (t: string) => localStorage.setItem(RTOKEN_KEY, t),
 }
 
+type ApiEnvelope<T> = {
+  success?: boolean
+  data?: T
+  error?: { code?: string; message?: string }
+  meta?: unknown
+  [key: string]: unknown
+}
+
+type RawCurrentUser = Partial<CurrentUser> & {
+  id?: string | number
+  email?: string
+  name?: string
+  role?: string
+  tenantId?: string | number
+  tenant_id?: string | number
+  mfaEnabled?: boolean
+  mfa_enabled?: boolean
+}
+
+type LegacyUserLookup = {
+  user?: RawCurrentUser
+}
+
+type TokenClaims = {
+  userId?: string | number
+  email?: string
+}
+
+type RawLoginResult = {
+  accessToken?: string
+  access_token?: string
+  token?: string
+  refreshToken?: string
+  refresh_token?: string
+  accessExpiresAt?: string
+  access_expires_at?: string
+  refreshExpiresAt?: string
+  refresh_expires_at?: string
+  user?: RawCurrentUser
+  requiresMfa?: boolean
+  requires_mfa?: boolean
+}
+
+function toDisplayName(email?: string, name?: string): string {
+  if (name?.trim()) return name.trim()
+  const localPart = email?.split('@')[0]?.trim()
+  return localPart && localPart.length > 0 ? localPart : 'User'
+}
+
+function normalizeCurrentUser(user: RawCurrentUser): CurrentUser {
+  const email = user.email ?? ''
+  return {
+    id: String(user.id ?? ''),
+    email,
+    name: toDisplayName(email, user.name),
+    role: user.role ?? 'member',
+    tenantId: String(user.tenantId ?? user.tenant_id ?? ''),
+    mfaEnabled: Boolean(user.mfaEnabled ?? user.mfa_enabled ?? false),
+  }
+}
+
+function unwrapSuccessPayload<T>(json: ApiEnvelope<T>): T {
+  if (Object.prototype.hasOwnProperty.call(json, 'data')) {
+    return json.data as T
+  }
+
+  const { success: _success, error: _error, meta: _meta, ...rest } = json
+  return rest as T
+}
+
+function normalizeLoginPayload(payload: RawLoginResult): Omit<LoginResult, 'user'> & { user?: CurrentUser } {
+  return {
+    accessToken: String(payload.accessToken ?? payload.access_token ?? payload.token ?? ''),
+    refreshToken: String(payload.refreshToken ?? payload.refresh_token ?? ''),
+    accessExpiresAt: String(payload.accessExpiresAt ?? payload.access_expires_at ?? ''),
+    refreshExpiresAt: String(payload.refreshExpiresAt ?? payload.refresh_expires_at ?? ''),
+    requiresMfa: Boolean(payload.requiresMfa ?? payload.requires_mfa ?? false),
+    user: payload.user ? normalizeCurrentUser(payload.user) : undefined,
+  }
+}
+
+async function fetchCurrentUser(accessToken: string): Promise<CurrentUser> {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${accessToken}`,
+  }
+
+  const authMeResponse = await fetch(`${BASE_URL}/v1/auth/me`, { headers })
+  if (authMeResponse.ok) {
+    const json = await authMeResponse.json().catch(() => ({})) as ApiEnvelope<RawCurrentUser>
+    if (json.success !== false) {
+      return normalizeCurrentUser(unwrapSuccessPayload<RawCurrentUser>(json))
+    }
+  } else if (authMeResponse.status !== 404) {
+    const json = await authMeResponse.json().catch(() => ({})) as ApiEnvelope<RawCurrentUser>
+    throw new ApiError(
+      String(json.error?.code ?? 'UNKNOWN_ERROR'),
+      String(json.error?.message ?? `HTTP ${authMeResponse.status}`),
+      authMeResponse.status,
+    )
+  }
+
+  const legacyUserResponse = await fetch(`${BASE_URL}/v1/users`, { headers })
+  if (legacyUserResponse.ok) {
+    const json = await legacyUserResponse.json().catch(() => ({})) as ApiEnvelope<LegacyUserLookup>
+    const payload = unwrapSuccessPayload<LegacyUserLookup>(json)
+    if (payload.user) {
+      return normalizeCurrentUser(payload.user)
+    }
+  } else {
+    const json = await legacyUserResponse.json().catch(() => ({})) as ApiEnvelope<LegacyUserLookup>
+    throw new ApiError(
+      String(json.error?.code ?? 'UNKNOWN_ERROR'),
+      String(json.error?.message ?? `HTTP ${legacyUserResponse.status}`),
+      legacyUserResponse.status,
+    )
+  }
+
+  try {
+    const payloadPart = accessToken.split('.')[1]
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = JSON.parse(atob(normalized)) as TokenClaims
+    return normalizeCurrentUser({
+      id: decoded.userId,
+      email: decoded.email,
+    })
+  } catch {
+    throw new ApiError('INVALID_AUTH_RESPONSE', 'Unable to resolve current user after login', 500)
+  }
+}
+
 // ── Core fetch wrapper ────────────────────────
 
 async function apiFetch<T>(
@@ -64,21 +195,17 @@ async function apiFetch<T>(
 }
 
 async function handleResponse<T>(resp: Response): Promise<T> {
-  const json = await resp.json().catch(() => ({})) as {
-    success?: boolean
-    data?:    T
-    error?:   { code: string; message: string }
-  }
+  const json = await resp.json().catch(() => ({})) as ApiEnvelope<T>
 
-  if (!resp.ok || !json.success) {
+  if (!resp.ok || json.success === false) {
     throw new ApiError(
-      json.error?.code    ?? 'UNKNOWN_ERROR',
-      json.error?.message ?? `HTTP ${resp.status}`,
+      String(json.error?.code ?? 'UNKNOWN_ERROR'),
+      String(json.error?.message ?? `HTTP ${resp.status}`),
       resp.status,
     )
   }
 
-  return json.data as T
+  return unwrapSuccessPayload<T>(json)
 }
 
 async function attemptRefresh(): Promise<boolean> {
@@ -89,16 +216,17 @@ async function attemptRefresh(): Promise<boolean> {
     const resp = await fetch(`${BASE_URL}/v1/auth/refresh`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ refreshToken }),
+      body:    JSON.stringify({ refreshToken, refresh_token: refreshToken }),
     })
     if (!resp.ok) return false
-    const data = await resp.json() as {
-      success: boolean
-      data: { accessToken: string; refreshToken: string }
-    }
-    if (!data.success) return false
-    tokenStorage.set(data.data.accessToken)
-    tokenStorage.setRefresh(data.data.refreshToken)
+    const json = await resp.json() as ApiEnvelope<RawLoginResult>
+    if (json.success === false) return false
+
+    const data = normalizeLoginPayload(unwrapSuccessPayload<RawLoginResult>(json))
+    if (!data.accessToken || !data.refreshToken) return false
+
+    tokenStorage.set(data.accessToken)
+    tokenStorage.setRefresh(data.refreshToken)
     return true
   } catch {
     return false
@@ -114,15 +242,28 @@ export const api = {
   // ── Auth ──────────────────────────────────
 
   auth: {
-    login: (email: string, password: string, totpCode?: string) =>
-      apiFetch<LoginResult>('/v1/auth/login', {
+    login: async (email: string, password: string, totpCode?: string) => {
+      const result = await apiFetch<RawLoginResult>('/v1/auth/login', {
         method: 'POST',
         body:   JSON.stringify({ email, password, totpCode }),
-      }),
+      })
+
+      const normalized = normalizeLoginPayload(result)
+      if (normalized.requiresMfa) {
+        return normalized
+      }
+
+      if (!normalized.accessToken || !normalized.refreshToken) {
+        throw new ApiError('INVALID_AUTH_RESPONSE', 'Login response did not include tokens', 500)
+      }
+
+      const user = normalized.user ?? await fetchCurrentUser(normalized.accessToken)
+      return { ...normalized, user }
+    },
     logout: () =>
       apiFetch<void>('/v1/auth/logout', { method: 'POST' }),
-    me: () =>
-      apiFetch<CurrentUser>('/v1/auth/me'),
+    me: async () =>
+      normalizeCurrentUser(await apiFetch<RawCurrentUser>('/v1/auth/me')),
   },
 
   // ── Alerts ────────────────────────────────
@@ -240,6 +381,23 @@ export const api = {
     usage:        () => apiFetch<UsageSummary>('/v1/billing/usage'),
     subscription: () => apiFetch<Subscription>('/v1/billing/subscription'),
   },
+
+  // ── AI ────────────────────────────────────
+
+  ai: {
+    chat: (message: string, sessionId?: string) =>
+      apiFetch<AiChatMessage>('/v1/assistant/chat', {
+        method: 'POST',
+        body:   JSON.stringify({ message, sessionId }),
+      }),
+    investigations: () =>
+      apiFetch<AiInvestigation[]>('/v1/investigations'),
+    createInvestigation: (alertId: string, context?: string) =>
+      apiFetch<AiInvestigation>('/v1/investigations', {
+        method: 'POST',
+        body:   JSON.stringify({ alertId, context }),
+      }),
+  },
 }
 
 // ─────────────────────────────────────────────
@@ -251,7 +409,7 @@ export interface LoginResult {
   refreshToken:     string
   accessExpiresAt:  string
   refreshExpiresAt: string
-  user:             CurrentUser
+  user?:            CurrentUser
   requiresMfa:      boolean
 }
 
@@ -517,4 +675,21 @@ export interface Subscription {
   currentPeriodStart: string
   currentPeriodEnd:   string
   trialEndsAt:        string | null
+}
+
+export interface AiChatMessage {
+  role:        string
+  content:     string
+  model:       string
+  sessionId:   string | null
+  trialBypass: boolean
+}
+
+export interface AiInvestigation {
+  id:        string
+  tenantId:  number
+  alertId:   string
+  status:    'queued' | 'completed' | 'failed'
+  summary:   string
+  createdAt: string
 }

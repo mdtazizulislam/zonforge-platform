@@ -29,6 +29,8 @@ const AiCapabilitiesPage          = lazy(() => import('@/pages/AiCapabilitiesPag
 const AiIntelligencePage         = lazy(() => import('@/pages/AiIntelligencePage'))
 const EnterpriseSetupPage        = lazy(() => import('@/pages/EnterpriseSetupPage'))
 const EnterpriseSalesPage        = lazy(() => import('@/pages/EnterpriseSalesPage'))
+const AiAssistantPage            = lazy(() => import('@/pages/AiAssistantPage'))
+const InvestigationsPage         = lazy(() => import('@/pages/InvestigationsPage'))
 
 // ─────────────────────────────────────────────
 // AUTH GUARD
@@ -194,6 +196,24 @@ const router = createBrowserRouter([
       <RequireAuth>
         <Suspense fallback={<PageLoader />}>
           <AiSocAnalystPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  { path: '/ai-assistant',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <AiAssistantPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  { path: '/investigations',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <InvestigationsPage />
         </Suspense>
       </RequireAuth>
     ),

@@ -6,6 +6,7 @@ import {
   ShieldCheck, BookOpen, Settings, ChevronLeft,
   ChevronRight, LogOut, Shield, CreditCard, Building2,
   Search, FlaskConical, Brain, Network, Sparkles, Cpu,
+  MessageSquare, FileSearch,
 } from 'lucide-react'
 
 interface NavItem { label: string; href: string; icon: React.ElementType; exact?: boolean }
@@ -15,6 +16,8 @@ const NAV_MAIN: NavItem[] = [
   { label: 'Alerts',            href: '/alerts',             icon: ShieldAlert },
   { label: 'AI SOC Analyst',    href: '/ai-soc-analyst',     icon: Brain },
   { label: 'AI Intelligence',   href: '/ai-intelligence',    icon: Sparkles },
+  { label: 'AI Assistant',      href: '/ai-assistant',       icon: MessageSquare },
+  { label: 'Investigations',    href: '/investigations',     icon: FileSearch },
   { label: 'Risk',              href: '/risk',               icon: BarChart3 },
   { label: 'Threat Hunting',    href: '/threat-hunting',     icon: Search },
   { label: 'Security Validation', href: '/security-validation', icon: FlaskConical },
@@ -84,6 +87,8 @@ export function Sidebar() {
           </div>
         )}
         <button onClick={toggleSidebar}
+          title="Collapse sidebar"
+          aria-label="Collapse sidebar"
           className={clsx('text-gray-600 hover:text-gray-400 p-1 rounded transition-colors',
             sidebarCollapsed && 'hidden')}>
           <ChevronLeft className="h-4 w-4" />

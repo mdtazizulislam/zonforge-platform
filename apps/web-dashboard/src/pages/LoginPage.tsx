@@ -31,6 +31,9 @@ export function LoginPage() {
 
       tokenStorage.set(result.accessToken)
       tokenStorage.setRefresh(result.refreshToken)
+      if (!result.user) {
+        throw new Error('Login succeeded but no user profile was returned')
+      }
       setUser(result.user)
       navigate('/dashboard', { replace: true })
     } catch (err) {

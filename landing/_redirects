@@ -29,6 +29,10 @@
 /security-validation/* /app/index.html 200
 /ai-soc-analyst      /app/index.html  200
 /ai-soc-analyst/*    /app/index.html  200
+/ai-assistant        /app/index.html  200
+/ai-assistant/*      /app/index.html  200
+/investigations      /app/index.html  200
+/investigations/*    /app/index.html  200
 /ai-intelligence     /app/index.html  200
 /ai-intelligence/*   /app/index.html  200
 /ai-capabilities     /app/index.html  200
