@@ -1,4 +1,15 @@
 [build]
-  base = "landing"
-  command = "echo static landing deploy"
-  publish = "."
+  publish = "landing"
+  command = "npm run build:dashboard"
+
+[build.environment]
+  VITE_API_URL = "/api"
+  NODE_VERSION = "20"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
