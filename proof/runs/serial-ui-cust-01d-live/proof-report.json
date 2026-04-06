@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-04-06T21:37:49.877Z",
+  "baseUrl": "https://zonforge.com",
+  "captures": {
+    "dashboard": {
+      "routePath": "/customer-dashboard",
+      "url": "https://zonforge.com/customer-dashboard",
+      "title": "Security Dashboard"
+    },
+    "alerts": {
+      "routePath": "/customer-alerts",
+      "url": "https://zonforge.com/customer-alerts",
+      "title": "Customer Alerts"
+    },
+    "investigations": {
+      "routePath": "/customer-investigations",
+      "url": "https://zonforge.com/customer-investigations",
+      "title": "Customer Investigations"
+    },
+    "aiAssistant": {
+      "routePath": "/customer-ai-assistant",
+      "url": "https://zonforge.com/customer-ai-assistant",
+      "title": "Customer AI Assistant"
+    },
+    "billing": {
+      "routePath": "/customer-billing",
+      "url": "https://zonforge.com/customer-billing",
+      "title": "Customer Billing"
+    },
+    "settings": {
+      "routePath": "/customer-settings",
+      "url": "https://zonforge.com/customer-settings",
+      "title": "Customer Settings"
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}
