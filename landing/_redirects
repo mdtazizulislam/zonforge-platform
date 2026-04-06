@@ -1,8 +1,12 @@
 # ── React SPA app routes ──────────────────────────────────────────────────────
 # All authenticated-app routes are served by the React SPA (landing/app/index.html)
 # Netlify internally rewrites (200) so browser URL stays intact for React Router.
-/login               /app/index.html  200
+/login               /app/index.html  200!
 /dashboard           /app/index.html  200
+/customer-dashboard  /app/index.html  200
+/customer-dashboard/* /app/index.html 200
+/customer            /app/index.html  200
+/customer/*          /app/index.html  200
 /alerts              /app/index.html  200
 /alerts/*            /app/index.html  200
 /risk                /app/index.html  200
@@ -46,7 +50,7 @@
 /supply-chain        /app/index.html  200
 /supply-chain/*      /app/index.html  200
 # ── Marketing static pages ────────────────────────────────────────────────────
-/signup              /signup.html     200
+/signup              /app/index.html  200!
 /pricing             /index.html      200
 # ── Backend API proxy — must be BEFORE the wildcard ─────────────────────────
 # Netlify proxies /api/* → api.zonforge.com so SPA fetch('/api/...') calls work

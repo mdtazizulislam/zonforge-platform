@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
 import {
@@ -6,27 +5,31 @@ import {
   useConnectors, usePipelineHealth,
 } from '@/hooks/queries'
 import { AppShell, PageContent } from '@/components/layout/AppShell'
-import { PostureGauge }         from '@/components/widgets/PostureGauge'
-import { AlertTrendChart }      from '@/components/charts/AlertTrendChart'
-import { useAuthStore }         from '@/stores/auth.store'
+import { PostureGauge } from '@/components/widgets/PostureGauge'
 import {
-  ShieldAlert, Users, Server, Clock, Activity,
-  TrendingUp, TrendingDown, Minus, ArrowRight,
-  AlertTriangle, CheckCircle2, XCircle, Loader2,
-  Wifi, WifiOff,
+  ArrowRight,
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  ShieldAlert,
+  Clock,
+  Server,
+  TrendingDown,
+  TrendingUp,
+  Users,
+  Wifi,
+  WifiOff,
 } from 'lucide-react'
-
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
+import { useAuthStore } from '@/stores/auth.store'
+import { AlertTrendChart } from '@/components/charts/AlertTrendChart'
 
 function severityBadge(sev: string) {
   const map: Record<string, string> = {
     critical: 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
-    high:     'bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/30',
-    medium:   'bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-500/30',
-    low:      'bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30',
-    info:     'bg-gray-700 text-gray-400',
+    high: 'bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/30',
+    medium: 'bg-yellow-500/15 text-yellow-400 ring-1 ring-yellow-500/30',
+    low: 'bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30',
+    info: 'bg-gray-700 text-gray-400',
   }
   return map[sev] ?? map.info
 }
@@ -41,44 +44,23 @@ function priorityDot(priority: string) {
   return map[priority] ?? 'bg-gray-500'
 }
 
-function scoreColor(score: number) {
-  if (score >= 70) return 'text-red-400'
-  if (score >= 50) return 'text-orange-400'
-  if (score >= 25) return 'text-yellow-400'
-  return 'text-green-400'
-}
-
-function scoreTrend(current: number, prev: number) {
-  const delta = current - prev
-  if (Math.abs(delta) < 2) return { icon: Minus,       color: 'text-gray-400', label: 'stable' }
-  if (delta > 0)            return { icon: TrendingUp,  color: 'text-red-400',  label: `+${delta}` }
-  return                           { icon: TrendingDown, color: 'text-green-400', label: `${delta}` }
-}
-
-// ─────────────────────────────────────────────
-// STAT CARD
-// ─────────────────────────────────────────────
-
 interface StatCardProps {
-  label:     string
-  value:     string | number
+  label: string
+  value: string | number
   subLabel?: string
-  icon:      React.ElementType
+  icon: React.ElementType
   iconColor: string
-  trend?:    { direction: 'up' | 'down' | 'flat'; value: string; isGood: boolean }
-  href?:     string
-  loading?:  boolean
+  trend?: { direction: 'up' | 'down' | 'flat'; value: string; isGood: boolean }
+  href?: string
+  loading?: boolean
 }
 
-function StatCard({
-  label, value, subLabel, icon: Icon, iconColor,
-  trend, href, loading,
-}: StatCardProps) {
+function StatCard({ label, value, subLabel, icon: Icon, iconColor, trend, href, loading }: StatCardProps) {
   const card = (
     <div className={clsx(
       'relative flex flex-col gap-3 rounded-xl border border-gray-800',
       'bg-gray-900 p-5 transition-colors',
-      href && 'hover:border-gray-700 hover:bg-gray-800/60 cursor-pointer',
+      href && 'cursor-pointer hover:border-gray-700 hover:bg-gray-800/60',
     )}>
       <div className="flex items-start justify-between">
         <div className={clsx('rounded-lg p-2.5', iconColor)}>
@@ -89,117 +71,113 @@ function StatCard({
             'flex items-center gap-1 text-xs font-medium',
             trend.isGood ? 'text-green-400' : 'text-red-400',
           )}>
-            {trend.direction === 'up'   && <TrendingUp className="h-3.5 w-3.5" />}
+            {trend.direction === 'up' && <TrendingUp className="h-3.5 w-3.5" />}
             {trend.direction === 'down' && <TrendingDown className="h-3.5 w-3.5" />}
-            {trend.direction === 'flat' && <Minus className="h-3.5 w-3.5 text-gray-500" />}
+            {trend.direction === 'flat' && <ArrowRight className="h-3.5 w-3.5 rotate-45 text-gray-500" />}
             <span>{trend.value}</span>
           </div>
         )}
       </div>
       <div>
         {loading ? (
-          <div className="h-8 w-24 rounded bg-gray-800 animate-pulse" />
+          <div className="h-8 w-24 animate-pulse rounded bg-gray-800" />
         ) : (
-          <p className="text-2xl font-bold text-gray-100 tabular-nums">{value}</p>
+          <p className="text-2xl font-bold tabular-nums text-gray-100">{value}</p>
         )}
         <p className="mt-0.5 text-sm text-gray-400">{label}</p>
         {subLabel && <p className="mt-1 text-xs text-gray-600">{subLabel}</p>}
       </div>
-      {href && (
-        <ArrowRight className="absolute right-4 bottom-4 h-4 w-4 text-gray-600" />
-      )}
+      {href && <ArrowRight className="absolute bottom-4 right-4 h-4 w-4 text-gray-600" />}
     </div>
   )
 
   return href ? <Link to={href}>{card}</Link> : card
 }
 
-// ─────────────────────────────────────────────
-// CONNECTOR STATUS ROW
-// ─────────────────────────────────────────────
-
 function ConnectorStatusRow({ connector }: { connector: {
-  id: string; name: string; type: string;
-  status: string; lastEventAt: string | null; isHealthy: boolean
-}}) {
+  id: string
+  name: string
+  type: string
+  status: string
+  lastEventAt: string | null
+  isHealthy: boolean
+} }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-gray-800 last:border-0">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={clsx('h-2 w-2 rounded-full flex-shrink-0', {
-          'bg-green-400': connector.status === 'active' && connector.isHealthy,
-          'bg-yellow-400': connector.status === 'active' && !connector.isHealthy,
-          'bg-red-400':   connector.status === 'error',
-          'bg-gray-600':  connector.status === 'paused' || connector.status === 'pending_auth',
-        })} />
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-200 truncate">{connector.name}</p>
-          <p className="text-xs text-gray-500">{connector.type.replace(/_/g, ' ')}</p>
+    <div className="border-b border-gray-800 py-2.5 last:border-0">
+      <div className="flex items-center justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={clsx('h-2 w-2 flex-shrink-0 rounded-full', {
+            'bg-green-400': connector.status === 'active' && connector.isHealthy,
+            'bg-yellow-400': connector.status === 'active' && !connector.isHealthy,
+            'bg-red-400': connector.status === 'error',
+            'bg-gray-600': connector.status === 'paused' || connector.status === 'pending_auth',
+          })} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-gray-200">{connector.name}</p>
+            <p className="text-xs text-gray-500">{connector.type.replace(/_/g, ' ')}</p>
+          </div>
         </div>
-      </div>
-      <div className="flex-shrink-0 text-right">
-        {connector.lastEventAt ? (
-          <p className="text-xs text-gray-400">
-            {new Date(connector.lastEventAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div className="flex-shrink-0 text-right">
+          {connector.lastEventAt ? (
+            <p className="text-xs text-gray-400">
+              {new Date(connector.lastEventAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-600">No events</p>
+          )}
+          <p className={clsx('mt-0.5 text-xs font-medium', {
+            'text-green-400': connector.status === 'active' && connector.isHealthy,
+            'text-yellow-400': connector.status === 'active' && !connector.isHealthy,
+            'text-red-400': connector.status === 'error',
+            'text-gray-500': connector.status === 'paused',
+          })}>
+            {connector.status === 'active' && connector.isHealthy ? 'Healthy'
+              : connector.status === 'active' ? 'Lagging'
+              : connector.status === 'error' ? 'Error'
+              : connector.status === 'paused' ? 'Paused' : 'Pending'}
           </p>
-        ) : (
-          <p className="text-xs text-gray-600">No events</p>
-        )}
-        <p className={clsx('text-xs font-medium mt-0.5', {
-          'text-green-400': connector.status === 'active' && connector.isHealthy,
-          'text-yellow-400': connector.status === 'active' && !connector.isHealthy,
-          'text-red-400':   connector.status === 'error',
-          'text-gray-500':  connector.status === 'paused',
-        })}>
-          {connector.status === 'active' && connector.isHealthy ? 'Healthy' :
-           connector.status === 'active' ? 'Lagging' :
-           connector.status === 'error' ? 'Error' :
-           connector.status === 'paused' ? 'Paused' : 'Pending'}
-        </p>
+        </div>
       </div>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────
-// RECENT ALERT ROW
-// ─────────────────────────────────────────────
-
 function AlertRow({ alert }: { alert: {
-  id: string; title: string; severity: string;
-  priority: string; status: string; createdAt: string;
+  id: string
+  title: string
+  severity: string
+  priority: string
+  status: string
+  createdAt: string
   mitreTechniques: string[]
-}}) {
+} }) {
   return (
     <Link
       to={`/alerts/${alert.id}`}
-      className="flex items-start gap-3 py-3 border-b border-gray-800 last:border-0
-                 hover:bg-gray-800/50 -mx-4 px-4 rounded-lg transition-colors"
+      className="-mx-4 flex items-start gap-3 rounded-lg border-b border-gray-800 px-4 py-3 transition-colors hover:bg-gray-800/50 last:border-0"
     >
-      <div className="flex-shrink-0 mt-0.5">
-        <div className={clsx('h-2 w-2 rounded-full mt-1.5', priorityDot(alert.priority))} />
+      <div className="mt-0.5 flex-shrink-0">
+        <div className={clsx('mt-1.5 h-2 w-2 rounded-full', priorityDot(alert.priority))} />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-200 truncate">{alert.title}</p>
-        <div className="mt-1 flex items-center gap-2 flex-wrap">
-          <span className={clsx('inline-flex px-1.5 py-0.5 rounded text-xs font-medium',
-            severityBadge(alert.severity))}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-gray-200">{alert.title}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className={clsx('inline-flex rounded px-1.5 py-0.5 text-xs font-medium', severityBadge(alert.severity))}>
             {alert.severity}
           </span>
-          {alert.mitreTechniques.slice(0, 2).map(t => (
-            <span key={t} className="text-xs text-gray-600 font-mono">{t}</span>
+          {alert.mitreTechniques.slice(0, 2).map((technique) => (
+            <span key={technique} className="font-mono text-xs text-gray-600">{technique}</span>
           ))}
         </div>
       </div>
       <div className="flex-shrink-0 text-right">
         <p className="text-xs text-gray-500">
-          {new Date(alert.createdAt).toLocaleTimeString([], {
-            hour: '2-digit', minute: '2-digit',
-          })}
+          {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
-        <p className={clsx('text-xs mt-0.5 font-medium', {
+        <p className={clsx('mt-0.5 text-xs font-medium', {
           'text-yellow-400': alert.status === 'investigating',
-          'text-gray-400':   alert.status === 'open',
-          'text-green-400':  alert.status === 'resolved',
+          'text-gray-400': alert.status === 'open',
+          'text-green-400': alert.status === 'resolved',
         })}>
           {alert.status}
         </p>
@@ -208,31 +186,21 @@ function AlertRow({ alert }: { alert: {
   )
 }
 
-// ─────────────────────────────────────────────
-// DASHBOARD PAGE
-// ─────────────────────────────────────────────
-
 export default function DashboardPage() {
   const user = useAuthStore(s => s.user)
 
-  const { data: risk,       isLoading: riskLoading }   = useRiskSummary()
-  const { data: alertsData, isLoading: alertsLoading } = useAlerts({
-    status:   ['open', 'investigating'],
-    limit:    8,
-  })
-  const { data: mttd,       isLoading: mttdLoading }   = useMttdMetrics()
-  const { data: connData,   isLoading: connLoading }   = useConnectors()
-  const { data: pipeline }                             = usePipelineHealth()
+  const { data: risk, isLoading: riskLoading } = useRiskSummary()
+  const { data: alertsData, isLoading: alertsLoading } = useAlerts({ status: ['open', 'investigating'], limit: 8 })
+  const { data: mttd, isLoading: mttdLoading } = useMttdMetrics()
+  const { data: connData, isLoading: connLoading } = useConnectors()
+  const { data: pipeline } = usePipelineHealth()
 
-  const alerts     = alertsData?.data    ?? []
-  const connectors = connData?.data      ?? []
+  const alerts = alertsData?.data ?? []
+  const connectors = connData?.data ?? []
+  const openP1 = alerts.filter(alert => alert.priority === 'P1').length
+  const healthyConn = connectors.filter((connector: any) => connector.isHealthy).length
 
-  const openP1     = alerts.filter(a => a.priority === 'P1').length
-  const openP2     = alerts.filter(a => a.priority === 'P2').length
-  const healthyConn = connectors.filter((c: any) => c.isHealthy).length
-
-  // Greeting
-  const hour     = new Date().getHours()
+  const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   return (
@@ -240,12 +208,11 @@ export default function DashboardPage() {
       title="Executive Overview"
       actions={
         <div className="flex items-center gap-2">
-          {/* Pipeline status indicator */}
           <div className={clsx(
-            'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border',
+            'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
             pipeline?.data?.overall === 'healthy'
-              ? 'bg-green-500/10 text-green-400 border-green-500/20'
-              : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+              ? 'border-green-500/20 bg-green-500/10 text-green-400'
+              : 'border-yellow-500/20 bg-yellow-500/10 text-yellow-400',
           )}>
             {pipeline?.data?.overall === 'healthy'
               ? <Wifi className="h-3.5 w-3.5" />
@@ -256,8 +223,6 @@ export default function DashboardPage() {
       }
     >
       <PageContent>
-
-        {/* ── Welcome ─────────────────────────────── */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-100">
             {greeting}, {user?.name?.split(' ')[0] ?? 'Analyst'}
@@ -269,8 +234,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* ── Top-level KPI row ─────────────────────── */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-6">
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard
             label="Open Critical"
             value={riskLoading ? '—' : String(risk?.data?.openCriticalAlerts ?? 0)}
@@ -291,8 +255,8 @@ export default function DashboardPage() {
             icon={ShieldAlert}
             iconColor={
               (risk?.data?.postureScore ?? 0) >= 80 ? 'bg-green-500/15 text-green-400'
-              : (risk?.data?.postureScore ?? 0) >= 60 ? 'bg-yellow-500/15 text-yellow-400'
-              : 'bg-red-500/15 text-red-400'
+                : (risk?.data?.postureScore ?? 0) >= 60 ? 'bg-yellow-500/15 text-yellow-400'
+                  : 'bg-red-500/15 text-red-400'
             }
             href="/risk"
             loading={riskLoading}
@@ -300,10 +264,7 @@ export default function DashboardPage() {
 
           <StatCard
             label="MTTD (P50)"
-            value={mttdLoading ? '—'
-              : mttd?.data?.p50Minutes != null
-                ? `${mttd.data.p50Minutes}m`
-                : 'N/A'}
+            value={mttdLoading ? '—' : mttd?.data?.p50Minutes != null ? `${mttd.data.p50Minutes}m` : 'N/A'}
             subLabel="Median detection time"
             icon={Clock}
             iconColor="bg-blue-500/15 text-blue-400"
@@ -315,145 +276,118 @@ export default function DashboardPage() {
             value={connLoading ? '—' : `${healthyConn}/${connectors.length}`}
             subLabel="Healthy / Total"
             icon={Activity}
-            iconColor={
-              healthyConn === connectors.length ? 'bg-green-500/15 text-green-400'
-              : 'bg-orange-500/15 text-orange-400'
-            }
+            iconColor={healthyConn === connectors.length ? 'bg-green-500/15 text-green-400' : 'bg-orange-500/15 text-orange-400'}
             href="/connectors"
             loading={connLoading}
           />
         </div>
 
-        {/* ── Main 3-column grid ────────────────────── */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-
-          {/* LEFT: Posture gauge + top risk users */}
           <div className="flex flex-col gap-6">
-
-            {/* Posture gauge */}
             <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-300">Security Posture</h3>
-                <Link to="/risk" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                <Link to="/risk" className="flex items-center gap-1 text-xs text-blue-400 hover:underline">
                   Details <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
               <div className="flex justify-center py-2">
-                <PostureGauge
-                  score={risk?.data?.postureScore ?? 0}
-                  loading={riskLoading}
-                />
+                <PostureGauge score={risk?.data?.postureScore ?? 0} loading={riskLoading} />
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 text-center">
-                <div className="rounded-lg bg-gray-800/60 py-2 px-3">
-                  <p className="text-lg font-bold text-orange-400">
-                    {risk?.data?.openHighAlerts ?? '—'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">High alerts</p>
+                <div className="rounded-lg bg-gray-800/60 px-3 py-2">
+                  <p className="text-lg font-bold text-orange-400">{risk?.data?.openHighAlerts ?? '—'}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">High alerts</p>
                 </div>
-                <div className="rounded-lg bg-gray-800/60 py-2 px-3">
-                  <p className="text-lg font-bold text-gray-200">
-                    {risk?.data?.avgUserRiskScore ?? '—'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">Avg user risk</p>
+                <div className="rounded-lg bg-gray-800/60 px-3 py-2">
+                  <p className="text-lg font-bold text-gray-200">{risk?.data?.avgUserRiskScore ?? '—'}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">Avg user risk</p>
                 </div>
               </div>
             </div>
 
-            {/* Top risk users */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 flex-1">
-              <div className="flex items-center justify-between mb-4">
+            <div className="flex-1 rounded-xl border border-gray-800 bg-gray-900 p-5">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-300">
-                  <Users className="inline h-4 w-4 mr-1.5 text-gray-500" />
+                  <Users className="mr-1.5 inline h-4 w-4 text-gray-500" />
                   Top Risk Users
                 </h3>
-                <Link to="/risk" className="text-xs text-blue-400 hover:underline">
-                  View all
-                </Link>
+                <Link to="/risk" className="text-xs text-blue-400 hover:underline">View all</Link>
               </div>
               {riskLoading ? (
                 <div className="space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-gray-800 animate-pulse" />
+                  {[...Array(4)].map((_, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <div className="h-8 w-8 animate-pulse rounded-full bg-gray-800" />
                       <div className="flex-1">
-                        <div className="h-3 w-28 rounded bg-gray-800 animate-pulse mb-1.5" />
-                        <div className="h-2 w-16 rounded bg-gray-800 animate-pulse" />
+                        <div className="mb-1.5 h-3 w-28 animate-pulse rounded bg-gray-800" />
+                        <div className="h-2 w-16 animate-pulse rounded bg-gray-800" />
                       </div>
-                      <div className="h-6 w-10 rounded bg-gray-800 animate-pulse" />
+                      <div className="h-6 w-10 animate-pulse rounded bg-gray-800" />
                     </div>
                   ))}
                 </div>
               ) : (risk?.data?.topRiskUserIds ?? []).length > 0 ? (
                 <div className="space-y-1">
-                  {(risk?.data?.topRiskUserIds ?? []).slice(0, 5).map((userId: string, idx: number) => (
+                  {(risk?.data?.topRiskUserIds ?? []).slice(0, 5).map((userId: string, index: number) => (
                     <Link
                       key={userId}
                       to={`/risk?userId=${userId}`}
-                      className="flex items-center gap-3 py-2 rounded-lg
-                                 hover:bg-gray-800/60 -mx-2 px-2 transition-colors"
+                      className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-gray-800/60"
                     >
                       <div className={clsx(
                         'flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold',
-                        idx === 0 ? 'bg-red-500/20 text-red-400'
-                        : idx === 1 ? 'bg-orange-500/20 text-orange-400'
-                        : 'bg-gray-700 text-gray-400',
+                        index === 0 ? 'bg-red-500/20 text-red-400'
+                          : index === 1 ? 'bg-orange-500/20 text-orange-400'
+                            : 'bg-gray-700 text-gray-400',
                       )}>
-                        {idx + 1}
+                        {index + 1}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 font-mono truncate">
-                          {userId.slice(0, 12)}…
-                        </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-mono text-sm text-gray-300">{userId.slice(0, 12)}…</p>
                         <p className="text-xs text-gray-600">User</p>
                       </div>
-                      <ArrowRight className="h-3.5 w-3.5 text-gray-600 flex-shrink-0" />
+                      <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-600" />
                     </Link>
                   ))}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <CheckCircle2 className="h-8 w-8 text-green-500/40 mb-2" />
+                  <CheckCircle2 className="mb-2 h-8 w-8 text-green-500/40" />
                   <p className="text-sm text-gray-500">No high-risk users</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* CENTER: Alert trend + recent alerts */}
-          <div className="lg:col-span-1 flex flex-col gap-6">
-
-            {/* Alert trend chart */}
+          <div className="flex flex-col gap-6 lg:col-span-1">
             <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-300">Alert Trend (30 days)</h3>
-                <Link to="/alerts" className="text-xs text-blue-400 hover:underline flex items-center gap-1">
+                <Link to="/alerts" className="flex items-center gap-1 text-xs text-blue-400 hover:underline">
                   All alerts <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
               <AlertTrendChart height={180} />
             </div>
 
-            {/* Recent alerts */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 flex-1">
-              <div className="flex items-center justify-between mb-2">
+            <div className="flex-1 rounded-xl border border-gray-800 bg-gray-900 p-5">
+              <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-300">
-                  <ShieldAlert className="inline h-4 w-4 mr-1.5 text-gray-500" />
+                  <ShieldAlert className="mr-1.5 inline h-4 w-4 text-gray-500" />
                   Recent Alerts
                 </h3>
-                <Link to="/alerts" className="text-xs text-blue-400 hover:underline">
-                  View all
-                </Link>
+                <Link to="/alerts" className="text-xs text-blue-400 hover:underline">View all</Link>
               </div>
 
               {alertsLoading ? (
-                <div className="space-y-3 mt-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="flex gap-3">
-                      <div className="h-2 w-2 mt-2 rounded-full bg-gray-800 animate-pulse flex-shrink-0" />
+                <div className="mt-3 space-y-3">
+                  {[...Array(4)].map((_, index) => (
+                    <div key={index} className="flex gap-3">
+                      <div className="mt-2 h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-gray-800" />
                       <div className="flex-1">
-                        <div className="h-3 w-full rounded bg-gray-800 animate-pulse mb-1.5" />
-                        <div className="h-2 w-24 rounded bg-gray-800 animate-pulse" />
+                        <div className="mb-1.5 h-3 w-full animate-pulse rounded bg-gray-800" />
+                        <div className="h-2 w-24 animate-pulse rounded bg-gray-800" />
                       </div>
                     </div>
                   ))}
@@ -466,70 +400,64 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <CheckCircle2 className="h-10 w-10 text-green-500/30 mb-3" />
+                  <CheckCircle2 className="mb-3 h-10 w-10 text-green-500/30" />
                   <p className="text-sm font-medium text-gray-400">No open alerts</p>
-                  <p className="text-xs text-gray-600 mt-1">All clear — keep monitoring</p>
+                  <p className="mt-1 text-xs text-gray-600">All clear — keep monitoring</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* RIGHT: Connectors + top risk assets */}
           <div className="flex flex-col gap-6">
-
-            {/* Connector status */}
             <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-300">
-                  <Activity className="inline h-4 w-4 mr-1.5 text-gray-500" />
+                  <Activity className="mr-1.5 inline h-4 w-4 text-gray-500" />
                   Data Connectors
                 </h3>
-                <Link to="/connectors" className="text-xs text-blue-400 hover:underline">
-                  Manage
-                </Link>
+                <Link to="/connectors" className="text-xs text-blue-400 hover:underline">Manage</Link>
               </div>
 
               {connLoading ? (
                 <div className="space-y-3">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="h-2 w-2 rounded-full bg-gray-800 animate-pulse flex-shrink-0" />
-                      <div className="flex-1 h-3 rounded bg-gray-800 animate-pulse" />
-                      <div className="h-3 w-12 rounded bg-gray-800 animate-pulse" />
+                  {[...Array(3)].map((_, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <div className="h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-gray-800" />
+                      <div className="h-3 flex-1 animate-pulse rounded bg-gray-800" />
+                      <div className="h-3 w-12 animate-pulse rounded bg-gray-800" />
                     </div>
                   ))}
                 </div>
               ) : connectors.length > 0 ? (
                 <div>
-                  {connectors.slice(0, 5).map((c: any) => (
-                    <ConnectorStatusRow key={c.id} connector={c} />
+                  {connectors.slice(0, 5).map((connector: any) => (
+                    <ConnectorStatusRow key={connector.id} connector={connector} />
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-6">
-                  <WifiOff className="h-8 w-8 text-gray-700 mx-auto mb-2" />
+                <div className="py-6 text-center">
+                  <WifiOff className="mx-auto mb-2 h-8 w-8 text-gray-700" />
                   <p className="text-sm text-gray-500">No connectors configured</p>
-                  <Link to="/connectors" className="text-xs text-blue-400 mt-2 inline-block hover:underline">
+                  <Link to="/connectors" className="mt-2 inline-block text-xs text-blue-400 hover:underline">
                     Add connector →
                   </Link>
                 </div>
               )}
             </div>
 
-            {/* MTTD widget */}
             <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-300">
-                  <Clock className="inline h-4 w-4 mr-1.5 text-gray-500" />
+                  <Clock className="mr-1.5 inline h-4 w-4 text-gray-500" />
                   Detection Time (MTTD)
                 </h3>
               </div>
               {mttdLoading ? (
                 <div className="grid grid-cols-3 gap-3">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="rounded-lg bg-gray-800/60 p-3 text-center">
-                      <div className="h-6 w-10 rounded bg-gray-800 animate-pulse mx-auto mb-1" />
-                      <div className="h-2 w-8 rounded bg-gray-800 animate-pulse mx-auto" />
+                  {[...Array(3)].map((_, index) => (
+                    <div key={index} className="rounded-lg bg-gray-800/60 p-3 text-center">
+                      <div className="mx-auto mb-1 h-6 w-10 animate-pulse rounded bg-gray-800" />
+                      <div className="mx-auto h-2 w-8 animate-pulse rounded bg-gray-800" />
                     </div>
                   ))}
                 </div>
@@ -541,10 +469,8 @@ export default function DashboardPage() {
                     { label: 'P99', value: mttd?.data?.p99Minutes },
                   ].map(({ label, value }) => (
                     <div key={label} className="rounded-lg bg-gray-800/60 p-3 text-center">
-                      <p className="text-lg font-bold text-gray-100">
-                        {value != null ? `${value}m` : 'N/A'}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+                      <p className="text-lg font-bold text-gray-100">{value != null ? `${value}m` : 'N/A'}</p>
+                      <p className="mt-0.5 text-xs text-gray-500">{label}</p>
                     </div>
                   ))}
                 </div>
@@ -566,55 +492,45 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Top risk assets */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 flex-1">
-              <div className="flex items-center justify-between mb-4">
+            <div className="flex-1 rounded-xl border border-gray-800 bg-gray-900 p-5">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-300">
-                  <Server className="inline h-4 w-4 mr-1.5 text-gray-500" />
+                  <Server className="mr-1.5 inline h-4 w-4 text-gray-500" />
                   Top Risk Assets
                 </h3>
-                <Link to="/risk?view=assets" className="text-xs text-blue-400 hover:underline">
-                  View all
-                </Link>
+                <Link to="/risk?view=assets" className="text-xs text-blue-400 hover:underline">View all</Link>
               </div>
               {riskLoading ? (
                 <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-10 rounded-lg bg-gray-800 animate-pulse" />
+                  {[...Array(3)].map((_, index) => (
+                    <div key={index} className="h-10 animate-pulse rounded-lg bg-gray-800" />
                   ))}
                 </div>
               ) : (risk?.data?.topRiskAssetIds ?? []).length > 0 ? (
                 <div className="space-y-1">
-                  {(risk?.data?.topRiskAssetIds ?? []).slice(0, 4).map((assetId: string, idx: number) => (
-                    <div
-                      key={assetId}
-                      className="flex items-center gap-3 py-2 rounded-lg"
-                    >
+                  {(risk?.data?.topRiskAssetIds ?? []).slice(0, 4).map((assetId: string, index: number) => (
+                    <div key={assetId} className="flex items-center gap-3 rounded-lg py-2">
                       <div className={clsx(
                         'flex h-7 w-7 items-center justify-center rounded text-xs font-bold',
-                        idx === 0 ? 'bg-red-500/20 text-red-400'
-                        : idx === 1 ? 'bg-orange-500/20 text-orange-400'
-                        : 'bg-gray-700 text-gray-400',
+                        index === 0 ? 'bg-red-500/20 text-red-400'
+                          : index === 1 ? 'bg-orange-500/20 text-orange-400'
+                            : 'bg-gray-700 text-gray-400',
                       )}>
-                        {idx + 1}
+                        {index + 1}
                       </div>
-                      <p className="text-sm text-gray-300 font-mono truncate flex-1">
-                        {assetId.slice(0, 12)}…
-                      </p>
+                      <p className="flex-1 truncate font-mono text-sm text-gray-300">{assetId.slice(0, 12)}…</p>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-6 text-center">
-                  <CheckCircle2 className="h-8 w-8 text-green-500/40 mb-2" />
+                  <CheckCircle2 className="mb-2 h-8 w-8 text-green-500/40" />
                   <p className="text-sm text-gray-500">No high-risk assets</p>
                 </div>
               )}
             </div>
-
           </div>
         </div>
-
       </PageContent>
     </AppShell>
   )

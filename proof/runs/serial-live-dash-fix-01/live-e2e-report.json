@@ -1,0 +1,141 @@
+{
+  "generatedAt": "2026-04-05T19:20:48.877Z",
+  "baseUrl": "https://zonforge.com",
+  "email": "deployproof_20260405145529@zonforge.test",
+  "desktop": {
+    "viewport": "desktop",
+    "login": {
+      "url": "https://zonforge.com/dashboard",
+      "title": "ZonForge Sentinel",
+      "hasSidebar": false,
+      "bodySample": "Loading…",
+      "sidebarLabels": [],
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\desktop-dashboard.png"
+    },
+    "routes": [
+      {
+        "route": "/dashboard",
+        "finalUrl": "https://zonforge.com/dashboard",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nSecurity Dashboard\nPipeline healthy\n\nGood afternoon, deployproof_20260405145529\n\nYour security workspace is live\n\nReview active alerts, current posture, AI findings, and investigation status from the live platform services. Billing remains available, but this is now the primary post-login view.\n\nOpen AlertsStart InvestigationAsk AI Assistant\n\n0\n\nTotal Alerts\n\nLive alert count from the alert service\n\n0\n\nCritical Alerts\n\nOpen critical issues needing attention\n\n0/100\n\nRisk Score\n\nTrend not exposed by the current API\n\n0\n\nActive Investigations\n\nQueued, in-progress, or awaiting review\n\nRecent Alerts\n\nSeverity, status, and timestamps from the live alert feed\n\nView alert center\n\nNo alerts yet\n\nThe alert service is reachable, but there are no recent alerts for this tenant.\n\nAI Assistant\n\nQuick-launch into the live assistant with recommended prompts\n\nOpen assistant\n\nAsk for direction, triage, or explanations\n\nThe assistant is backed by the liv",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\desktop-dashboard.png"
+      },
+      {
+        "route": "/alerts",
+        "finalUrl": "https://zonforge.com/alerts",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": false,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "Alert Center\nowner\nAlert Queue\nShow resolved\n\nUpdated 03:20:33 PM\n\nQueue is clear\n\nNo open alerts right now\n\n0\n\nOpen\n\n0\n\nActive\n\n0\n\nSLA\n\nSelect an alert to investigate\n\nChoose an alert from the queue to begin investigation. P1 alerts are shown first.\n\n⌘[ Queue⌘] Context",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\desktop-alerts.png"
+      },
+      {
+        "route": "/ai-assistant",
+        "finalUrl": "https://zonforge.com/ai-assistant",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nAI Security Assistant\n\nAsk about threats, investigations, or security guidance\n\nZonForge AI Assistant\n\nAsk about alerts, investigations, posture, or first-response priorities.\n\nExplain latest alertSummarize my riskWhat should I do first?\n\nAI responses may contain inaccuracies. Verify before acting.",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\desktop-ai_assistant.png"
+      },
+      {
+        "route": "/investigations",
+        "finalUrl": "https://zonforge.com/investigations",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nInvestigations\nAnalyst ViewStart Investigation\nAI Investigations\n\nLive investigation queue, status, and summaries from the SOC analyst service\n\n0\n\nTotal\n\n0\n\nTrue Positives\n\n0\n\nFalse Positives\n\n0\n\nPending Review\n\nNo investigations yet\n\nCreate an investigation to get an AI-generated deep dive into an alert.",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\desktop-investigations.png"
+      },
+      {
+        "route": "/compliance",
+        "finalUrl": "https://zonforge.com/compliance",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nCompliance & Coverage\n\n0%\n\nATT&CK Technique Coverage\n\n0 of 0 techniques\n\n0\n\nActive Detection Rules\n\n0 total\n\n0\n\nAudit Events (30 days)\n\nHash-chained log\n\nATT&CK CoverageDetection RulesAudit Log\n\nCoverage across MITRE ATT&CK tactics and techniques.MITRE ATT&CK \n\nShow gaps only",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\desktop-compliance.png"
+      }
+    ]
+  },
+  "mobile": {
+    "viewport": "mobile",
+    "login": {
+      "url": "https://zonforge.com/dashboard",
+      "title": "ZonForge Sentinel",
+      "hasSidebar": true,
+      "bodySample": "Loading…",
+      "sidebarLabels": [],
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\mobile-dashboard.png"
+    },
+    "routes": [
+      {
+        "route": "/dashboard",
+        "finalUrl": "https://zonforge.com/dashboard",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nSecurity Dashboard\nPipeline healthy\n\nGood afternoon, deployproof_20260405145529\n\nYour security workspace is live\n\nReview active alerts, current posture, AI findings, and investigation status from the live platform services. Billing remains available, but this is now the primary post-login view.\n\nOpen AlertsStart InvestigationAsk AI Assistant\n\n0\n\nTotal Alerts\n\nLive alert count from the alert service\n\n0\n\nCritical Alerts\n\nOpen critical issues needing attention\n\n0/100\n\nRisk Score\n\nTrend not exposed by the current API\n\n0\n\nActive Investigations\n\nQueued, in-progress, or awaiting review\n\nRecent Alerts\n\nSeverity, status, and timestamps from the live alert feed\n\nView alert center\n\nNo alerts yet\n\nThe alert service is reachable, but there are no recent alerts for this tenant.\n\nAI Assistant\n\nQuick-launch into the live assistant with recommended prompts\n\nOpen assistant\n\nAsk for direction, triage, or explanations\n\nThe assistant is backed by the liv",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\mobile-dashboard.png"
+      },
+      {
+        "route": "/alerts",
+        "finalUrl": "https://zonforge.com/alerts",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": false,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "Alert Center\nowner\nAlert Queue\nShow resolved\n\nUpdated 03:20:42 PM\n\nQueue is clear\n\nNo open alerts right now\n\n0\n\nOpen\n\n0\n\nActive\n\n0\n\nSLA\n\nSelect an alert to investigate\n\nChoose an alert from the queue to begin investigation. P1 alerts are shown first.\n\n⌘[ Queue⌘] Context",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\mobile-alerts.png"
+      },
+      {
+        "route": "/ai-assistant",
+        "finalUrl": "https://zonforge.com/ai-assistant",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nAI Security Assistant\n\nAsk about threats, investigations, or security guidance\n\nZonForge AI Assistant\n\nAsk about alerts, investigations, posture, or first-response priorities.\n\nExplain latest alertSummarize my riskWhat should I do first?\n\nAI responses may contain inaccuracies. Verify before acting.",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\mobile-ai_assistant.png"
+      },
+      {
+        "route": "/investigations",
+        "finalUrl": "https://zonforge.com/investigations",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nInvestigations\nAnalyst ViewStart Investigation\nAI Investigations\n\nLive investigation queue, status, and summaries from the SOC analyst service\n\n0\n\nTotal\n\n0\n\nTrue Positives\n\n0\n\nFalse Positives\n\n0\n\nPending Review\n\nNo investigations yet\n\nCreate an investigation to get an AI-generated deep dive into an alert.",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\mobile-investigations.png"
+      },
+      {
+        "route": "/compliance",
+        "finalUrl": "https://zonforge.com/compliance",
+        "title": "ZonForge Sentinel",
+        "hasSidebar": true,
+        "pageNotFound": false,
+        "showsLogin": false,
+        "hasWorkspaceDashboardText": false,
+        "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nCompliance & Coverage\n\n0%\n\nATT&CK Technique Coverage\n\n0 of 0 techniques\n\n0\n\nActive Detection Rules\n\n0 total\n\n0\n\nAudit Events (30 days)\n\nHash-chained log\n\nATT&CK CoverageDetection RulesAudit Log\n\nCoverage across MITRE ATT&CK tactics and techniques.MITRE ATT&CK \n\nShow gaps only",
+        "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-live-dash-fix-01\\mobile-compliance.png"
+      }
+    ]
+  }
+}

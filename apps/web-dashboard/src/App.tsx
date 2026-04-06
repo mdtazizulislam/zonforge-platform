@@ -7,7 +7,8 @@ import { useAuthStore } from '@/stores/auth.store'
 // LAZY PAGES — code-split per route
 // ─────────────────────────────────────────────
 
-const LoginPage         = lazy(() => import('@/pages/LoginPage'))
+const LoginPage         = lazy(() => import('@/pages/LoginPage.tsx'))
+const SignupPage        = lazy(() => import('@/pages/SignupPage.tsx'))
 const DashboardPage     = lazy(() => import('@/pages/DashboardPage'))
 const AlertsPage        = lazy(() => import('@/pages/AlertsPage'))
 const AlertDetailPage   = lazy(() => import('@/pages/AlertDetailPage'))
@@ -86,6 +87,14 @@ const router = createBrowserRouter([
     element: (
       <Suspense fallback={<PageLoader />}>
         <LoginPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/signup',
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <SignupPage />
       </Suspense>
     ),
   },

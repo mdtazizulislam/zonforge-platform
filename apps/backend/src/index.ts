@@ -45,9 +45,11 @@ import {
   trackConversionEvent,
 } from './growth.js';
 import { sendProductEmail } from './email.js';
+import { createCustomerSecurityRouter } from './customerSecurity.js';
 
 const app = new Hono();
 const API_PREFIX = '/v1';
+const customerSecurityRouter = createCustomerSecurityRouter(requireAuthUserId);
 
 function normalizeAppError(error: unknown): AppError {
   if (error instanceof AppError) {
@@ -190,6 +192,8 @@ function resolveFrontendOrigin(c: any): string {
 
   return 'https://zonforge.com';
 }
+
+app.route('/', customerSecurityRouter);
 
 function normalizeCheckoutRequest(body: Record<string, unknown>) {
   const rawPlanId = body.plan_id ?? body.planId ?? body.planCode ?? body.plan ?? null;

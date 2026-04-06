@@ -258,6 +258,143 @@ export async function initDatabase() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS security_alerts (
+        id BIGSERIAL PRIMARY KEY,
+        alert_id UUID NOT NULL UNIQUE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        title TEXT,
+        description TEXT,
+        severity VARCHAR(16) NOT NULL DEFAULT 'info',
+        priority VARCHAR(8),
+        status VARCHAR(32) NOT NULL DEFAULT 'open',
+        affected_user_id VARCHAR(255),
+        affected_ip VARCHAR(255),
+        evidence_json JSONB,
+        mitre_tactics_json JSONB,
+        mitre_techniques_json JSONB,
+        detection_gap_minutes INTEGER,
+        mttd_sla_breached BOOLEAN NOT NULL DEFAULT false,
+        assigned_to VARCHAR(255),
+        recommended_actions_json JSONB,
+        first_signal_time TIMESTAMPTZ,
+        llm_narrative_json JSONB,
+        llm_narrative_generated_at TIMESTAMPTZ,
+        resolved_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS connector_configs (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(128) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'configured',
+        config_json JSONB,
+        poll_interval_minutes INTEGER DEFAULT 15,
+        last_poll_at TIMESTAMPTZ,
+        last_event_at TIMESTAMPTZ,
+        last_error_message TEXT,
+        consecutive_errors INTEGER NOT NULL DEFAULT 0,
+        event_rate_per_hour INTEGER NOT NULL DEFAULT 0,
+        is_enabled BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ai_investigations (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        alert_id VARCHAR(255) NOT NULL,
+        alert_title TEXT,
+        alert_severity VARCHAR(32),
+        status VARCHAR(32) NOT NULL DEFAULT 'queued',
+        verdict VARCHAR(64),
+        confidence INTEGER NOT NULL DEFAULT 0,
+        summary TEXT,
+        executive_summary TEXT,
+        detailed_report TEXT,
+        recommendations_json JSONB,
+        ioc_list_json JSONB,
+        thoughts_json JSONB,
+        evidence_json JSONB,
+        total_steps INTEGER NOT NULL DEFAULT 0,
+        total_tokens INTEGER NOT NULL DEFAULT 0,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        agent_model VARCHAR(255),
+        review_notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS title TEXT`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS description TEXT`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS priority VARCHAR(8)`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS affected_user_id VARCHAR(255)`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS affected_ip VARCHAR(255)`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS evidence_json JSONB`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS mitre_tactics_json JSONB`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS mitre_techniques_json JSONB`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS detection_gap_minutes INTEGER`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS mttd_sla_breached BOOLEAN NOT NULL DEFAULT false`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(255)`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS recommended_actions_json JSONB`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS first_signal_time TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS llm_narrative_json JSONB`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS llm_narrative_generated_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS name VARCHAR(255)`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS type VARCHAR(128)`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'configured'`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS config_json JSONB`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS poll_interval_minutes INTEGER DEFAULT 15`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_event_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_error_message TEXT`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS consecutive_errors INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS event_rate_per_hour INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN NOT NULL DEFAULT true`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS alert_id VARCHAR(255)`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS alert_title TEXT`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS alert_severity VARCHAR(32)`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'queued'`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS verdict VARCHAR(64)`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS confidence INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS summary TEXT`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS executive_summary TEXT`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS detailed_report TEXT`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS recommendations_json JSONB`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS ioc_list_json JSONB`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS thoughts_json JSONB`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS evidence_json JSONB`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS total_steps INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS total_tokens INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS duration_ms INTEGER NOT NULL DEFAULT 0`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS agent_model VARCHAR(255)`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS review_notes TEXT`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_security_alerts_tenant ON security_alerts(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_security_alerts_status ON security_alerts(tenant_id, status, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_connector_configs_tenant ON connector_configs(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_ai_investigations_tenant ON ai_investigations(tenant_id, created_at DESC)`);
+
     // ─── LEGACY BILLING_SUBSCRIPTIONS (USER-BASED, FOR BACKWARD COMPAT) ───
     await client.query(`
       CREATE TABLE IF NOT EXISTS billing_subscriptions (

@@ -1,0 +1,13 @@
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "dashboardRoute": "/customer-dashboard",
+  "redirectRoute": "/customer",
+  "redirectTarget": "/customer-dashboard",
+  "redirectWorked": true,
+  "screenshots": {
+    "dashboard": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01b\\customer-dashboard.png",
+    "redirect": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01b\\customer-redirect.png"
+  },
+  "consoleErrors": [],
+  "capturedAt": "2026-04-05T21:51:12.036Z"
+}

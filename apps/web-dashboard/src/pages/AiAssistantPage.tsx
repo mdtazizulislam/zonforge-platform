@@ -1,36 +1,67 @@
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { MessageSquare, Send, Bot, User, AlertCircle, Sparkles } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { PageContent } from '@/components/layout/AppShell'
 import { Spinner } from '@/components/shared/ui'
 import { api } from '@/lib/api'
+import { useAssistantSuggestions } from '@/hooks/queries'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  toolsUsed?: string[]
 }
 
 export default function AiAssistantPage() {
+  const [searchParams] = useSearchParams()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [sessionId] = useState(() => crypto.randomUUID())
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { data: suggestionsData } = useAssistantSuggestions()
+
+  const promptFromRoute = searchParams.get('prompt')?.trim() ?? ''
+
+  useEffect(() => {
+    if (promptFromRoute) {
+      setInput(promptFromRoute)
+    }
+  }, [promptFromRoute])
+
+  const suggestions = useMemo(() => {
+    return Array.from(new Set([
+      'Explain latest alert',
+      'Summarize my risk',
+      'What should I do first?',
+      ...(suggestionsData?.data ?? []),
+    ])).slice(0, 6)
+  }, [suggestionsData?.data])
 
   const { mutate: sendMessage, isPending, error } = useMutation({
-    mutationFn: (message: string) => api.ai.chat(message, sessionId),
+    mutationFn: (nextMessages: Message[]) => api.ai.chat(
+      nextMessages.map(message => ({ role: message.role, content: message.content })),
+      sessionId,
+    ),
     onSuccess: (data) => {
-      setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
+      setSessionId(data.sessionId)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.message,
+        toolsUsed: data.toolsUsed,
+      }])
     },
   })
 
-  function handleSend() {
-    const text = input.trim()
+  function handleSend(textOverride?: string) {
+    const text = (textOverride ?? input).trim()
     if (!text || isPending) return
-    setMessages(prev => [...prev, { role: 'user', content: text }])
+    const nextMessages = [...messages, { role: 'user' as const, content: text }]
+    setMessages(nextMessages)
     setInput('')
-    sendMessage(text)
+    sendMessage(nextMessages)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -67,16 +98,11 @@ export default function AiAssistantPage() {
                 <div>
                   <p className="mb-1 font-medium text-gray-300">ZonForge AI Assistant</p>
                   <p className="max-w-xs text-sm text-gray-600">
-                    Ask about alerts, threat hunting, compliance, incident response, or general security topics.
+                    Ask about alerts, investigations, posture, or first-response priorities.
                   </p>
                 </div>
                 <div className="mt-2 grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
-                  {[
-                    'Explain lateral movement techniques',
-                    'What does a ransomware kill chain look like?',
-                    'How do I investigate a suspicious login?',
-                    'Summarize NIST CSF controls',
-                  ].map(suggestion => (
+                  {suggestions.map(suggestion => (
                     <button
                       key={suggestion}
                       onClick={() => { setInput(suggestion) }}
@@ -105,6 +131,18 @@ export default function AiAssistantPage() {
                   )}
                 >
                   <pre className="whitespace-pre-wrap font-sans">{msg.content}</pre>
+                  {msg.role === 'assistant' && msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 border-t border-gray-700/60 pt-2">
+                      {msg.toolsUsed.map(tool => (
+                        <span
+                          key={tool}
+                          className="rounded-full bg-gray-700/70 px-2 py-0.5 text-[11px] text-gray-400"
+                        >
+                          {tool}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {msg.role === 'user' && (
                   <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gray-700">

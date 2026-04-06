@@ -1,0 +1,369 @@
+{
+  "generatedAt": "2026-04-05T23:07:48.832Z",
+  "baseUrl": "http://127.0.0.1:4300",
+  "credentials": {
+    "email": "audit_1775430468832@example.com",
+    "password": "AuditPass123!"
+  },
+  "checks": {
+    "signupPageLoad": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/signup"
+    },
+    "signupFlow": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/login"
+    },
+    "loginRedirect": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    "customerApi": {
+      "/v1/risk/summary": {
+        "pass": true,
+        "hits": [
+          {
+            "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+            "status": 200,
+            "ok": true,
+            "page": "http://127.0.0.1:4300/customer-dashboard"
+          }
+        ]
+      },
+      "/v1/alerts": {
+        "pass": true,
+        "hits": [
+          {
+            "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+            "status": 200,
+            "ok": true,
+            "page": "http://127.0.0.1:4300/customer-dashboard"
+          }
+        ]
+      },
+      "/v1/investigations": {
+        "pass": true,
+        "hits": [
+          {
+            "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+            "status": 200,
+            "ok": true,
+            "page": "http://127.0.0.1:4300/customer-dashboard"
+          }
+        ]
+      },
+      "/v1/health/pipeline": {
+        "pass": true,
+        "hits": [
+          {
+            "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+            "status": 200,
+            "ok": true,
+            "page": "http://127.0.0.1:4300/customer-dashboard"
+          }
+        ]
+      }
+    },
+    "customerDashboardWidgets": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    "customerRedirect": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    "alertsNav": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/alerts"
+    },
+    "investigationsNav": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/investigations"
+    },
+    "assistantNav": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/ai-assistant"
+    },
+    "billingNav": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/billing"
+    },
+    "settingsNav": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/settings"
+    },
+    "analystDashboardPreserved": {
+      "pass": true,
+      "url": "http://127.0.0.1:4300/dashboard",
+      "title": "Executive Overview"
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "requestFailures": [],
+  "apiResponses": [
+    {
+      "url": "http://127.0.0.1:4300/api/v1/auth/register",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/signup"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/auth/login",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/login"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/auth/me",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/login"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?status=open&status=investigating&limit=200",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/alerts"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations/stats",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/investigations"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=20",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/investigations"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/assistant/suggestions",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/ai-assistant"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/billing/plans",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/billing"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/billing/usage",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/billing"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/billing/subscription",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/billing"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?limit=24",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/customer-dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/risk/summary",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/alerts?status=open&status=investigating&limit=8",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/connectors",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/metrics/mttd",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/dashboard"
+    },
+    {
+      "url": "http://127.0.0.1:4300/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true,
+      "page": "http://127.0.0.1:4300/dashboard"
+    }
+  ],
+  "summary": {
+    "consoleErrorCount": 0,
+    "pageErrorCount": 0,
+    "requestFailureCount": 0
+  }
+}

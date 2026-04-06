@@ -1,0 +1,726 @@
+diff --git a/apps/web-dashboard/src/App.tsx b/apps/web-dashboard/src/App.tsx
+index ae37633..75687aa 100644
+--- a/apps/web-dashboard/src/App.tsx
++++ b/apps/web-dashboard/src/App.tsx
+@@ -7,7 +7,8 @@ import { useAuthStore } from '@/stores/auth.store'
+ // LAZY PAGES ΓÇö code-split per route
+ // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ 
+-const LoginPage         = lazy(() => import('@/pages/LoginPage'))
++const LoginPage         = lazy(() => import('@/pages/LoginPage.tsx'))
++const SignupPage        = lazy(() => import('@/pages/SignupPage.tsx'))
+ const DashboardPage     = lazy(() => import('@/pages/DashboardPage'))
+ const AlertsPage        = lazy(() => import('@/pages/AlertsPage'))
+ const AlertDetailPage   = lazy(() => import('@/pages/AlertDetailPage'))
+@@ -89,6 +90,14 @@ const router = createBrowserRouter([
+       </Suspense>
+     ),
+   },
++  {
++    path: '/signup',
++    element: (
++      <Suspense fallback={<PageLoader />}>
++        <SignupPage />
++      </Suspense>
++    ),
++  },
+   {
+     path: '/',
+     element: <RequireAuth><Navigate to="/dashboard" replace /></RequireAuth>,
+diff --git a/apps/web-dashboard/src/components/auth/AuthCard.tsx b/apps/web-dashboard/src/components/auth/AuthCard.tsx
+new file mode 100644
+index 0000000..df69505
+--- /dev/null
++++ b/apps/web-dashboard/src/components/auth/AuthCard.tsx
+@@ -0,0 +1,17 @@
++import React from 'react'
++
++type AuthCardProps = {
++  heading: string
++  description: string
++  children: React.ReactNode
++}
++
++export default function AuthCard({ heading, description, children }: AuthCardProps) {
++  return (
++    <div className="zf-auth-card">
++      <h1>{heading}</h1>
++      <p>{description}</p>
++      {children}
++    </div>
++  )
++}
+\ No newline at end of file
+diff --git a/apps/web-dashboard/src/components/auth/AuthShell.tsx b/apps/web-dashboard/src/components/auth/AuthShell.tsx
+new file mode 100644
+index 0000000..4d6fb4e
+--- /dev/null
++++ b/apps/web-dashboard/src/components/auth/AuthShell.tsx
+@@ -0,0 +1,55 @@
++import React from 'react'
++
++type AuthShellProps = {
++  title: string
++  subtitle: string
++  children: React.ReactNode
++}
++
++const valuePoints = [
++  'Proactive Threat Detection',
++  'Cloud Security Signals',
++  'Identity Threat Protection',
++]
++
++const footerPills = ['AI-Native Detection', 'Analyst-Ready', 'Multi-Source Visibility']
++
++export default function AuthShell({ title, subtitle, children }: AuthShellProps) {
++  return (
++    <div className="zf-auth-page">
++      <section className="zf-auth-brand" aria-label="ZonForge brand panel">
++        <div className="zf-brand-top">
++          <div className="zf-logo-row">
++            <div className="zf-logo-badge">ZF</div>
++            <div className="zf-logo-text">ZonForge Sentinel</div>
++          </div>
++
++          <p className="zf-kicker">AI-Powered Cyber Early Warning</p>
++          <h2 className="zf-auth-heading">{title}</h2>
++          <p className="zf-auth-subheading">{subtitle}</p>
++
++          <ul className="zf-value-list">
++            {valuePoints.map((item) => (
++              <li key={item}>
++                <span className="zf-value-dot" />
++                <span>{item}</span>
++              </li>
++            ))}
++          </ul>
++        </div>
++
++        <div className="zf-brand-bottom">
++          <div className="zf-brand-footer">
++            {footerPills.map((pill) => (
++              <span key={pill} className="zf-pill">
++                {pill}
++              </span>
++            ))}
++          </div>
++        </div>
++      </section>
++
++      <section className="zf-auth-card-wrap">{children}</section>
++    </div>
++  )
++}
+\ No newline at end of file
+diff --git a/apps/web-dashboard/src/pages/LoginPage.tsx b/apps/web-dashboard/src/pages/LoginPage.tsx
+index 83c9bac..61369ca 100644
+--- a/apps/web-dashboard/src/pages/LoginPage.tsx
++++ b/apps/web-dashboard/src/pages/LoginPage.tsx
+@@ -1,154 +1,160 @@
+-import { useState, type FormEvent } from 'react'
+-import { useNavigate } from 'react-router-dom'
+-import { api, tokenStorage, type LoginResult } from '@/lib/api'
++import React, { useMemo, useState } from 'react'
++import { Link, useLocation, useNavigate } from 'react-router-dom'
++import AuthShell from '../components/auth/AuthShell'
++import AuthCard from '../components/auth/AuthCard'
++import { api, tokenStorage } from '@/lib/api'
+ import { useAuthStore } from '@/stores/auth.store'
+-import { Spinner } from '@/components/ui'
+ 
+-export function LoginPage() {
+-  const navigate = useNavigate()
+-  const setUser  = useAuthStore(s => s.setUser)
++type LoginResponse =
++  | {
++      accessToken?: string
++      token?: string
++      refreshToken?: string
++      user?: unknown
++    }
++  | Record<string, unknown>
++
++function resolveApiBase(): string {
++  const env = (import.meta as unknown as { env?: Record<string, string> }).env
++  const envBase = env?.VITE_API_BASE_URL || env?.VITE_API_URL || '/api'
++  return envBase.replace(/\/$/, '')
++}
+ 
+-  const [email,    setEmail]    = useState('')
++async function postJson<T>(url: string, payload: Record<string, unknown>): Promise<T> {
++  const response = await fetch(url, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    credentials: 'include',
++    body: JSON.stringify(payload),
++  })
++
++  const text = await response.text()
++  const data = text ? JSON.parse(text) : {}
++
++  if (!response.ok) {
++    const message =
++      (data && (data.message || data.error || data.detail)) ||
++      'Unable to sign in. Please verify your credentials.'
++    throw new Error(String(message))
++  }
++
++  return data as T
++}
++
++function extractAccessToken(data: LoginResponse): string | null {
++  if (typeof data.accessToken === 'string' && data.accessToken) return data.accessToken
++  if (typeof data.token === 'string' && data.token) return data.token
++  return null
++}
++
++export default function LoginPage() {
++  const navigate = useNavigate()
++  const location = useLocation()
++  const setUser = useAuthStore((state) => state.setUser)
++  const apiBase = useMemo(resolveApiBase, [])
++  const [email, setEmail] = useState('')
+   const [password, setPassword] = useState('')
+-  const [totp,     setTotp]     = useState('')
+-  const [needsMfa, setNeedsMfa] = useState(false)
+-  const [error,    setError]    = useState<string | null>(null)
+-  const [loading,  setLoading]  = useState(false)
++  const [submitting, setSubmitting] = useState(false)
++  const [errorMessage, setErrorMessage] = useState('')
+ 
+-  async function handleSubmit(e: FormEvent) {
+-    e.preventDefault()
+-    setError(null)
+-    setLoading(true)
++  const from =
++    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/customer-dashboard'
++
++  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
++    event.preventDefault()
++    setSubmitting(true)
++    setErrorMessage('')
+ 
+     try {
+-      const result = await api.auth.login(email, password, needsMfa ? totp : undefined)
++      const data = await postJson<LoginResponse>(`${apiBase}/v1/auth/login`, {
++        email: email.trim(),
++        password,
++      })
+ 
+-      if (result.requiresMfa) {
+-        setNeedsMfa(true)
+-        setLoading(false)
+-        return
++      const accessToken = extractAccessToken(data)
++      if (accessToken) {
++        tokenStorage.set(accessToken)
+       }
+ 
+-      tokenStorage.set(result.accessToken)
+-      tokenStorage.setRefresh(result.refreshToken)
+-      if (!result.user) {
+-        throw new Error('Login succeeded but no user profile was returned')
++      const refreshToken = typeof data.refreshToken === 'string' ? data.refreshToken : null
++      if (refreshToken) {
++        tokenStorage.setRefresh(refreshToken)
+       }
+-      setUser(result.user)
+-      navigate('/dashboard', { replace: true })
+-    } catch (err) {
+-      setError(err instanceof Error ? err.message : 'Login failed')
++
++      const currentUser = await api.auth.me()
++      setUser(currentUser)
++
++      navigate(from, { replace: true })
++    } catch (error) {
++      setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in.')
+     } finally {
+-      setLoading(false)
++      setSubmitting(false)
+     }
+   }
+ 
+   return (
+-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+-      {/* Background grid */}
+-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)]
+-                      bg-[size:4rem_4rem] opacity-30 pointer-events-none" />
+-
+-      <div className="relative w-full max-w-sm">
+-        {/* Logo */}
+-        <div className="flex flex-col items-center mb-8">
+-          <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center mb-4 shadow-lg shadow-brand-600/30">
+-            <span className="text-white text-xl font-bold">Z</span>
++    <AuthShell
++      title="Security visibility that feels immediate."
++      subtitle="Sign in to access your ZonForge workspace, review active threats, and move from signal to action without losing context."
++    >
++      <AuthCard
++        heading="Sign in to ZonForge"
++        description="Use your workspace credentials to access the production security console."
++      >
++        <form className="zf-auth-form" onSubmit={handleSubmit} noValidate>
++          <div className="zf-field">
++            <label htmlFor="login-email">Email</label>
++            <input
++              id="login-email"
++              name="email"
++              type="email"
++              autoComplete="email"
++              placeholder="you@company.com"
++              value={email}
++              onChange={(event) => setEmail(event.target.value)}
++              required
++            />
+           </div>
+-          <h1 className="text-xl font-bold text-gray-100">ZonForge Sentinel</h1>
+-          <p className="text-sm text-gray-500 mt-1">AI-Powered Cyber Early Warning</p>
+-        </div>
+ 
+-        {/* Card */}
+-        <div className="card p-6 shadow-2xl shadow-black/50">
+-          <h2 className="text-sm font-semibold text-gray-300 mb-5">
+-            {needsMfa ? 'Two-Factor Authentication' : 'Sign in to your account'}
+-          </h2>
+-
+-          <form onSubmit={handleSubmit} className="space-y-4">
+-            {!needsMfa ? (
+-              <>
+-                <div>
+-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Email</label>
+-                  <input
+-                    type="email"
+-                    required
+-                    className="input"
+-                    placeholder="analyst@company.com"
+-                    value={email}
+-                    onChange={e => setEmail(e.target.value)}
+-                    autoComplete="email"
+-                    autoFocus
+-                  />
+-                </div>
+-                <div>
+-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Password</label>
+-                  <input
+-                    type="password"
+-                    required
+-                    className="input"
+-                    placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+-                    value={password}
+-                    onChange={e => setPassword(e.target.value)}
+-                    autoComplete="current-password"
+-                  />
+-                </div>
+-              </>
+-            ) : (
+-              <div>
+-                <label className="block text-xs font-medium text-gray-400 mb-1.5">
+-                  Authenticator code
+-                </label>
+-                <input
+-                  type="text"
+-                  required
+-                  className="input font-mono text-center tracking-[0.25em] text-lg"
+-                  placeholder="000 000"
+-                  value={totp}
+-                  onChange={e => setTotp(e.target.value.replace(/\s/g, ''))}
+-                  maxLength={6}
+-                  autoFocus
+-                  inputMode="numeric"
+-                />
+-                <p className="text-xs text-gray-500 mt-2 text-center">
+-                  Enter the 6-digit code from your authenticator app
+-                </p>
+-              </div>
+-            )}
+-
+-            {error && (
+-              <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+-                <p className="text-xs text-red-400">{error}</p>
+-              </div>
+-            )}
+-
+-            <button
+-              type="submit"
+-              disabled={loading}
+-              className="btn-primary w-full justify-center"
+-            >
+-              {loading ? <Spinner size="sm" /> : null}
+-              {needsMfa ? 'Verify' : 'Sign In'}
++          <div className="zf-field">
++            <label htmlFor="login-password">Password</label>
++            <input
++              id="login-password"
++              name="password"
++              type="password"
++              autoComplete="current-password"
++              placeholder="Enter your password"
++              value={password}
++              onChange={(event) => setPassword(event.target.value)}
++              required
++            />
++          </div>
++
++          {errorMessage ? <div className="zf-form-error">{errorMessage}</div> : null}
++
++          <button className="zf-auth-primary" type="submit" disabled={submitting}>
++            {submitting ? 'Signing in...' : 'Sign in'}
++          </button>
++
++          <div className="zf-auth-divider">or continue with</div>
++
++          <div className="zf-social-row">
++            <button className="zf-social-btn" type="button" disabled>
++              Google
++            </button>
++            <button className="zf-social-btn" type="button" disabled>
++              Microsoft
+             </button>
++          </div>
++        </form>
+ 
+-            {needsMfa && (
+-              <button
+-                type="button"
+-                onClick={() => { setNeedsMfa(false); setTotp('') }}
+-                className="btn-ghost w-full justify-center text-gray-500"
+-              >
+-                ΓåÉ Back to login
+-              </button>
+-            )}
+-          </form>
++        <div className="zf-auth-footer">
++          DonΓÇÖt have an account?{' '}
++          <Link className="zf-auth-link" to="/signup">
++            Create one
++          </Link>
+         </div>
+-
+-        <p className="text-center text-xs text-gray-600 mt-4">
+-          Protected by ZonForge Sentinel v4.6.0
+-        </p>
+-      </div>
+-    </div>
++      </AuthCard>
++    </AuthShell>
+   )
+ }
+-
+-export default LoginPage
+diff --git a/apps/web-dashboard/src/pages/SignupPage.tsx b/apps/web-dashboard/src/pages/SignupPage.tsx
+new file mode 100644
+index 0000000..77a0eea
+--- /dev/null
++++ b/apps/web-dashboard/src/pages/SignupPage.tsx
+@@ -0,0 +1,152 @@
++import React, { useMemo, useState } from 'react'
++import { Link, useNavigate } from 'react-router-dom'
++import AuthShell from '../components/auth/AuthShell'
++import AuthCard from '../components/auth/AuthCard'
++
++type SignupResponse = Record<string, unknown>
++
++function resolveApiBase(): string {
++  const env = (import.meta as unknown as { env?: Record<string, string> }).env
++  const envBase = env?.VITE_API_BASE_URL || env?.VITE_API_URL || '/api'
++  return envBase.replace(/\/$/, '')
++}
++
++async function postJson<T>(url: string, payload: Record<string, unknown>): Promise<T> {
++  const response = await fetch(url, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    credentials: 'include',
++    body: JSON.stringify(payload),
++  })
++
++  const text = await response.text()
++  const data = text ? JSON.parse(text) : {}
++
++  if (!response.ok) {
++    const message =
++      (data && (data.message || data.error || data.detail)) ||
++      'Unable to create account. Please check your details.'
++    throw new Error(String(message))
++  }
++
++  return data as T
++}
++
++export default function SignupPage() {
++  const navigate = useNavigate()
++  const apiBase = useMemo(resolveApiBase, [])
++  const [email, setEmail] = useState('')
++  const [password, setPassword] = useState('')
++  const [confirmPassword, setConfirmPassword] = useState('')
++  const [submitting, setSubmitting] = useState(false)
++  const [errorMessage, setErrorMessage] = useState('')
++  const [successMessage, setSuccessMessage] = useState('')
++
++  function validate(): string | null {
++    if (!email.trim()) return 'Work email is required.'
++    if (password.length < 8) return 'Password must be at least 8 characters.'
++    if (password !== confirmPassword) return 'Passwords do not match.'
++    return null
++  }
++
++  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
++    event.preventDefault()
++    setErrorMessage('')
++    setSuccessMessage('')
++
++    const validationError = validate()
++    if (validationError) {
++      setErrorMessage(validationError)
++      return
++    }
++
++    setSubmitting(true)
++
++    try {
++      await postJson<SignupResponse>(`${apiBase}/v1/auth/register`, {
++        email: email.trim(),
++        password,
++      })
++
++      setSuccessMessage('Account created successfully. Redirecting to sign in...')
++      window.setTimeout(() => {
++        navigate('/login', { replace: true })
++      }, 900)
++    } catch (error) {
++      setErrorMessage(error instanceof Error ? error.message : 'Unable to create account.')
++    } finally {
++      setSubmitting(false)
++    }
++  }
++
++  return (
++    <AuthShell
++      title="Start with a secure workspace from day one."
++      subtitle="Create your ZonForge account to begin monitoring identity, cloud, and early threat signals through a single security workspace."
++    >
++      <AuthCard
++        heading="Create your ZonForge workspace"
++        description="Register a production-ready account and continue into your security environment."
++      >
++        <form className="zf-auth-form" onSubmit={handleSubmit} noValidate>
++          <div className="zf-field">
++            <label htmlFor="signup-email">Work Email</label>
++            <input
++              id="signup-email"
++              name="email"
++              type="email"
++              autoComplete="email"
++              placeholder="you@company.com"
++              value={email}
++              onChange={(event) => setEmail(event.target.value)}
++              required
++            />
++          </div>
++
++          <div className="zf-field">
++            <label htmlFor="signup-password">Password</label>
++            <input
++              id="signup-password"
++              name="password"
++              type="password"
++              autoComplete="new-password"
++              placeholder="Minimum 8 characters"
++              value={password}
++              onChange={(event) => setPassword(event.target.value)}
++              required
++            />
++            <div className="zf-helper">Use at least 8 characters for a production-safe password baseline.</div>
++          </div>
++
++          <div className="zf-field">
++            <label htmlFor="signup-confirm-password">Confirm Password</label>
++            <input
++              id="signup-confirm-password"
++              name="confirmPassword"
++              type="password"
++              autoComplete="new-password"
++              placeholder="Re-enter your password"
++              value={confirmPassword}
++              onChange={(event) => setConfirmPassword(event.target.value)}
++              required
++            />
++          </div>
++
++          {errorMessage ? <div className="zf-form-error">{errorMessage}</div> : null}
++          {successMessage ? <div className="zf-form-success">{successMessage}</div> : null}
++
++          <button className="zf-auth-primary" type="submit" disabled={submitting}>
++            {submitting ? 'Creating account...' : 'Create Account'}
++          </button>
++        </form>
++
++        <div className="zf-auth-footer">
++          Already have an account?{' '}
++          <Link className="zf-auth-link" to="/login">
++            Sign in
++          </Link>
++        </div>
++      </AuthCard>
++    </AuthShell>
++  )
++}
+\ No newline at end of file
+diff --git a/landing/_redirects b/landing/_redirects
+index 662d376..d07eb7e 100644
+--- a/landing/_redirects
++++ b/landing/_redirects
+@@ -1,8 +1,12 @@
+ # ΓöÇΓöÇ React SPA app routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ # All authenticated-app routes are served by the React SPA (landing/app/index.html)
+ # Netlify internally rewrites (200) so browser URL stays intact for React Router.
+-/login               /app/index.html  200
++/login               /app/index.html  200!
+ /dashboard           /app/index.html  200
++/customer-dashboard  /app/index.html  200
++/customer-dashboard/* /app/index.html 200
++/customer            /app/index.html  200
++/customer/*          /app/index.html  200
+ /alerts              /app/index.html  200
+ /alerts/*            /app/index.html  200
+ /risk                /app/index.html  200
+@@ -46,7 +50,7 @@
+ /supply-chain        /app/index.html  200
+ /supply-chain/*      /app/index.html  200
+ # ΓöÇΓöÇ Marketing static pages ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+-/signup              /signup.html     200
++/signup              /app/index.html  200!
+ /pricing             /index.html      200
+ # ΓöÇΓöÇ Backend API proxy ΓÇö must be BEFORE the wildcard ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ # Netlify proxies /api/* ΓåÆ api.zonforge.com so SPA fetch('/api/...') calls work
+diff --git a/landing/signup.html b/landing/signup.html
+deleted file mode 100644
+index 999bd75..0000000
+--- a/landing/signup.html
++++ /dev/null
+@@ -1,123 +0,0 @@
+-<!DOCTYPE html>
+-<html lang="en">
+-<head>
+-<meta charset="UTF-8">
+-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+-<title>Create Account - ZonForge</title>
+-<style>
+-body{font-family:Arial,sans-serif;max-width:520px;margin:40px auto;padding:0 16px;background:#020b12;color:#ddeeff}
+-label{display:block;margin:12px 0 6px}
+-input{width:100%;padding:10px;border:1px solid #0f2236;border-radius:6px;background:#07141f;color:#ddeeff}
+-button{margin-top:16px;padding:10px 14px;border:1px solid #00d4ff;border-radius:6px;background:#0b2a3a;color:#00d4ff;cursor:pointer}
+-.notice{margin-top:12px;padding:10px;border-radius:6px;display:none}
+-.notice.ok{display:block;background:#123a22;border:1px solid #22c55e;color:#86efac}
+-.notice.err{display:block;background:#3a1616;border:1px solid #ef4444;color:#fca5a5}
+-small,a{color:#8daec4}
+-</style>
+-</head>
+-<body>
+-  <h1>Create Account</h1>
+-  <p>Register against production API.</p>
+-
+-  <form id="signup-form">
+-    <label for="email">Email</label>
+-    <input id="email" type="email" required placeholder="you@company.com" />
+-
+-    <label for="password">Password</label>
+-    <input id="password" type="password" required placeholder="At least 8 chars" />
+-
+-    <button type="submit">Create Account</button>
+-    <div id="notice" class="notice"></div>
+-  </form>
+-
+-  <p><small>Already have an account? <a href="/login">Sign In</a></small></p>
+-
+-<script>
+-const API_BASE = (localStorage.getItem('zonforge_api_base') || window.ZONFORGE_API_BASE || 'https://api.zonforge.com').replace(/\/$/, '');
+-const TOKEN_KEY = 'zonforge_access_token';
+-const params = new URLSearchParams(window.location.search);
+-const checkoutPlan = params.get('checkout_plan');
+-const billingCycle = params.get('billing_cycle') === 'annual' ? 'annual' : 'monthly';
+-const nextPath = params.get('next') || '/dashboard';
+-
+-const loginLink = document.querySelector('a[href="/login"]');
+-if (loginLink && window.location.search) {
+-  loginLink.href = `/login${window.location.search}`;
+-}
+-
+-function showNotice(text, type) {
+-  const notice = document.getElementById('notice');
+-  notice.className = `notice ${type}`;
+-  notice.textContent = text;
+-}
+-
+-async function resumeCheckout(token) {
+-  if (!checkoutPlan || !token) {
+-    return false;
+-  }
+-
+-  showNotice('Account created. Starting secure checkout...', 'ok');
+-  const resp = await fetch(`${API_BASE}/v1/billing/checkout`, {
+-    method: 'POST',
+-    headers: {
+-      'Content-Type': 'application/json',
+-      Authorization: `Bearer ${token}`,
+-    },
+-    credentials: 'include',
+-    body: JSON.stringify({
+-      plan_id: checkoutPlan,
+-      billing_cycle: billingCycle,
+-    }),
+-  });
+-
+-  const payload = await resp.json().catch(() => ({}));
+-  if (!resp.ok) {
+-    throw new Error(payload?.error || `Checkout failed (${resp.status})`);
+-  }
+-
+-  const sessionUrl = payload?.session_url || payload?.url;
+-  if (!sessionUrl) {
+-    throw new Error('Checkout session URL was missing from the response.');
+-  }
+-
+-  window.location.href = sessionUrl;
+-  return true;
+-}
+-
+-document.getElementById('signup-form').addEventListener('submit', async (e) => {
+-  e.preventDefault();
+-  const email = document.getElementById('email').value.trim();
+-  const password = document.getElementById('password').value;
+-
+-  try {
+-    const resp = await fetch(`${API_BASE}/v1/auth/register`, {
+-      method: 'POST',
+-      headers: { 'Content-Type': 'application/json' },
+-      credentials: 'include',
+-      body: JSON.stringify({ email, password }),
+-    });
+-
+-    const payload = await resp.json().catch(() => ({}));
+-    if (!resp.ok) {
+-      showNotice(payload?.error || payload?.detail || `Registration failed (${resp.status})`, 'err');
+-      return;
+-    }
+-
+-    const token = payload?.access_token || payload?.token || payload?.data?.accessToken;
+-    if (token) {
+-      localStorage.setItem(TOKEN_KEY, token);
+-    }
+-
+-    if (await resumeCheckout(token)) {
+-      return;
+-    }
+-
+-    showNotice('Account created successfully. Redirecting...', 'ok');
+-    setTimeout(() => { window.location.href = nextPath; }, 500);
+-  } catch (err) {
+-    showNotice(err instanceof Error ? err.message : 'Request failed', 'err');
+-  }
+-});
+-</script>
+-</body>
+-</html>

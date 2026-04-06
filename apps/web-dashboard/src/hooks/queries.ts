@@ -1,5 +1,5 @@
 import {
-  useQuery, useMutation, useQueryClient, type UseQueryResult,
+  useQuery, useMutation, useQueryClient,
 } from '@tanstack/react-query'
 import {
   api,
@@ -19,9 +19,37 @@ import {
   type DetectionRule,
   type AuditLogEntry,
   type UsageSummary,
+  type AiInvestigation,
+  type AiInvestigationStats,
+  type AssistantSuggestions,
+  type ComplianceReportCatalog,
 } from '@/lib/api'
 
 type WithData<T, R = T> = R & { data: T }
+
+function normalizeArrayData<T>(value: unknown): T[] {
+  if (Array.isArray(value)) {
+    return value as T[]
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+
+    if (Array.isArray(record.data)) {
+      return record.data as T[]
+    }
+
+    if (Array.isArray(record.items)) {
+      return record.items as T[]
+    }
+
+    if (Array.isArray(record.results)) {
+      return record.results as T[]
+    }
+  }
+
+  return []
+}
 
 // ─────────────────────────────────────────────
 // QUERY KEYS (centralized to avoid typos)
@@ -44,6 +72,11 @@ export const QK = {
   playbooks:                                    ['playbooks'],
   usage:                                        ['billing', 'usage'],
   subscription:                                 ['billing', 'subscription'],
+  investigations: (limit?: number)           => ['ai', 'investigations', limit],
+  investigation:  (id: string)               => ['ai', 'investigation', id],
+  investigationStats:                           ['ai', 'investigation-stats'],
+  assistantSuggestions:                         ['ai', 'assistant-suggestions'],
+  reportCatalog:                                ['compliance', 'reports', 'catalog'],
 } as const
 
 // ─────────────────────────────────────────────
@@ -274,6 +307,82 @@ export function useUsage() {
       return { ...usage, data: usage }
     },
     staleTime: 300_000,
+  })
+}
+
+// ─────────────────────────────────────────────
+// AI + REPORT QUERIES
+// ─────────────────────────────────────────────
+
+export function useInvestigations(limit = 20) {
+  return useQuery({
+    queryKey: QK.investigations(limit),
+    queryFn:  async (): Promise<WithData<AiInvestigation[], Record<string, unknown>>> => {
+      const raw = await api.ai.investigations({ limit }) as unknown
+      const investigations = normalizeArrayData<AiInvestigation>(raw)
+
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        return {
+          ...(raw as Record<string, unknown>),
+          data: investigations,
+        }
+      }
+
+      return { data: investigations }
+    },
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+  })
+}
+
+export function useInvestigation(id: string) {
+  return useQuery({
+    queryKey: QK.investigation(id),
+    queryFn:  async (): Promise<WithData<AiInvestigation, AiInvestigation>> => {
+      const investigation = await api.ai.investigation(id)
+      return { ...investigation, data: investigation }
+    },
+    enabled: !!id,
+    staleTime: 10_000,
+  })
+}
+
+export function useInvestigationStats() {
+  return useQuery({
+    queryKey: QK.investigationStats,
+    queryFn:  async (): Promise<WithData<AiInvestigationStats, AiInvestigationStats>> => {
+      const stats = await api.ai.investigationStats()
+      return { ...stats, data: stats }
+    },
+    staleTime: 60_000,
+  })
+}
+
+export function useAssistantSuggestions() {
+  return useQuery({
+    queryKey: QK.assistantSuggestions,
+    queryFn:  async (): Promise<WithData<string[], AssistantSuggestions>> => {
+      const suggestions = await api.ai.suggestions()
+      return {
+        ...suggestions,
+        data: suggestions.suggestions ?? [],
+      }
+    },
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useReportCatalog() {
+  return useQuery({
+    queryKey: QK.reportCatalog,
+    queryFn:  async (): Promise<WithData<ComplianceReportCatalog['reports'], ComplianceReportCatalog>> => {
+      const catalog = await api.compliance.reportsList()
+      return {
+        ...catalog,
+        data: catalog.reports ?? [],
+      }
+    },
+    staleTime: 5 * 60_000,
   })
 }
 

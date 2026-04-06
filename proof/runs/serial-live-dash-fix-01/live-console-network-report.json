@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-04-05T19:20:49.735Z",
+  "baseUrl": "https://zonforge.com",
+  "email": "deployproof_20260405145529@zonforge.test",
+  "consoleErrors": [],
+  "consoleWarnings": [],
+  "apiCalls": [
+    {
+      "url": "https://zonforge.com/api/v1/auth/login",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/auth/me",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/assistant/suggestions",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/alerts?limit=6",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/investigations/stats",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/health/pipeline",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/investigations?limit=6",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/risk/summary",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/investigations?limit=20",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "url": "https://zonforge.com/api/v1/investigations/stats",
+      "status": 200,
+      "ok": true
+    }
+  ],
+  "routes": [
+    {
+      "route": "/dashboard",
+      "finalUrl": "https://zonforge.com/dashboard",
+      "title": "ZonForge Sentinel",
+      "hasSidebar": true,
+      "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nSecurity Dashboard\nPipeline healthy\n\nGood afternoon, deployproof_20260405145529\n\nYour security workspace is live\n\nReview active alerts, current posture, AI findings, and investigation status from the live platform services. Billing remains available, but this is now the primary post-login view.\n\nOpen AlertsStart InvestigationAsk AI Assistant\n\n0\n\nTotal Alerts\n\nLive alert count from the alert service\n\n0\n\nCritical Alerts\n\nOpen critical issues needing attention\n\n0/100\n\nRisk Score\n\nTrend not exposed by the current API\n\n0\n\nActive Investigations\n\nQueued, in-progress, or awaiting review\n\nRecent Alerts\n\nSeverity, status, and timestamps from the live alert feed\n\nView alert center\n\nNo alerts yet\n\nThe alert service is reachable, but there are no recent alerts for this tenant.\n\nAI Assistant\n\nQuick-launch into the live assistant with recommended prompts\n\nOpen assistant\n\nAsk for direction, triage, or explanations\n\nThe assistant is backed by the liv"
+    },
+    {
+      "route": "/investigations",
+      "finalUrl": "https://zonforge.com/investigations",
+      "title": "ZonForge Sentinel",
+      "hasSidebar": true,
+      "bodySample": "ZonForge\n\nSentinel\n\nDashboardAlertsAI SOC AnalystAI IntelligenceAI AssistantInvestigationsRiskThreat HuntingSecurity ValidationSupply ChainEnterpriseConnectors\nComplianceAudit LogMSSPEnterprise SalesBillingSettings\nD\n\ndeployproof_20260405145529\n\nowner\n\nInvestigations\nAnalyst ViewStart Investigation\nAI Investigations\n\nLive investigation queue, status, and summaries from the SOC analyst service\n\n0\n\nTotal\n\n0\n\nTrue Positives\n\n0\n\nFalse Positives\n\n0\n\nPending Review\n\nNo investigations yet\n\nCreate an investigation to get an AI-generated deep dive into an alert."
+    }
+  ]
+}

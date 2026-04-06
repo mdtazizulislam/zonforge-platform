@@ -5,6 +5,30 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
 
+function buildQueryString(params?: Record<string, unknown>): string {
+  if (!params) return ''
+
+  const search = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === '') continue
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (entry != null && entry !== '') {
+          search.append(key, String(entry))
+        }
+      }
+      continue
+    }
+
+    search.set(key, String(value))
+  }
+
+  const query = search.toString()
+  return query ? `?${query}` : ''
+}
+
 // ── API error ────────────────────────────────
 
 export class ApiError extends Error {
@@ -93,6 +117,14 @@ function normalizeCurrentUser(user: RawCurrentUser): CurrentUser {
 }
 
 function unwrapSuccessPayload<T>(json: ApiEnvelope<T>): T {
+  if (Array.isArray(json)) {
+    return json as T
+  }
+
+  if (!json || typeof json !== 'object') {
+    return json as T
+  }
+
   if (Object.prototype.hasOwnProperty.call(json, 'data')) {
     return json.data as T
   }
@@ -271,7 +303,7 @@ export const api = {
   alerts: {
     list: (params?: AlertListParams) =>
       apiFetch<PaginatedResult<AlertSummary>>(
-        `/v1/alerts?${new URLSearchParams(params as Record<string, string> ?? {}).toString()}`,
+        `/v1/alerts${buildQueryString(params as Record<string, unknown> | undefined)}`,
       ),
     get: (id: string) =>
       apiFetch<AlertDetail>(`/v1/alerts/${id}`),
@@ -299,13 +331,13 @@ export const api = {
       apiFetch<OrgPosture>('/v1/risk/summary'),
     users: (params?: { limit?: number; cursor?: string }) =>
       apiFetch<PaginatedResult<UserRiskScore>>(
-        `/v1/risk/users?${new URLSearchParams(params as Record<string, string> ?? {}).toString()}`,
+        `/v1/risk/users${buildQueryString(params as Record<string, unknown> | undefined)}`,
       ),
     userProfile: (userId: string) =>
       apiFetch<UserRiskProfile>(`/v1/risk/users/${userId}`),
     assets: (params?: { limit?: number }) =>
       apiFetch<PaginatedResult<AssetRiskScore>>(
-        `/v1/risk/assets?${new URLSearchParams(params as Record<string, string> ?? {}).toString()}`,
+        `/v1/risk/assets${buildQueryString(params as Record<string, unknown> | undefined)}`,
       ),
     assetProfile: (assetId: string) =>
       apiFetch<AssetRiskProfile>(`/v1/risk/assets/${assetId}`),
@@ -327,10 +359,12 @@ export const api = {
       ),
     auditLog: (params?: { limit?: number; cursor?: string }) =>
       apiFetch<PaginatedResult<AuditLogEntry>>(
-        `/v1/compliance/audit-log?${new URLSearchParams(params as Record<string, string> ?? {}).toString()}`,
+        `/v1/compliance/audit-log${buildQueryString(params as Record<string, unknown> | undefined)}`,
       ),
     rules: () =>
       apiFetch<DetectionRule[]>('/v1/compliance/rules'),
+    reportsList: () =>
+      apiFetch<ComplianceReportCatalog>('/v1/compliance/reports/list'),
   },
 
   // ── Connectors ────────────────────────────
@@ -385,15 +419,21 @@ export const api = {
   // ── AI ────────────────────────────────────
 
   ai: {
-    chat: (message: string, sessionId?: string) =>
-      apiFetch<AiChatMessage>('/v1/assistant/chat', {
+    chat: (messages: Array<{ role: 'user' | 'assistant'; content: string }>, sessionId?: string | null) =>
+      apiFetch<AiChatResponse>('/v1/assistant/chat', {
         method: 'POST',
-        body:   JSON.stringify({ message, sessionId }),
+        body:   JSON.stringify({ messages, sessionId: sessionId ?? undefined }),
       }),
-    investigations: () =>
-      apiFetch<AiInvestigation[]>('/v1/investigations'),
+    suggestions: () =>
+      apiFetch<AssistantSuggestions>('/v1/assistant/suggestions'),
+    investigations: (params?: { limit?: number }) =>
+      apiFetch<AiInvestigation[]>(`/v1/investigations${buildQueryString(params as Record<string, unknown> | undefined)}`),
+    investigation: (id: string) =>
+      apiFetch<AiInvestigation>(`/v1/investigations/${id}`),
+    investigationStats: () =>
+      apiFetch<AiInvestigationStats>('/v1/investigations/stats'),
     createInvestigation: (alertId: string, context?: string) =>
-      apiFetch<AiInvestigation>('/v1/investigations', {
+      apiFetch<AiInvestigationCreateResult>('/v1/investigations', {
         method: 'POST',
         body:   JSON.stringify({ alertId, context }),
       }),
@@ -677,19 +717,65 @@ export interface Subscription {
   trialEndsAt:        string | null
 }
 
-export interface AiChatMessage {
-  role:        string
-  content:     string
-  model:       string
+export interface AiChatResponse {
   sessionId:   string | null
-  trialBypass: boolean
+  message:     string
+  model:       string
+  toolsUsed:   string[]
 }
 
+export type AiChatMessage = AiChatResponse
+
 export interface AiInvestigation {
-  id:        string
-  tenantId:  number
-  alertId:   string
-  status:    'queued' | 'completed' | 'failed'
-  summary:   string
-  createdAt: string
+  id:                string
+  tenantId:          string
+  alertId:           string
+  alertTitle?:       string
+  alertSeverity?:    string
+  status:            'queued' | 'investigating' | 'awaiting_approval' | 'completed' | 'failed'
+  verdict?:          string | null
+  confidence:        number
+  summary?:          string
+  executiveSummary?: string
+  detailedReport?:   string
+  recommendations?:  string[]
+  iocList?:          string[]
+  thoughts?:         unknown[]
+  evidence?:         unknown[]
+  totalSteps?:       number
+  totalTokens?:      number
+  durationMs?:       number
+  agentModel?:       string
+  createdAt:         string
+  updatedAt?:        string
+}
+
+export interface AiInvestigationCreateResult {
+  investigationId: string
+  status:          string
+  message:         string
+}
+
+export interface AiInvestigationStats {
+  totalInvestigations: number
+  truePositives:       number
+  falsePositives:      number
+  pendingReview:       number
+  tpRate:              number
+  fpRate:              number
+  period:              string
+}
+
+export interface AssistantSuggestions {
+  suggestions: string[]
+}
+
+export interface ComplianceReportDescriptor {
+  type:      string
+  name:      string
+  available: boolean
+}
+
+export interface ComplianceReportCatalog {
+  reports: ComplianceReportDescriptor[]
 }

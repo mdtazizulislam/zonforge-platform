@@ -13,6 +13,7 @@ interface NavItem { label: string; href: string; icon: React.ElementType; exact?
 
 const NAV_MAIN: NavItem[] = [
   { label: 'Dashboard',         href: '/dashboard',          icon: LayoutDashboard, exact: true },
+  { label: 'Customer Dashboard', href: '/customer-dashboard', icon: LayoutDashboard },
   { label: 'Alerts',            href: '/alerts',             icon: ShieldAlert },
   { label: 'AI SOC Analyst',    href: '/ai-soc-analyst',     icon: Brain },
   { label: 'AI Intelligence',   href: '/ai-intelligence',    icon: Sparkles },
