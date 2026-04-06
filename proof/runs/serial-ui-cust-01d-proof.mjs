@@ -218,13 +218,18 @@ async function capture(routePath, selector, screenshotName) {
   }
 }
 
-const dashboard = await capture('/customer-dashboard', '.zf-customer-app', 'customer-dashboard-clean.png')
-const settings = await capture('/customer-settings', 'text=Customer Settings', 'customer-settings-fixed.png')
+const captures = {
+  dashboard: await capture('/customer-dashboard', 'text=Security Dashboard', 'customer-dashboard-clean.png'),
+  alerts: await capture('/customer-alerts', 'text=Customer Alerts', 'customer-alerts-clean.png'),
+  investigations: await capture('/customer-investigations', 'text=Customer Investigations', 'customer-investigations-clean.png'),
+  aiAssistant: await capture('/customer-ai-assistant', 'text=Customer AI Assistant', 'customer-ai-assistant-clean.png'),
+  billing: await capture('/customer-billing', 'text=Customer Billing', 'customer-billing-clean.png'),
+  settings: await capture('/customer-settings', 'text=Customer Settings', 'customer-settings-fixed.png'),
+}
 
 const report = {
   timestamp: new Date().toISOString(),
-  dashboard,
-  settings,
+  captures,
   consoleErrors,
   pageErrors,
 }

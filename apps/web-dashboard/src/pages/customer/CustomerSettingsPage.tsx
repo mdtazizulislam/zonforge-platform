@@ -6,7 +6,6 @@ export default function CustomerSettingsPage() {
   const ownerName = user?.name ?? 'Customer Owner'
   const ownerEmail = user?.email ?? 'owner@example.com'
   const ownerRole = user?.role ?? 'Owner'
-  const workspaceId = user?.tenantId || 'Primary customer workspace'
 
   return (
     <CustomerLayout
@@ -15,61 +14,50 @@ export default function CustomerSettingsPage() {
     >
       <div className="zf-page">
         <div className="zf-container">
-          <div className="zf-grid">
-            <section className="zf-card">
-              <h2 className="zf-title">Profile</h2>
-              <p className="zf-sub">Primary customer account identity and workspace ownership details.</p>
-              <div className="zf-settings-stack">
-                <div className="zf-row">
-                  <div>
-                    <div className="zf-label">Customer Owner</div>
-                    <div className="zf-value">{ownerName}</div>
-                  </div>
-                </div>
-                <div className="zf-row">
-                  <div>
-                    <div className="zf-label">Email</div>
-                    <div className="zf-value">{ownerEmail}</div>
-                  </div>
-                </div>
-                <div className="zf-row">
-                  <div>
-                    <div className="zf-label">Role</div>
-                    <div className="zf-value">{ownerRole}</div>
-                  </div>
-                </div>
-                <div className="zf-row">
-                  <div>
-                    <div className="zf-label">Workspace</div>
-                    <div className="zf-value">{workspaceId}</div>
-                  </div>
-                </div>
-              </div>
-            </section>
+          <section className="zf-section">
+            <div className="zf-section-head">
+              <h1 className="zf-page-title">Settings</h1>
+              <p className="zf-page-subtitle">
+                Manage your account, security preferences, and workspace controls.
+              </p>
+            </div>
 
-            <section className="zf-card">
-              <h2 className="zf-title">Security</h2>
-              <p className="zf-sub">Customer-safe authentication controls without exposing analyst administration tools.</p>
-              <div className="zf-settings-stack">
-                <div className="zf-row zf-row--stack">
-                  <div>
-                    <div className="zf-label">Authentication</div>
-                    <div className="zf-value">{user?.mfaEnabled ? 'Multi-factor authentication is enabled for this account.' : 'Strengthen access with MFA and password rotation.'}</div>
+            <div className="zf-grid zf-grid-2">
+              <article className="zf-card">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Profile</h2>
+                  <p className="zf-card-subtitle">Basic customer account information.</p>
+                </div>
+
+                <div className="zf-detail-list">
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Name</span>
+                    <span className="zf-value">{ownerName}</span>
                   </div>
-                  <div className="zf-row__actions">
-                    <button type="button" className="zf-btn">Change Password</button>
-                    <button type="button" className="zf-btn zf-btn--secondary">Enable MFA</button>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Email</span>
+                    <span className="zf-value">{ownerEmail}</span>
+                  </div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Role</span>
+                    <span className="zf-value">{ownerRole}</span>
                   </div>
                 </div>
-                <div className="zf-row">
-                  <div>
-                    <div className="zf-label">Review Priority</div>
-                    <div className="zf-value">Confirm the owner email is current for billing and incident notices.</div>
-                  </div>
+              </article>
+
+              <article className="zf-card">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Security Settings</h2>
+                  <p className="zf-card-subtitle">Authentication and account protection controls.</p>
                 </div>
-              </div>
-            </section>
-          </div>
+
+                <div className="zf-action-stack">
+                  <button className="zf-btn-primary" type="button">Change Password</button>
+                  <button className="zf-btn-secondary" type="button">Enable MFA</button>
+                </div>
+              </article>
+            </div>
+          </section>
         </div>
       </div>
     </CustomerLayout>

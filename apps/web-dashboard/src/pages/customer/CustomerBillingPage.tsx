@@ -22,31 +22,39 @@ export default function CustomerBillingPage() {
     >
       <div className="zf-page">
         <div className="zf-container">
-          <div className="zf-grid">
-            <section className="zf-card zf-card--wide">
-              <h2 className="zf-title">Plan and usage snapshot</h2>
-              <p className="zf-sub">Billing details remain simple here while analyst and finance workflows stay untouched.</p>
-              <div className="zf-settings-stack">
-                <div className="zf-row">
-                  <div>
-                    <div className="zf-label">Plan Tier</div>
-                    <div className="zf-value">{subscription?.planTier ?? usage?.planTier ?? 'Unknown'}</div>
+          <section className="zf-section">
+            <div className="zf-section-head">
+              <h1 className="zf-page-title">Billing</h1>
+              <p className="zf-page-subtitle">A polished commercial snapshot for customer review, consistent with the premium dashboard shell.</p>
+            </div>
+
+            <div className="zf-grid zf-grid-2">
+              <section className="zf-card zf-card--wide">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Plan and usage snapshot</h2>
+                  <p className="zf-card-subtitle">Billing details remain simple here while analyst and finance workflows stay untouched.</p>
+                </div>
+                <div className="zf-detail-list">
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Plan Tier</span>
+                    <span className="zf-value">{subscription?.planTier ?? usage?.planTier ?? 'Unknown'}</span>
                   </div>
-                  <div>
-                    <div className="zf-label">Subscription</div>
-                    <div className="zf-value">{subscription?.status ?? 'Unknown'}</div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Subscription</span>
+                    <span className="zf-value">{subscription?.status ?? 'Unknown'}</span>
                   </div>
-                  <div>
-                    <div className="zf-label">Retention</div>
-                    <div className="zf-value">{usage?.retentionDays ?? 0}d</div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Retention</span>
+                    <span className="zf-value">{usage?.retentionDays ?? 0}d</span>
                   </div>
                 </div>
-              </div>
-            </section>
+              </section>
 
-            <section className="zf-card zf-card--wide">
-              <h2 className="zf-title">Current plan allowances</h2>
-              <p className="zf-sub">Usage entries stay readable without the previous overlapping shell wrappers.</p>
+              <section className="zf-card zf-card--wide">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Current plan allowances</h2>
+                  <p className="zf-card-subtitle">Usage entries stay readable without the previous overlapping shell wrappers.</p>
+                </div>
               {(usageQuery.isLoading || subscriptionQuery.isLoading) ? (
                 <div className="zf-panel-empty">Loading subscription details.</div>
               ) : usageEntries.length === 0 ? (
@@ -66,27 +74,30 @@ export default function CustomerBillingPage() {
                   ))}
                 </div>
               )}
-            </section>
+              </section>
 
-            <section className="zf-card">
-              <h2 className="zf-title">Key dates</h2>
-              <p className="zf-sub">Commercial checkpoints for the current billing cycle.</p>
-              <div className="zf-customer-shell-detail-grid">
-                <div className="zf-customer-shell-detail">
-                  <span>Current period start</span>
-                  <strong>{subscription?.currentPeriodStart ? new Date(subscription.currentPeriodStart).toLocaleDateString() : 'Unknown'}</strong>
+              <section className="zf-card">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Key dates</h2>
+                  <p className="zf-card-subtitle">Commercial checkpoints for the current billing cycle.</p>
                 </div>
-                <div className="zf-customer-shell-detail">
-                  <span>Current period end</span>
-                  <strong>{subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : 'Unknown'}</strong>
+                <div className="zf-customer-shell-detail-grid">
+                  <div className="zf-customer-shell-detail">
+                    <span>Current period start</span>
+                    <strong>{subscription?.currentPeriodStart ? new Date(subscription.currentPeriodStart).toLocaleDateString() : 'Unknown'}</strong>
+                  </div>
+                  <div className="zf-customer-shell-detail">
+                    <span>Current period end</span>
+                    <strong>{subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : 'Unknown'}</strong>
+                  </div>
+                  <div className="zf-customer-shell-detail">
+                    <span>Trial ends</span>
+                    <strong>{subscription?.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString() : 'Not in trial'}</strong>
+                  </div>
                 </div>
-                <div className="zf-customer-shell-detail">
-                  <span>Trial ends</span>
-                  <strong>{subscription?.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString() : 'Not in trial'}</strong>
-                </div>
-              </div>
-            </section>
-          </div>
+              </section>
+            </div>
+          </section>
         </div>
       </div>
     </CustomerLayout>

@@ -577,27 +577,33 @@ export default function CustomerDashboardPage() {
     >
       <div className="zf-page">
         <div className="zf-container">
-          <div className="zf-grid">
-            <section className="zf-card zf-card--wide zf-card--compact">
-              <h2 className="zf-title">Search the executive view</h2>
-              <p className="zf-sub">Filter alerts and investigations without leaving the customer workspace.</p>
-              <div className="zf-settings-stack">
-                <div className="zf-row zf-row--stack">
-                  <label className="zf-customer-search" aria-label="Search customer dashboard content">
-                    <input
-                      type="search"
-                      value={searchValue}
-                      onChange={(event) => setSearchValue(event.target.value)}
-                      placeholder="Search alerts, sources, and investigations..."
-                    />
-                  </label>
-                </div>
-              </div>
-            </section>
+          <section className="zf-section">
+            <div className="zf-section-head">
+              <h1 className="zf-page-title">Security Dashboard</h1>
+              <p className="zf-page-subtitle">Executive posture, active threats, and action-ready customer insights in a premium enterprise shell.</p>
+            </div>
 
-            <section className="zf-card zf-card--wide zf-card--compact">
-              <h2 className="zf-title">Executive posture</h2>
-              <p className="zf-sub">Executive posture, active threats, and action-ready customer insights in a stable shell.</p>
+            <div className="zf-grid zf-grid-2">
+              <section className="zf-card zf-card--wide">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Search the executive view</h2>
+                  <p className="zf-card-subtitle">Filter alerts and investigations without leaving the customer workspace.</p>
+                </div>
+                <label className="zf-customer-search" aria-label="Search customer dashboard content">
+                  <input
+                    type="search"
+                    value={searchValue}
+                    onChange={(event) => setSearchValue(event.target.value)}
+                    placeholder="Search alerts, sources, and investigations..."
+                  />
+                </label>
+              </section>
+
+              <section className="zf-card zf-card--wide">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Executive posture</h2>
+                  <p className="zf-card-subtitle">A cleaner KPI, chart, and side-panel composition for customer-facing security review.</p>
+                </div>
               {isInitialLoading ? (
                 <div className="zf-customer-loading" aria-label="Loading customer dashboard">
                   {buildLoadingCards().map((index) => <div key={index} className="zf-customer-loading__card" />)}
@@ -669,8 +675,9 @@ export default function CustomerDashboardPage() {
               {isEmptyState ? (
                 <div className="zf-customer-empty">The dashboard is live, but the current APIs did not return customer dashboard data yet.</div>
               ) : null}
-            </section>
-          </div>
+              </section>
+            </div>
+          </section>
         </div>
       </div>
     </CustomerLayout>

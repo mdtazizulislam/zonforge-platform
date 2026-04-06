@@ -40,31 +40,39 @@ export default function CustomerAlertsPage() {
     >
       <div className="zf-page">
         <div className="zf-container">
-          <div className="zf-grid">
-            <section className="zf-card zf-card--wide">
-              <h2 className="zf-title">Alert posture</h2>
-              <p className="zf-sub">Critical issues, open investigations, and source coverage are summarized for fast executive review.</p>
-              <div className="zf-settings-stack">
-                <div className="zf-row">
-                  <div>
-                    <div className="zf-label">Critical Alerts</div>
-                    <div className="zf-value">{metrics.critical}</div>
+          <section className="zf-section">
+            <div className="zf-section-head">
+              <h1 className="zf-page-title">Alerts</h1>
+              <p className="zf-page-subtitle">A premium customer alert view with executive context and clean prioritization.</p>
+            </div>
+
+            <div className="zf-grid zf-grid-2">
+              <section className="zf-card zf-card--wide">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Alert posture</h2>
+                  <p className="zf-card-subtitle">Critical issues, open investigations, and source coverage are summarized for fast executive review.</p>
+                </div>
+                <div className="zf-detail-list">
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Critical Alerts</span>
+                    <span className="zf-value">{metrics.critical}</span>
                   </div>
-                  <div>
-                    <div className="zf-label">Open Alerts</div>
-                    <div className="zf-value">{metrics.active}</div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Open Alerts</span>
+                    <span className="zf-value">{metrics.active}</span>
                   </div>
-                  <div>
-                    <div className="zf-label">Sources Reporting</div>
-                    <div className="zf-value">{metrics.monitoredSources}</div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Sources Reporting</span>
+                    <span className="zf-value">{metrics.monitoredSources}</span>
                   </div>
                 </div>
-              </div>
-            </section>
+              </section>
 
-            <section className="zf-card zf-card--wide">
-              <h2 className="zf-title">Recent alerts</h2>
-              <p className="zf-sub">Customer-safe alert activity without analyst-only controls.</p>
+              <section className="zf-card zf-card--wide">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">Recent alerts</h2>
+                  <p className="zf-card-subtitle">Customer-safe alert activity without analyst-only controls.</p>
+                </div>
               {alertsQuery.isLoading ? (
                 <div className="zf-panel-empty">Loading the latest customer alerts.</div>
               ) : alerts.length === 0 ? (
@@ -84,18 +92,21 @@ export default function CustomerAlertsPage() {
                   ))}
                 </div>
               )}
-            </section>
+              </section>
 
-            <section className="zf-card">
-              <h2 className="zf-title">What to do next</h2>
-              <p className="zf-sub">Immediate customer-facing actions to keep response momentum clean.</p>
-              <div className="zf-action-list">
-                <div className="zf-action-item"><span className="zf-action-item__index">01</span><p>Escalate any critical customer alert that remains open.</p></div>
-                <div className="zf-action-item"><span className="zf-action-item__index">02</span><p>Confirm the highest-volume alert source is expected and healthy.</p></div>
-                <div className="zf-action-item"><span className="zf-action-item__index">03</span><p>Use investigations for deeper analyst context without leaving the customer shell.</p></div>
-              </div>
-            </section>
-          </div>
+              <section className="zf-card">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">What to do next</h2>
+                  <p className="zf-card-subtitle">Immediate customer-facing actions to keep response momentum clean.</p>
+                </div>
+                <div className="zf-action-list">
+                  <div className="zf-action-item"><span className="zf-action-item__index">01</span><p>Escalate any critical customer alert that remains open.</p></div>
+                  <div className="zf-action-item"><span className="zf-action-item__index">02</span><p>Confirm the highest-volume alert source is expected and healthy.</p></div>
+                  <div className="zf-action-item"><span className="zf-action-item__index">03</span><p>Use investigations for deeper analyst context without leaving the customer shell.</p></div>
+                </div>
+              </section>
+            </div>
+          </section>
         </div>
       </div>
     </CustomerLayout>
