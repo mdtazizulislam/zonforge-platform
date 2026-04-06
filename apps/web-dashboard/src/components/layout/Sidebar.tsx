@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { useAuthStore, useUiStore } from '@/stores/auth.store'
+import { api, redirectToLogout } from '@/lib/api'
 import {
   LayoutDashboard, ShieldAlert, BarChart3, Wifi,
   ShieldCheck, BookOpen, Settings, ChevronLeft,
@@ -39,6 +41,7 @@ export function Sidebar() {
   const location                           = useLocation()
   const { user, clearAuth }                = useAuthStore()
   const { sidebarCollapsed, toggleSidebar } = useUiStore()
+  const [loggingOut, setLoggingOut]        = useState(false)
 
   function isActive(href: string, exact = false) {
     return exact ? location.pathname === href : location.pathname.startsWith(href)
@@ -62,6 +65,20 @@ export function Sidebar() {
         {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
       </Link>
     )
+  }
+
+  async function handleLogout() {
+    if (loggingOut) return
+
+    setLoggingOut(true)
+
+    try {
+      await api.auth.logout()
+    } catch {
+    } finally {
+      clearAuth()
+      redirectToLogout()
+    }
   }
 
   return (
@@ -120,7 +137,7 @@ export function Sidebar() {
               <p className="text-xs text-gray-600 truncate">{user?.role ?? '—'}</p>
             </div>
           )}
-          <button onClick={clearAuth} title="Log out"
+          <button onClick={handleLogout} title="Log out" disabled={loggingOut}
             className="flex-shrink-0 text-gray-700 hover:text-red-400 transition-colors">
             <LogOut className="h-3.5 w-3.5" />
           </button>

@@ -10,5 +10,18 @@ export function resolveAdminAppUrl(): string {
 }
 
 export function resolveAdminApiBaseUrl(): string {
-  return trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || '/api') || '/api'
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+  return trimTrailingSlash(API_BASE) || '/api'
+}
+
+export function resolveAdminAuthCallbackUrl(): string {
+  return import.meta.env.VITE_AUTH_CALLBACK_URL || resolveAdminAppUrl() || '/'
+}
+
+export function resolveAdminLogoutRedirectUrl(): string {
+  return import.meta.env.VITE_LOGOUT_REDIRECT_URL || resolveAdminAuthCallbackUrl()
+}
+
+export function resolveAdminSessionValidationUrl(): string {
+  return `${resolveAdminApiBaseUrl()}/v1/auth/me`
 }

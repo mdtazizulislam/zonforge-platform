@@ -3,7 +3,7 @@
 // Typed fetch wrapper with JWT auth + error handling
 // ─────────────────────────────────────────────
 
-import { buildAppUrl, resolveApiBaseUrl } from '@/lib/runtime-config'
+import { buildAppUrl, resolveApiBaseUrl, resolveLogoutRedirectUrl } from '@/lib/runtime-config'
 
 const BASE_URL = resolveApiBaseUrl()
 
@@ -295,7 +295,10 @@ export const api = {
       return { ...normalized, user }
     },
     logout: () =>
-      apiFetch<void>('/v1/auth/logout', { method: 'POST' }),
+      apiFetch<void>('/v1/auth/logout', {
+        method: 'POST',
+        body:   JSON.stringify({ refresh_token: tokenStorage.getRefresh() }),
+      }),
     me: async () =>
       normalizeCurrentUser(await apiFetch<RawCurrentUser>('/v1/auth/me')),
   },
@@ -440,6 +443,11 @@ export const api = {
         body:   JSON.stringify({ alertId, context }),
       }),
   },
+}
+
+export function redirectToLogout(): void {
+  tokenStorage.clear()
+  window.location.href = resolveLogoutRedirectUrl()
 }
 
 // ─────────────────────────────────────────────

@@ -3,8 +3,8 @@ function trimTrailingSlash(value: string): string {
 }
 
 export function resolveApiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '/api'
-  return trimTrailingSlash(configured) || '/api'
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+  return trimTrailingSlash(API_BASE) || '/api'
 }
 
 export function resolveAppOrigin(): string {
@@ -25,4 +25,12 @@ export function buildAppUrl(path: string): string {
 
 export function resolveAuthCallbackUrl(): string {
   return import.meta.env.VITE_AUTH_CALLBACK_URL || buildAppUrl('/login')
+}
+
+export function resolveLogoutRedirectUrl(): string {
+  return import.meta.env.VITE_LOGOUT_REDIRECT_URL || resolveAuthCallbackUrl()
+}
+
+export function resolveSessionValidationUrl(): string {
+  return `${resolveApiBaseUrl()}/v1/auth/me`
 }
