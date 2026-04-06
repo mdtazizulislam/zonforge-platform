@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-04-06T21:18:56.020Z",
+  "dashboard": {
+    "routePath": "/customer-dashboard",
+    "url": "http://127.0.0.1:4173/customer-dashboard",
+    "title": "Security Dashboard"
+  },
+  "settings": {
+    "routePath": "/customer-settings",
+    "url": "http://127.0.0.1:4173/customer-settings",
+    "title": "Customer Settings"
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

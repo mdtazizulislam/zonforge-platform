@@ -1,8 +1,10 @@
 import fs from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const rootDir = path.resolve('landing')
+const scriptDir = path.dirname(fileURLToPath(import.meta.url))
+const rootDir = path.resolve(scriptDir, '..', '..', 'landing')
 const host = '127.0.0.1'
 const port = Number(process.env.PORT || 4173)
 

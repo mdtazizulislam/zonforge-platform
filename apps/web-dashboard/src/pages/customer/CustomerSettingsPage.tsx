@@ -3,6 +3,10 @@ import { useAuthStore } from '@/stores/auth.store'
 
 export default function CustomerSettingsPage() {
   const user = useAuthStore((state) => state.user)
+  const ownerName = user?.name ?? 'Customer Owner'
+  const ownerEmail = user?.email ?? 'owner@example.com'
+  const ownerRole = user?.role ?? 'Owner'
+  const workspaceId = user?.tenantId || 'Primary customer workspace'
 
   return (
     <CustomerLayout
@@ -14,44 +18,54 @@ export default function CustomerSettingsPage() {
           <div className="zf-grid">
             <section className="zf-card">
               <h2 className="zf-title">Profile</h2>
+              <p className="zf-sub">Primary customer account identity and workspace ownership details.</p>
               <div className="zf-settings-stack">
-                <div className="zf-settings-item">
-                  <span className="zf-label">Name</span>
-                  <strong className="zf-value">{user?.name ?? 'Customer Team'}</strong>
+                <div className="zf-row">
+                  <div>
+                    <div className="zf-label">Customer Owner</div>
+                    <div className="zf-value">{ownerName}</div>
+                  </div>
                 </div>
-                <div className="zf-settings-item">
-                  <span className="zf-label">Email</span>
-                  <strong className="zf-value">{user?.email ?? 'Unknown'}</strong>
+                <div className="zf-row">
+                  <div>
+                    <div className="zf-label">Email</div>
+                    <div className="zf-value">{ownerEmail}</div>
+                  </div>
                 </div>
-                <div className="zf-settings-item">
-                  <span className="zf-label">Tenant</span>
-                  <strong className="zf-value">{user?.tenantId || 'Not provided'}</strong>
+                <div className="zf-row">
+                  <div>
+                    <div className="zf-label">Role</div>
+                    <div className="zf-value">{ownerRole}</div>
+                  </div>
                 </div>
-                <div className="zf-settings-item">
-                  <span className="zf-label">Role</span>
-                  <strong className="zf-value">{user?.role ?? 'member'}</strong>
-                </div>
-                <div className="zf-settings-item">
-                  <span className="zf-label">MFA</span>
-                  <strong className="zf-value">{user?.mfaEnabled ? 'Enabled' : 'Not enabled'}</strong>
+                <div className="zf-row">
+                  <div>
+                    <div className="zf-label">Workspace</div>
+                    <div className="zf-value">{workspaceId}</div>
+                  </div>
                 </div>
               </div>
             </section>
 
             <section className="zf-card">
-              <h2 className="zf-title">Workspace Policies</h2>
+              <h2 className="zf-title">Security</h2>
+              <p className="zf-sub">Customer-safe authentication controls without exposing analyst administration tools.</p>
               <div className="zf-settings-stack">
-                <div className="zf-settings-item">
-                  <span className="zf-label">Priority 01</span>
-                  <p className="zf-value">Review MFA enrollment for customer-facing operators.</p>
+                <div className="zf-row zf-row--stack">
+                  <div>
+                    <div className="zf-label">Authentication</div>
+                    <div className="zf-value">{user?.mfaEnabled ? 'Multi-factor authentication is enabled for this account.' : 'Strengthen access with MFA and password rotation.'}</div>
+                  </div>
+                  <div className="zf-row__actions">
+                    <button type="button" className="zf-btn">Change Password</button>
+                    <button type="button" className="zf-btn zf-btn--secondary">Enable MFA</button>
+                  </div>
                 </div>
-                <div className="zf-settings-item">
-                  <span className="zf-label">Priority 02</span>
-                  <p className="zf-value">Confirm the workspace owner email is current for billing notices.</p>
-                </div>
-                <div className="zf-settings-item">
-                  <span className="zf-label">Priority 03</span>
-                  <p className="zf-value">Use the internal settings route only for analyst-specific administration.</p>
+                <div className="zf-row">
+                  <div>
+                    <div className="zf-label">Review Priority</div>
+                    <div className="zf-value">Confirm the owner email is current for billing and incident notices.</div>
+                  </div>
                 </div>
               </div>
             </section>

@@ -780,60 +780,139 @@
 
 .zf-page {
   width: 100%;
-  min-height: 100vh;
-  padding: 32px;
-  background: #0b1220;
+  padding: 24px;
 }
 
 .zf-container {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
 .zf-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
+  align-items: start;
 }
 
 .zf-card {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 12px;
-  padding: 20px;
-  overflow: visible;
-  height: auto;
+  min-width: 0;
   min-height: 0;
+  height: auto;
+  overflow: visible;
+  border-radius: 16px;
+  border: 1px solid rgba(110, 151, 228, 0.14);
+  background: linear-gradient(180deg, rgba(9, 19, 38, 0.92), rgba(12, 25, 49, 0.96));
+  box-shadow: 0 24px 60px rgba(3, 10, 24, 0.28);
+  padding: 24px;
+}
+
+.zf-card--wide {
+  grid-column: 1 / -1;
+}
+
+.zf-card--compact {
+  padding: 20px;
 }
 
 .zf-title {
-  margin: 0 0 12px;
-  font-size: 22px;
-  font-weight: 600;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--zf-text);
+}
+
+.zf-sub {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--zf-text-soft);
 }
 
 .zf-label {
   display: block;
   font-size: 12px;
-  color: #9ca3af;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--zf-text-soft);
 }
 
 .zf-value {
-  margin: 0;
+  margin: 6px 0 0;
   font-size: 16px;
-  color: #e5e7eb;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--zf-text);
+}
+
+.zf-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(110, 151, 228, 0.1);
+}
+
+.zf-row:first-of-type {
+  padding-top: 0;
+}
+
+.zf-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.zf-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.zf-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.zf-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(120, 160, 255, 0.18);
+  border-radius: 12px;
+  color: var(--zf-text);
+  background: rgba(47, 124, 255, 0.12);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.zf-btn:hover {
+  border-color: rgba(120, 160, 255, 0.34);
+  background: rgba(47, 124, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.zf-btn--secondary {
+  background: rgba(14, 29, 53, 0.82);
+}
+
+.zf-section-stack {
+  display: grid;
+  gap: 16px;
 }
 
 .zf-settings-stack {
   display: grid;
-  gap: 16px;
+  gap: 8px;
+  margin-top: 20px;
 }
 
 .zf-settings-item {
   display: grid;
   gap: 8px;
   align-content: start;
-  padding-top: 4px;
 }
 
 @keyframes zfPulse {
@@ -919,10 +998,23 @@
   .zf-grid {
     grid-template-columns: 1fr;
   }
+
+  .zf-card--wide {
+    grid-column: auto;
+  }
+
+  .zf-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 720px) {
   .zf-page {
+    padding: 16px;
+  }
+
+  .zf-card {
     padding: 20px;
   }
 }

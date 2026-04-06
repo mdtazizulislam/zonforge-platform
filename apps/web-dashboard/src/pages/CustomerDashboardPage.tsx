@@ -575,95 +575,102 @@ export default function CustomerDashboardPage() {
       title="Security Dashboard"
       subtitle="Executive posture, active threats, and action-ready customer insights."
     >
-      <div className="zf-dashboard-grid">
-        <section className="zf-panel-card zf-full-span zf-customer-shell-filter">
-          <div>
-            <p className="zf-panel-heading__eyebrow">Customer filter</p>
-            <h2 className="zf-panel-heading__title">Search the executive view</h2>
-            <p className="zf-panel-heading__meta">Filter alerts and investigations without leaving the customer workspace.</p>
+      <div className="zf-page">
+        <div className="zf-container">
+          <div className="zf-grid">
+            <section className="zf-card zf-card--wide zf-card--compact">
+              <h2 className="zf-title">Search the executive view</h2>
+              <p className="zf-sub">Filter alerts and investigations without leaving the customer workspace.</p>
+              <div className="zf-settings-stack">
+                <div className="zf-row zf-row--stack">
+                  <label className="zf-customer-search" aria-label="Search customer dashboard content">
+                    <input
+                      type="search"
+                      value={searchValue}
+                      onChange={(event) => setSearchValue(event.target.value)}
+                      placeholder="Search alerts, sources, and investigations..."
+                    />
+                  </label>
+                </div>
+              </div>
+            </section>
+
+            <section className="zf-card zf-card--wide zf-card--compact">
+              <h2 className="zf-title">Executive posture</h2>
+              <p className="zf-sub">Executive posture, active threats, and action-ready customer insights in a stable shell.</p>
+              {isInitialLoading ? (
+                <div className="zf-customer-loading" aria-label="Loading customer dashboard">
+                  {buildLoadingCards().map((index) => <div key={index} className="zf-customer-loading__card" />)}
+                </div>
+              ) : (
+                <div className="zf-dashboard-grid">
+                  <section className="zf-kpi-grid">
+                    <RiskGaugeCard
+                      score={risk.riskScore}
+                      helper={risk.riskScore > 0 ? 'Current organization posture score' : 'No risk score yet'}
+                    />
+
+                    <KpiCard
+                      title="Critical Alerts"
+                      value={criticalAlerts}
+                      helper={
+                        criticalAlerts > 0
+                          ? `${criticalAlerts} ${formatCountLabel(criticalAlerts, 'critical issue requires immediate review', 'critical issues require immediate review')}`
+                          : 'No critical alerts detected in the current feed'
+                      }
+                      tone={criticalAlerts > 0 ? 'danger' : 'success'}
+                    />
+
+                    <KpiCard
+                      title="Active Threats"
+                      value={activeThreats}
+                      helper={
+                        activeThreats > 0
+                          ? `${activeThreats} ${formatCountLabel(activeThreats, 'active high-severity threat is still open', 'active high-severity threats are still open')}`
+                          : 'No active high-severity threats currently surfaced'
+                      }
+                      tone={activeThreats > 0 ? 'warning' : 'success'}
+                    />
+
+                    <KpiCard
+                      title="Cloud Exposure"
+                      value={risk.cloudExposure}
+                      helper={risk.cloudExposureHelper}
+                      tone={risk.cloudExposure > 0 ? severityTone(risk.cloudExposure > 3 ? 'high' : 'medium') : 'default'}
+                    />
+                  </section>
+
+                  <div className="zf-span-8">
+                    <RiskTrendChart points={risk.trendPoints} />
+                  </div>
+
+                  <div className="zf-span-4">
+                    <TopThreatsPanel items={topThreats} />
+                  </div>
+
+                  <div className="zf-span-8">
+                    <RecentAlertsTable alerts={recentAlerts} />
+                  </div>
+
+                  <div className="zf-span-4">
+                    <RecommendedActionsPanel actions={recommendedActions} />
+                  </div>
+
+                  <div className="zf-span-8">
+                    <InvestigationPreviewPanel items={investigationItems} />
+                  </div>
+
+                  <div className="zf-span-4">
+                    <ConnectorHealthPanel items={connectorItems} />
+                  </div>
+                </div>
+              )}
+
+              {isEmptyState ? (
+                <div className="zf-customer-empty">The dashboard is live, but the current APIs did not return customer dashboard data yet.</div>
+              ) : null}
+            </section>
           </div>
-          <label className="zf-customer-search" aria-label="Search customer dashboard content">
-            <input
-              type="search"
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder="Search alerts, sources, and investigations..."
-            />
-          </label>
-        </section>
-
-        <div className="zf-full-span">
-          {isInitialLoading ? (
-            <div className="zf-customer-loading" aria-label="Loading customer dashboard">
-              {buildLoadingCards().map((index) => <div key={index} className="zf-customer-loading__card" />)}
-            </div>
-          ) : (
-            <div className="zf-dashboard-grid">
-              <section className="zf-kpi-grid">
-                <RiskGaugeCard
-                  score={risk.riskScore}
-                  helper={risk.riskScore > 0 ? 'Current organization posture score' : 'No risk score yet'}
-                />
-
-                <KpiCard
-                  title="Critical Alerts"
-                  value={criticalAlerts}
-                  helper={
-                    criticalAlerts > 0
-                      ? `${criticalAlerts} ${formatCountLabel(criticalAlerts, 'critical issue requires immediate review', 'critical issues require immediate review')}`
-                      : 'No critical alerts detected in the current feed'
-                  }
-                  tone={criticalAlerts > 0 ? 'danger' : 'success'}
-                />
-
-                <KpiCard
-                  title="Active Threats"
-                  value={activeThreats}
-                  helper={
-                    activeThreats > 0
-                      ? `${activeThreats} ${formatCountLabel(activeThreats, 'active high-severity threat is still open', 'active high-severity threats are still open')}`
-                      : 'No active high-severity threats currently surfaced'
-                  }
-                  tone={activeThreats > 0 ? 'warning' : 'success'}
-                />
-
-                <KpiCard
-                  title="Cloud Exposure"
-                  value={risk.cloudExposure}
-                  helper={risk.cloudExposureHelper}
-                  tone={risk.cloudExposure > 0 ? severityTone(risk.cloudExposure > 3 ? 'high' : 'medium') : 'default'}
-                />
-              </section>
-
-              <div className="zf-span-8">
-                <RiskTrendChart points={risk.trendPoints} />
-              </div>
-
-              <div className="zf-span-4">
-                <TopThreatsPanel items={topThreats} />
-              </div>
-
-              <div className="zf-span-8">
-                <RecentAlertsTable alerts={recentAlerts} />
-              </div>
-
-              <div className="zf-span-4">
-                <RecommendedActionsPanel actions={recommendedActions} />
-              </div>
-
-              <div className="zf-span-8">
-                <InvestigationPreviewPanel items={investigationItems} />
-              </div>
-
-              <div className="zf-span-4">
-                <ConnectorHealthPanel items={connectorItems} />
-              </div>
-            </div>
-          )}
-
-          {isEmptyState ? (
-            <div className="zf-customer-empty">The dashboard is live, but the current APIs did not return customer dashboard data yet.</div>
-          ) : null}
         </div>
       </div>
     </CustomerLayout>
