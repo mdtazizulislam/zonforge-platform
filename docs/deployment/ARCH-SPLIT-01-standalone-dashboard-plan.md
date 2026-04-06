@@ -18,8 +18,8 @@
 
 ## Additive Delta In This Serial
 
-- Added `apps/web-dashboard/vite.app.config.ts` to build the dashboard as a standalone SPA at the domain root.
-- Preserved the existing `apps/web-dashboard/vite.config.ts` build that outputs into `landing/app`.
+- Extended `apps/web-dashboard/vite.config.ts` so `--mode standalone` builds the dashboard as a standalone SPA at the domain root.
+- Preserved the default `apps/web-dashboard/vite.config.ts` build that outputs into `landing/app`.
 - Added `apps/web-dashboard/netlify.app.toml` as the future app-site deployment config.
 - Added `apps/web-dashboard/public/_redirects` for standalone SPA routing and `/api` proxying on the future app domain.
 - Added `apps/web-dashboard/.env.example` to document non-secret app/api domain configuration.
@@ -59,11 +59,11 @@
 ### Environment Variables
 
 - `VITE_API_URL=/api`
-- `VITE_API_BASE_URL=/api`
+- `VITE_API_BASE_URL=https://api.zonforge.com`
 - `VITE_APP_URL=https://app.zonforge.com`
 - `VITE_AUTH_CALLBACK_URL=https://app.zonforge.com/login`
 
-These defaults keep the browser talking to `/api` on the app domain while allowing the deployment layer to proxy to `https://api.zonforge.com`.
+The runtime default still falls back to `/api` when `VITE_API_BASE_URL` is not set, which preserves the current mixed deployment and local proxy behavior.
 
 ## Risks
 
@@ -81,10 +81,38 @@ These defaults keep the browser talking to `/api` on the app domain while allowi
 ## Validation Checklist
 
 - Root production build path preserved: `apps/web-dashboard/vite.config.ts` still outputs to `landing/app` with base `/app/`.
-- Standalone dashboard build path added: `apps/web-dashboard/vite.app.config.ts` outputs to `apps/web-dashboard/dist` with base `/`.
+- Standalone dashboard build path added: `apps/web-dashboard/vite.config.ts --mode standalone` outputs to `apps/web-dashboard/dist` with base `/`.
 - Standalone Netlify config added without changing the current root `netlify.toml`.
 - Standalone SPA rewrite/proxy config added without changing `landing/_redirects`.
 - Env documentation added without storing any secrets.
+
+## SERIAL 02 — Customer Standalone Readiness
+
+### Build Command
+
+- `npm run build:standalone`
+
+### Output Folder
+
+- `apps/web-dashboard/dist`
+
+### Environment Variables
+
+- `VITE_APP_URL=https://app.zonforge.com`
+- `VITE_API_BASE_URL=https://api.zonforge.com`
+- `VITE_AUTH_CALLBACK_URL=https://app.zonforge.com/login`
+
+### Routing Assumptions
+
+- Standalone mode builds with Vite base `/`, so the app can be hosted at the root of `app.zonforge.com`.
+- React Router route definitions are already root-based and do not depend on a `/app` pathname prefix.
+- Standalone SPA fallback is handled by `apps/web-dashboard/public/_redirects`.
+
+### API Configuration
+
+- The shared API client supports `VITE_API_BASE_URL` and defaults to `/api` when unset.
+- This preserves compatibility with the current mixed deployment while allowing standalone builds to target `https://api.zonforge.com` explicitly.
+- Direct `/api/...` fetch calls remain compatible with a proxy-backed standalone deployment and should be normalized in later serials if direct cross-origin API access is adopted everywhere.
 
 ## Next Serial Requirements For ARCH-SPLIT-02
 

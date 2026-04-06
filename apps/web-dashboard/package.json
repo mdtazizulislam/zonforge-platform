@@ -6,9 +6,9 @@
   "scripts": {
     "dev":       "vite",
     "build":     "vite build",
-    "build:standalone": "vite build --config vite.app.config.ts",
+    "build:standalone": "vite build --mode standalone",
     "preview":   "vite preview",
-    "preview:standalone": "vite preview --config vite.app.config.ts",
+    "preview:standalone": "vite preview",
     "typecheck": "tsc --noEmit",
     "clean":     "rm -rf dist"
   },

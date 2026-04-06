@@ -1,6 +1,15 @@
 import { createDashboardViteConfig } from './vite.shared'
 
-export default createDashboardViteConfig({
-  base: '/app/',
-  outDir: '../../landing/app',
+export default createDashboardViteConfig((mode) => {
+  if (mode === 'standalone') {
+    return {
+      base: '/',
+      outDir: 'dist',
+    }
+  }
+
+  return {
+    base: '/app/',
+    outDir: '../../landing/app',
+  }
 })

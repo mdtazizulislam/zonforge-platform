@@ -7,10 +7,13 @@ type DashboardViteTarget = {
   outDir: string
 }
 
-export function createDashboardViteConfig(target: DashboardViteTarget) {
-  return defineConfig({
+export function createDashboardViteConfig(target: DashboardViteTarget | ((mode: string) => DashboardViteTarget)) {
+  return defineConfig(({ mode }) => {
+    const resolvedTarget = typeof target === 'function' ? target(mode) : target
+
+    return {
     plugins: [react()],
-    base: target.base,
+    base: resolvedTarget.base,
     resolve: {
       alias: { '@': path.resolve(__dirname, './src') },
       extensions: ['.mjs', '.mts', '.ts', '.tsx', '.jsx', '.js', '.json'],
@@ -26,7 +29,7 @@ export function createDashboardViteConfig(target: DashboardViteTarget) {
       },
     },
     build: {
-      outDir: target.outDir,
+      outDir: resolvedTarget.outDir,
       emptyOutDir: true,
       sourcemap: true,
       rollupOptions: {
@@ -41,5 +44,6 @@ export function createDashboardViteConfig(target: DashboardViteTarget) {
         },
       },
     },
+  }
   })
 }
