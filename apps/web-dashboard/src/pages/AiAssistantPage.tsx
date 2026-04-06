@@ -186,7 +186,7 @@ export default function AiAssistantPage() {
                 className="max-h-32 flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-relaxed text-gray-200 outline-none placeholder:text-gray-600"
               />
               <button
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!input.trim() || isPending}
                 title="Send message"
                 aria-label="Send message"

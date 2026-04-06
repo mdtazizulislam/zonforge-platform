@@ -9,8 +9,10 @@ import { tokenStorage, type CurrentUser } from '@/lib/api'
 interface AuthState {
   user:        CurrentUser | null
   isLoggedIn:  boolean
+  hasHydrated: boolean
   setUser:     (user: CurrentUser) => void
   clearAuth:   () => void
+  markHydrated: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -18,15 +20,20 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user:       null,
       isLoggedIn: false,
+      hasHydrated: false,
       setUser:    (user) => set({ user, isLoggedIn: true }),
       clearAuth:  () => {
         tokenStorage.clear()
         set({ user: null, isLoggedIn: false })
       },
+      markHydrated: () => set({ hasHydrated: true }),
     }),
     {
       name:    'zf-auth',
       partialize: (state) => ({ user: state.user, isLoggedIn: state.isLoggedIn }),
+      onRehydrateStorage: () => (state) => {
+        state?.markHydrated()
+      },
     },
   ),
 )

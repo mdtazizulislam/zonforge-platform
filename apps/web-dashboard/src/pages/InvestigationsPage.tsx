@@ -9,7 +9,9 @@ import { api, type AiInvestigation } from '@/lib/api'
 import { useInvestigations, useInvestigationStats } from '@/hooks/queries'
 
 const STATUS_META: Record<AiInvestigation['status'], { label: string; color: string; icon: React.ElementType }> = {
+  investigating: { label: 'Investigating', color: 'border-blue-500/20 bg-blue-500/10 text-blue-400', icon: Brain },
   queued: { label: 'Queued', color: 'border-yellow-500/20 bg-yellow-500/10 text-yellow-400', icon: Loader2 },
+  awaiting_approval: { label: 'Awaiting approval', color: 'border-orange-500/20 bg-orange-500/10 text-orange-400', icon: Clock },
   completed: { label: 'Completed', color: 'border-green-500/20 bg-green-500/10 text-green-400', icon: CheckCircle2 },
   failed: { label: 'Failed', color: 'border-red-500/20 bg-red-500/10 text-red-400', icon: AlertCircle },
 }

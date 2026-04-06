@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import CustomerHeader from '@/components/customer/CustomerHeader'
-import CustomerSidebar from '@/components/customer/CustomerSidebar'
 import ConnectorHealthPanel from '@/components/customer/ConnectorHealthPanel'
+import { CustomerLayout } from '@/components/customer/CustomerLayout'
 import InvestigationPreviewPanel from '@/components/customer/InvestigationPreviewPanel'
 import KpiCard from '@/components/customer/KpiCard'
 import RecentAlertsTable from '@/components/customer/RecentAlertsTable'
@@ -361,9 +360,9 @@ function buildConnectorItems(payload: unknown): DashboardConnectorItem[] {
     const connectorTotal = safeNumber(connectors?.total)
     const connectorHealthy = safeNumber(connectors?.healthy)
     const overallStatus = formatLabel(summary?.overallStatus ?? record.status ?? record.health, 'Healthy')
-    const queueEntries = Object.values(asRecord(record.queues) ?? {})
-    const totalFailed = queueEntries.reduce((sum, entry) => sum + safeNumber(asRecord(entry)?.failed), 0)
-    const totalWaiting = queueEntries.reduce((sum, entry) => sum + safeNumber(asRecord(entry)?.waiting), 0)
+    const queueEntries = Object.values(asRecord(record.queues) ?? {}) as unknown[]
+    const totalFailed = queueEntries.reduce<number>((sum, entry) => sum + safeNumber(asRecord(entry)?.failed), 0)
+    const totalWaiting = queueEntries.reduce<number>((sum, entry) => sum + safeNumber(asRecord(entry)?.waiting), 0)
 
     if (!componentMap.has('api')) {
       componentMap.set('api', {
@@ -517,7 +516,6 @@ function queryKey(suffix: string) {
 }
 
 export default function CustomerDashboardPage() {
-  const user = useAuthStore((state) => state.user)
   const [searchValue, setSearchValue] = useState('')
 
   const [riskQuery, alertsQuery, investigationsQuery, pipelineQuery] = useQueries({
@@ -573,17 +571,28 @@ export default function CustomerDashboardPage() {
   })
 
   return (
-    <div className="zf-customer-page">
-      <CustomerSidebar />
+    <CustomerLayout
+      title="Security Dashboard"
+      subtitle="Executive posture, active threats, and action-ready customer insights."
+    >
+      <div className="zf-dashboard-grid">
+        <section className="zf-panel-card zf-full-span zf-customer-shell-filter">
+          <div>
+            <p className="zf-panel-heading__eyebrow">Customer filter</p>
+            <h2 className="zf-panel-heading__title">Search the executive view</h2>
+            <p className="zf-panel-heading__meta">Filter alerts and investigations without leaving the customer workspace.</p>
+          </div>
+          <label className="zf-customer-search" aria-label="Search customer dashboard content">
+            <input
+              type="search"
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Search alerts, sources, and investigations..."
+            />
+          </label>
+        </section>
 
-      <div className="zf-customer-main">
-        <CustomerHeader
-          searchValue={searchValue}
-          onSearchChange={setSearchValue}
-          userName={user?.name}
-        />
-
-        <main className="zf-customer-content">
+        <div className="zf-full-span">
           {isInitialLoading ? (
             <div className="zf-customer-loading" aria-label="Loading customer dashboard">
               {buildLoadingCards().map((index) => <div key={index} className="zf-customer-loading__card" />)}
@@ -655,8 +664,8 @@ export default function CustomerDashboardPage() {
           {isEmptyState ? (
             <div className="zf-customer-empty">The dashboard is live, but the current APIs did not return customer dashboard data yet.</div>
           ) : null}
-        </main>
+        </div>
       </div>
-    </div>
+    </CustomerLayout>
   )
 }

@@ -5,6 +5,16 @@
 /dashboard           /app/index.html  200
 /customer-dashboard  /app/index.html  200!
 /customer-dashboard/* /app/index.html 200!
+/customer-alerts     /app/index.html  200!
+/customer-alerts/*   /app/index.html  200!
+/customer-investigations /app/index.html 200!
+/customer-investigations/* /app/index.html 200!
+/customer-ai-assistant /app/index.html 200!
+/customer-ai-assistant/* /app/index.html 200!
+/customer-billing    /app/index.html  200!
+/customer-billing/*  /app/index.html  200!
+/customer-settings   /app/index.html  200!
+/customer-settings/* /app/index.html  200!
 /customer            /app/index.html  200!
 /customer/*          /app/index.html  200!
 /alerts              /app/index.html  200

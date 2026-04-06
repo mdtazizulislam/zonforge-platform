@@ -1,30 +1,22 @@
-import { Bell, Search } from 'lucide-react'
+import { Bell } from 'lucide-react'
+import { useAuthStore } from '@/stores/auth.store'
 
-export default function CustomerHeader({
-  searchValue,
-  onSearchChange,
-  userName,
-}: {
-  searchValue: string
-  onSearchChange: (value: string) => void
-  userName?: string
-}) {
+type CustomerHeaderProps = {
+  title?: string
+  subtitle?: string
+}
+
+export function CustomerHeader({ title, subtitle }: CustomerHeaderProps) {
+  const userName = useAuthStore((state) => state.user?.name) ?? 'Customer Team'
+  const resolvedTitle = title ?? 'Customer Dashboard'
+
   return (
     <header className="zf-customer-header">
       <div>
         <p className="zf-customer-header__eyebrow">Executive overview</p>
-        <h1 className="zf-customer-header__title">Security Dashboard</h1>
+        <h1 className="zf-customer-header__title">{resolvedTitle}</h1>
+        {subtitle ? <p className="zf-customer-header__subtitle">{subtitle}</p> : null}
       </div>
-
-      <label className="zf-customer-search" aria-label="Search entities, alerts, sources">
-        <Search className="zf-customer-search__icon" />
-        <input
-          type="search"
-          value={searchValue}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search entities, alerts, sources..."
-        />
-      </label>
 
       <div className="zf-customer-header__actions">
         <button type="button" className="zf-customer-notify" aria-label="Notifications">
@@ -43,3 +35,5 @@ export default function CustomerHeader({
     </header>
   )
 }
+
+export default CustomerHeader

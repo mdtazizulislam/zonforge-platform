@@ -1,64 +1,17 @@
-import React, { useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import AuthShell from '../components/auth/AuthShell'
 import AuthCard from '../components/auth/AuthCard'
 import { api, tokenStorage } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 
-type LoginResponse =
-  | {
-      accessToken?: string
-      token?: string
-      refreshToken?: string
-      user?: unknown
-    }
-  | Record<string, unknown>
-
-function resolveApiBase(): string {
-  const env = (import.meta as unknown as { env?: Record<string, string> }).env
-  const envBase = env?.VITE_API_BASE_URL || env?.VITE_API_URL || '/api'
-  return envBase.replace(/\/$/, '')
-}
-
-async function postJson<T>(url: string, payload: Record<string, unknown>): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(payload),
-  })
-
-  const text = await response.text()
-  const data = text ? JSON.parse(text) : {}
-
-  if (!response.ok) {
-    const message =
-      (data && (data.message || data.error || data.detail)) ||
-      'Unable to sign in. Please verify your credentials.'
-    throw new Error(String(message))
-  }
-
-  return data as T
-}
-
-function extractAccessToken(data: LoginResponse): string | null {
-  if (typeof data.accessToken === 'string' && data.accessToken) return data.accessToken
-  if (typeof data.token === 'string' && data.token) return data.token
-  return null
-}
-
 export default function LoginPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const setUser = useAuthStore((state) => state.setUser)
-  const apiBase = useMemo(resolveApiBase, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-
-  const from =
-    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/customer-dashboard'
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -66,25 +19,21 @@ export default function LoginPage() {
     setErrorMessage('')
 
     try {
-      const data = await postJson<LoginResponse>(`${apiBase}/v1/auth/login`, {
-        email: email.trim(),
-        password,
-      })
+      const result = await api.auth.login(email.trim(), password)
 
-      const accessToken = extractAccessToken(data)
-      if (accessToken) {
-        tokenStorage.set(accessToken)
+      if (result.requiresMfa) {
+        throw new Error('Multi-factor authentication is required for this account.')
       }
 
-      const refreshToken = typeof data.refreshToken === 'string' ? data.refreshToken : null
-      if (refreshToken) {
-        tokenStorage.setRefresh(refreshToken)
+      if (!result.accessToken || !result.refreshToken || !result.user) {
+        throw new Error('Unable to establish a customer session.')
       }
 
-      const currentUser = await api.auth.me()
-      setUser(currentUser)
+      tokenStorage.set(result.accessToken)
+      tokenStorage.setRefresh(result.refreshToken)
+      setUser(result.user)
 
-      navigate(from, { replace: true })
+      navigate('/customer-dashboard', { replace: true })
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in.')
     } finally {

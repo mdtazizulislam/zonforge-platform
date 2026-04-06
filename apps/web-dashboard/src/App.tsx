@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Suspense, lazy } from 'react'
 import { useAuthStore } from '@/stores/auth.store'
@@ -7,10 +7,15 @@ import { useAuthStore } from '@/stores/auth.store'
 // LAZY PAGES — code-split per route
 // ─────────────────────────────────────────────
 
-const LoginPage         = lazy(() => import('@/pages/LoginPage.tsx'))
-const SignupPage        = lazy(() => import('@/pages/SignupPage.tsx'))
+const LoginPage         = lazy(() => import('@/pages/LoginPage'))
+const SignupPage        = lazy(() => import('@/pages/SignupPage'))
 const DashboardPage     = lazy(() => import('@/pages/DashboardPage'))
 const CustomerDashboardPage = lazy(() => import('@/pages/CustomerDashboardPage'))
+const CustomerAlertsPage = lazy(() => import('@/pages/customer/CustomerAlertsPage'))
+const CustomerInvestigationsPage = lazy(() => import('@/pages/customer/CustomerInvestigationsPage'))
+const CustomerAiAssistantPage = lazy(() => import('@/pages/customer/CustomerAiAssistantPage'))
+const CustomerBillingPage = lazy(() => import('@/pages/customer/CustomerBillingPage'))
+const CustomerSettingsPage = lazy(() => import('@/pages/customer/CustomerSettingsPage'))
 const AlertsPage        = lazy(() => import('@/pages/AlertsPage'))
 const AlertDetailPage   = lazy(() => import('@/pages/AlertDetailPage'))
 const RiskPage          = lazy(() => import('@/pages/RiskPage'))
@@ -39,8 +44,15 @@ const InvestigationsPage         = lazy(() => import('@/pages/InvestigationsPage
 // ─────────────────────────────────────────────
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
   const isLoggedIn = useAuthStore(s => s.isLoggedIn)
-  if (!isLoggedIn) return <Navigate to="/login" replace />
+  const hasHydrated = useAuthStore(s => s.hasHydrated)
+
+  if (!hasHydrated) {
+    return <PageLoader />
+  }
+
+  if (!isLoggedIn) return <Navigate to="/login" replace state={{ from: location }} />
   return <>{children}</>
 }
 
@@ -126,6 +138,56 @@ const router = createBrowserRouter([
   {
     path: '/customer',
     element: <RequireAuth><Navigate to="/customer-dashboard" replace /></RequireAuth>,
+  },
+  {
+    path: '/customer-alerts',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <CustomerAlertsPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/customer-investigations',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <CustomerInvestigationsPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/customer-ai-assistant',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <CustomerAiAssistantPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/customer-billing',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <CustomerBillingPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/customer-settings',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <CustomerSettingsPage />
+        </Suspense>
+      </RequireAuth>
+    ),
   },
   {
     // Both /alerts and /alerts/:id render the 3-pane center

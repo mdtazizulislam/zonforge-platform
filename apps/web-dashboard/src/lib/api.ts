@@ -186,7 +186,7 @@ async function fetchCurrentUser(accessToken: string): Promise<CurrentUser> {
     const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
     const decoded = JSON.parse(atob(normalized)) as TokenClaims
     return normalizeCurrentUser({
-      id: decoded.userId,
+      id: decoded.userId != null ? String(decoded.userId) : undefined,
       email: decoded.email,
     })
   } catch {

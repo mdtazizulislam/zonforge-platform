@@ -10,14 +10,14 @@ import {
 
 const items = [
   { label: 'Dashboard', to: '/customer-dashboard', icon: LayoutDashboard },
-  { label: 'Alerts', to: '/alerts', icon: ShieldAlert },
-  { label: 'Investigations', to: '/investigations', icon: Search },
-  { label: 'AI Assistant', to: '/ai-assistant', icon: Bot },
-  { label: 'Billing', to: '/billing', icon: Briefcase },
-  { label: 'Settings', to: '/settings', icon: Settings },
+  { label: 'Alerts', to: '/customer-alerts', icon: ShieldAlert },
+  { label: 'Investigations', to: '/customer-investigations', icon: Search },
+  { label: 'AI Assistant', to: '/customer-ai-assistant', icon: Bot },
+  { label: 'Billing', to: '/customer-billing', icon: Briefcase },
+  { label: 'Settings', to: '/customer-settings', icon: Settings },
 ]
 
-export default function CustomerSidebar() {
+export function CustomerSidebar() {
   return (
     <aside className="zf-customer-sidebar">
       <div className="zf-customer-sidebar__brand">
@@ -33,6 +33,7 @@ export default function CustomerSidebar() {
           <NavLink
             key={to}
             to={to}
+            end
             className={({ isActive }) => isActive ? 'zf-customer-navlink is-active' : 'zf-customer-navlink'}
           >
             <Icon className="zf-customer-navlink__icon" />
@@ -48,3 +49,5 @@ export default function CustomerSidebar() {
     </aside>
   )
 }
+
+export default CustomerSidebar
