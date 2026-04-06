@@ -20,10 +20,12 @@
 
     "dev:backend":       "turbo run dev --filter=./apps/api-gateway... --parallel",
     "dev:dashboard":     "turbo run dev --filter=@zonforge/web-dashboard",
+    "dev:admin":         "turbo run dev --filter=@zonforge/admin-dashboard",
     "dev:landing":       "turbo run dev --filter=@zonforge/landing-web",
     "dev:mobile":        "turbo run dev --filter=@zonforge/mobile-app",
 
     "build:backend":     "turbo run build --filter=./apps/api-gateway...",
+    "build:admin":       "npm --workspace @zonforge/admin-dashboard run build",
     "build:dashboard":   "turbo run build --filter=@zonforge/web-dashboard",
     "build:dashboard:standalone": "npm --workspace @zonforge/web-dashboard run build:standalone",
     "build:landing":     "turbo run build --filter=@zonforge/landing-web",
