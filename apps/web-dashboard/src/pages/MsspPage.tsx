@@ -3,6 +3,7 @@ import { clsx } from 'clsx'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AppShell, PageContent } from '@/components/layout/AppShell'
 import { Badge, Button, Card, Skeleton, EmptyState } from '@/components/shared/ui'
+import { buildAppUrl } from '@/lib/runtime-config'
 import {
   Users, ShieldAlert, TrendingUp, Server, Globe,
   AlertTriangle, CheckCircle2, XCircle, Search,
@@ -280,7 +281,7 @@ export default function MsspPage() {
       const data = await r.json()
       if (data.data?.token) {
         // Open tenant dashboard in new tab with impersonation token
-        const url = `${window.location.origin}/dashboard?impersonate=${data.data.token}`
+        const url = buildAppUrl(`/dashboard?impersonate=${data.data.token}`)
         window.open(url, '_blank')
       }
     } finally {

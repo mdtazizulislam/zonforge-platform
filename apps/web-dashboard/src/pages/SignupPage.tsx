@@ -2,14 +2,9 @@ import React, { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthShell from '../components/auth/AuthShell'
 import AuthCard from '../components/auth/AuthCard'
+import { resolveApiBaseUrl } from '@/lib/runtime-config'
 
 type SignupResponse = Record<string, unknown>
-
-function resolveApiBase(): string {
-  const env = (import.meta as unknown as { env?: Record<string, string> }).env
-  const envBase = env?.VITE_API_BASE_URL || env?.VITE_API_URL || '/api'
-  return envBase.replace(/\/$/, '')
-}
 
 async function postJson<T>(url: string, payload: Record<string, unknown>): Promise<T> {
   const response = await fetch(url, {
@@ -34,7 +29,7 @@ async function postJson<T>(url: string, payload: Record<string, unknown>): Promi
 
 export default function SignupPage() {
   const navigate = useNavigate()
-  const apiBase = useMemo(resolveApiBase, [])
+  const apiBase = useMemo(resolveApiBaseUrl, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')

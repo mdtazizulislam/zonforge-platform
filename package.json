@@ -25,6 +25,7 @@
 
     "build:backend":     "turbo run build --filter=./apps/api-gateway...",
     "build:dashboard":   "turbo run build --filter=@zonforge/web-dashboard",
+    "build:dashboard:standalone": "npm --workspace @zonforge/web-dashboard run build:standalone",
     "build:landing":     "turbo run build --filter=@zonforge/landing-web",
     "build:packages":    "turbo run build --filter=./packages/*",
 

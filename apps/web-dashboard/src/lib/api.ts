@@ -3,7 +3,9 @@
 // Typed fetch wrapper with JWT auth + error handling
 // ─────────────────────────────────────────────
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '/api'
+import { buildAppUrl, resolveApiBaseUrl } from '@/lib/runtime-config'
+
+const BASE_URL = resolveApiBaseUrl()
 
 function buildQueryString(params?: Record<string, unknown>): string {
   if (!params) return ''
@@ -219,7 +221,7 @@ async function apiFetch<T>(
       return handleResponse<T>(retry)
     }
     tokenStorage.clear()
-    window.location.href = '/login'
+    window.location.href = buildAppUrl('/login')
     throw new ApiError('UNAUTHORIZED', 'Session expired', 401)
   }
 
