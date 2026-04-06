@@ -1,0 +1,14 @@
+{
+  "baseUrl": "http://127.0.0.1:4173/app",
+  "loginRoute": "/login",
+  "postLoginTarget": "/customer-dashboard",
+  "customerRedirectTarget": "/customer-dashboard",
+  "dashboardStillWorks": true,
+  "consoleErrors": [],
+  "screenshots": {
+    "postLoginCustomerDashboard": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-hotfix-cust-route-01-local\\post-login-customer-dashboard.png",
+    "customerRedirect": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-hotfix-cust-route-01-local\\customer-redirect.png",
+    "dashboardStillWorks": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-hotfix-cust-route-01-local\\dashboard-still-works.png"
+  },
+  "capturedAt": "2026-04-06T18:45:14.930Z"
+}

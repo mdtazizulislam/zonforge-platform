@@ -3,10 +3,10 @@
 # Netlify internally rewrites (200) so browser URL stays intact for React Router.
 /login               /app/index.html  200!
 /dashboard           /app/index.html  200
-/customer-dashboard  /app/index.html  200
-/customer-dashboard/* /app/index.html 200
-/customer            /app/index.html  200
-/customer/*          /app/index.html  200
+/customer-dashboard  /app/index.html  200!
+/customer-dashboard/* /app/index.html 200!
+/customer            /app/index.html  200!
+/customer/*          /app/index.html  200!
 /alerts              /app/index.html  200
 /alerts/*            /app/index.html  200
 /risk                /app/index.html  200

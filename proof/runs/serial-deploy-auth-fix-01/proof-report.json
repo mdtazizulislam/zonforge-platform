@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-04-06T18:25:24.374Z",
+  "baseUrl": "https://zonforge.com",
+  "login": {
+    "route": "/login",
+    "finalUrl": "https://zonforge.com/login",
+    "screenshotPath": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-deploy-auth-fix-01\\login.png",
+    "hasSubmitButton": true,
+    "title": "ZonForge Sentinel",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "bodySample": "ZF\nZonForge Sentinel\n\nAI-POWERED CYBER EARLY WARNING\n\nSecurity visibility that feels immediate.\n\nSign in to access your ZonForge workspace, review active threats, and move from signal to action without losing context.\n\nProactive Threat Detection\nCloud Security Signals\nIdentity Threat Protection\nAI-Native Detection\nAnalyst-Ready\nMulti-Source Visibility\nSign in to ZonForge\n\nUse your workspace credentials to access the production security console.\n\nEmail\nPassword\nSign in\nor continue with\nGoogle\nMicrosoft\nDon’t have an account? Create one",
+    "darkUi": true,
+    "hasLegacySignupForm": false,
+    "hasAuthShell": true,
+    "hasGradientButton": true,
+    "submitText": "Sign in"
+  },
+  "signup": {
+    "route": "/signup",
+    "finalUrl": "https://zonforge.com/signup",
+    "screenshotPath": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-deploy-auth-fix-01\\signup.png",
+    "hasSubmitButton": true,
+    "title": "ZonForge Sentinel",
+    "backgroundColor": "rgba(0, 0, 0, 0)",
+    "bodySample": "ZF\nZonForge Sentinel\n\nAI-POWERED CYBER EARLY WARNING\n\nStart with a secure workspace from day one.\n\nCreate your ZonForge account to begin monitoring identity, cloud, and early threat signals through a single security workspace.\n\nProactive Threat Detection\nCloud Security Signals\nIdentity Threat Protection\nAI-Native Detection\nAnalyst-Ready\nMulti-Source Visibility\nCreate your ZonForge workspace\n\nRegister a production-ready account and continue into your security environment.\n\nWork Email\nPassword\nUse at least 8 characters for a production-safe password baseline.\nConfirm Password\nCreate Account\nAlready have an account? Sign in",
+    "darkUi": true,
+    "hasLegacySignupForm": false,
+    "hasAuthShell": true,
+    "hasGradientButton": true,
+    "submitText": "Create Account"
+  },
+  "relevantEntries": [
+    {
+      "url": "https://zonforge.com/app/assets/AuthCard-Cc7-2MsV.js",
+      "status": 200,
+      "resourceType": "script"
+    },
+    {
+      "url": "https://zonforge.com/app/assets/index-DF16_AB7.js",
+      "status": 200,
+      "resourceType": "script"
+    },
+    {
+      "url": "https://zonforge.com/app/assets/LoginPage-Bh6TscTP.js",
+      "status": 200,
+      "resourceType": "script"
+    },
+    {
+      "url": "https://zonforge.com/app/assets/SignupPage-BLocyLZS.js",
+      "status": 200,
+      "resourceType": "script"
+    }
+  ],
+  "checks": {
+    "loginDarkUi": true,
+    "signupDarkUi": true,
+    "loginGradientButton": true,
+    "signupGradientButton": true,
+    "signupLegacyFormRemoved": true,
+    "hasIndexBundle": true,
+    "hasLoginChunk": true,
+    "hasSignupChunk": true,
+    "hasAuthCardChunk": true,
+    "oldChunkAbsent": true
+  },
+  "artifacts": {
+    "loginScreenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-deploy-auth-fix-01\\login.png",
+    "signupScreenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-deploy-auth-fix-01\\signup.png",
+    "networkScreenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-deploy-auth-fix-01\\network-proof.png"
+  }
+}

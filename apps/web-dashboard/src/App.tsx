@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth.store'
 const LoginPage         = lazy(() => import('@/pages/LoginPage.tsx'))
 const SignupPage        = lazy(() => import('@/pages/SignupPage.tsx'))
 const DashboardPage     = lazy(() => import('@/pages/DashboardPage'))
+const CustomerDashboardPage = lazy(() => import('@/pages/CustomerDashboardPage'))
 const AlertsPage        = lazy(() => import('@/pages/AlertsPage'))
 const AlertDetailPage   = lazy(() => import('@/pages/AlertDetailPage'))
 const RiskPage          = lazy(() => import('@/pages/RiskPage'))
@@ -111,6 +112,20 @@ const router = createBrowserRouter([
         </Suspense>
       </RequireAuth>
     ),
+  },
+  {
+    path: '/customer-dashboard',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <CustomerDashboardPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/customer',
+    element: <RequireAuth><Navigate to="/customer-dashboard" replace /></RequireAuth>,
   },
   {
     // Both /alerts and /alerts/:id render the 3-pane center
