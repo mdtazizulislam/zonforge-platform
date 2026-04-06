@@ -1,0 +1,103 @@
+{
+  "baseUrl": "https://zonforge.com",
+  "loginRoute": "/login",
+  "postLoginTarget": "/customer-dashboard",
+  "customerRedirectTarget": "/customer-dashboard",
+  "customerRoutesVisited": [
+    {
+      "path": "/customer-dashboard",
+      "heading": "Security Dashboard",
+      "shellVisible": true,
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\post-login-customer-dashboard.png"
+    },
+    {
+      "path": "/customer-alerts",
+      "heading": "Customer Alerts",
+      "shellVisible": true,
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-alerts.png"
+    },
+    {
+      "path": "/customer-investigations",
+      "heading": "Customer Investigations",
+      "shellVisible": true,
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-investigations.png"
+    },
+    {
+      "path": "/customer-ai-assistant",
+      "heading": "Customer AI Assistant",
+      "shellVisible": true,
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-ai-assistant.png"
+    },
+    {
+      "path": "/customer-billing",
+      "heading": "Customer Billing",
+      "shellVisible": true,
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-billing.png"
+    },
+    {
+      "path": "/customer-settings",
+      "heading": "Customer Settings",
+      "shellVisible": true,
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-settings.png"
+    }
+  ],
+  "sidebarClickResults": [
+    {
+      "label": "Dashboard",
+      "expectedPath": "/customer-dashboard",
+      "actualPath": "/customer-dashboard",
+      "forbiddenPath": "/dashboard",
+      "routedToExpected": true,
+      "routedToForbidden": false
+    },
+    {
+      "label": "Alerts",
+      "expectedPath": "/customer-alerts",
+      "actualPath": "/customer-alerts",
+      "forbiddenPath": "/alerts",
+      "routedToExpected": true,
+      "routedToForbidden": false
+    },
+    {
+      "label": "Investigations",
+      "expectedPath": "/customer-investigations",
+      "actualPath": "/customer-investigations",
+      "forbiddenPath": "/investigations",
+      "routedToExpected": true,
+      "routedToForbidden": false
+    },
+    {
+      "label": "AI Assistant",
+      "expectedPath": "/customer-ai-assistant",
+      "actualPath": "/customer-ai-assistant",
+      "forbiddenPath": "/ai-assistant",
+      "routedToExpected": true,
+      "routedToForbidden": false
+    },
+    {
+      "label": "Billing",
+      "expectedPath": "/customer-billing",
+      "actualPath": "/customer-billing",
+      "forbiddenPath": "/billing",
+      "routedToExpected": true,
+      "routedToForbidden": false
+    },
+    {
+      "label": "Settings",
+      "expectedPath": "/customer-settings",
+      "actualPath": "/customer-settings",
+      "forbiddenPath": "/settings",
+      "routedToExpected": true,
+      "routedToForbidden": false
+    }
+  ],
+  "consoleErrors": [],
+  "screenshots": {
+    "customerSidebar": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-sidebar.png",
+    "postLoginCustomerDashboard": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\post-login-customer-dashboard.png",
+    "customerAlerts": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-alerts.png",
+    "customerAlertsRefresh": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-alerts-refresh.png",
+    "customerRedirect": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-ui-cust-01c\\customer-redirect.png"
+  },
+  "capturedAt": "2026-04-06T20:21:58.150Z"
+}
