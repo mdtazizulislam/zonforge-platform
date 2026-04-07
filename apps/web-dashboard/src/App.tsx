@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth.store'
 
 const LoginPage         = lazy(() => import('@/pages/LoginPage'))
 const SignupPage        = lazy(() => import('@/pages/SignupPage'))
+const OnboardingPage    = lazy(() => import('@/pages/OnboardingPage'))
 const DashboardPage     = lazy(() => import('@/pages/DashboardPage'))
 const CustomerDashboardPage = lazy(() => import('@/pages/CustomerDashboardPage'))
 const CustomerAlertsPage = lazy(() => import('@/pages/customer/CustomerAlertsPage'))
@@ -109,6 +110,16 @@ const router = createBrowserRouter([
       <Suspense fallback={<PageLoader />}>
         <SignupPage />
       </Suspense>
+    ),
+  },
+  {
+    path: '/onboarding',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <OnboardingPage />
+        </Suspense>
+      </RequireAuth>
     ),
   },
   {

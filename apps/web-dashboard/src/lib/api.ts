@@ -65,15 +65,39 @@ type ApiEnvelope<T> = {
   [key: string]: unknown
 }
 
-type RawCurrentUser = Partial<CurrentUser> & {
+type RawCurrentUser = Partial<Omit<CurrentUser, 'tenant' | 'membership'>> & {
   id?: string | number
   email?: string
   name?: string
+  fullName?: string
+  full_name?: string
   role?: string
+  status?: string
   tenantId?: string | number
   tenant_id?: string | number
   mfaEnabled?: boolean
   mfa_enabled?: boolean
+  emailVerified?: boolean
+  email_verified?: boolean
+}
+
+type RawTenant = Partial<TenantContext> & {
+  id?: string | number
+  name?: string
+  slug?: string
+  plan?: string
+  onboardingStatus?: string
+  onboarding_status?: string
+}
+
+type RawMembership = Partial<MembershipContext> & {
+  role?: string
+}
+
+type RawAuthContext = RawCurrentUser & {
+  user?: RawCurrentUser
+  tenant?: RawTenant
+  membership?: RawMembership | null
 }
 
 type LegacyUserLookup = {
@@ -96,8 +120,28 @@ type RawLoginResult = {
   refreshExpiresAt?: string
   refresh_expires_at?: string
   user?: RawCurrentUser
+  tenant?: RawTenant
+  membership?: RawMembership | null
   requiresMfa?: boolean
   requires_mfa?: boolean
+}
+
+type RawOnboardingStep = {
+  stepKey?: string
+  step_key?: string
+  isComplete?: boolean
+  is_complete?: boolean
+  payload?: unknown
+  updatedAt?: string | null
+  updated_at?: string | null
+}
+
+type RawOnboardingStatus = {
+  tenantId?: string | number
+  tenant_id?: string | number
+  onboardingStatus?: string
+  onboarding_status?: string
+  steps?: RawOnboardingStep[]
 }
 
 function toDisplayName(email?: string, name?: string): string {
@@ -106,16 +150,60 @@ function toDisplayName(email?: string, name?: string): string {
   return localPart && localPart.length > 0 ? localPart : 'User'
 }
 
-function normalizeCurrentUser(user: RawCurrentUser): CurrentUser {
-  const email = user.email ?? ''
-  return {
-    id: String(user.id ?? ''),
-    email,
-    name: toDisplayName(email, user.name),
-    role: user.role ?? 'member',
-    tenantId: String(user.tenantId ?? user.tenant_id ?? ''),
-    mfaEnabled: Boolean(user.mfaEnabled ?? user.mfa_enabled ?? false),
+function normalizeTenantContext(tenant?: RawTenant, fallbackUser?: RawCurrentUser): TenantContext | undefined {
+  const tenantId = tenant?.id ?? fallbackUser?.tenantId ?? fallbackUser?.tenant_id
+  const tenantName = tenant?.name
+  const tenantSlug = tenant?.slug
+
+  if (tenantId == null && !tenantName && !tenantSlug) {
+    return undefined
   }
+
+  return {
+    id: tenantId != null ? String(tenantId) : '',
+    name: String(tenantName ?? 'Workspace'),
+    slug: String(tenantSlug ?? ''),
+    plan: String(tenant?.plan ?? 'starter'),
+    onboardingStatus: String(tenant?.onboardingStatus ?? tenant?.onboarding_status ?? 'pending'),
+  }
+}
+
+function normalizeMembershipContext(membership?: RawMembership | null, fallbackUser?: RawCurrentUser): MembershipContext | undefined {
+  const role = membership?.role ?? fallbackUser?.role
+  if (!role) {
+    return undefined
+  }
+
+  return {
+    role: String(role),
+  }
+}
+
+function normalizeAuthContext(payload: RawAuthContext): CurrentUser {
+  const sourceUser = payload.user ?? payload
+  const email = sourceUser.email ?? ''
+  const tenant = normalizeTenantContext(payload.tenant, sourceUser)
+  const membership = normalizeMembershipContext(payload.membership, sourceUser)
+  const fullName = String(sourceUser.fullName ?? sourceUser.full_name ?? sourceUser.name ?? toDisplayName(email, sourceUser.name))
+
+  return {
+    id: String(sourceUser.id ?? ''),
+    email,
+    fullName,
+    name: fullName,
+    role: membership?.role ?? sourceUser.role ?? 'member',
+    status: String(sourceUser.status ?? 'active'),
+    emailVerified: Boolean(sourceUser.emailVerified ?? sourceUser.email_verified ?? false),
+    tenantId: tenant?.id ?? String(sourceUser.tenantId ?? sourceUser.tenant_id ?? ''),
+    tenant,
+    membership,
+    onboardingStatus: tenant?.onboardingStatus,
+    mfaEnabled: Boolean(sourceUser.mfaEnabled ?? sourceUser.mfa_enabled ?? false),
+  }
+}
+
+function normalizeCurrentUser(user: RawCurrentUser): CurrentUser {
+  return normalizeAuthContext(user)
 }
 
 function unwrapSuccessPayload<T>(json: ApiEnvelope<T>): T {
@@ -142,7 +230,7 @@ function normalizeLoginPayload(payload: RawLoginResult): Omit<LoginResult, 'user
     accessExpiresAt: String(payload.accessExpiresAt ?? payload.access_expires_at ?? ''),
     refreshExpiresAt: String(payload.refreshExpiresAt ?? payload.refresh_expires_at ?? ''),
     requiresMfa: Boolean(payload.requiresMfa ?? payload.requires_mfa ?? false),
-    user: payload.user ? normalizeCurrentUser(payload.user) : undefined,
+    user: payload.user ? normalizeAuthContext({ user: payload.user, tenant: payload.tenant, membership: payload.membership }) : undefined,
   }
 }
 
@@ -154,12 +242,12 @@ async function fetchCurrentUser(accessToken: string): Promise<CurrentUser> {
 
   const authMeResponse = await fetch(`${BASE_URL}/v1/auth/me`, { headers })
   if (authMeResponse.ok) {
-    const json = await authMeResponse.json().catch(() => ({})) as ApiEnvelope<RawCurrentUser>
+    const json = await authMeResponse.json().catch(() => ({})) as ApiEnvelope<RawAuthContext>
     if (json.success !== false) {
-      return normalizeCurrentUser(unwrapSuccessPayload<RawCurrentUser>(json))
+      return normalizeAuthContext(unwrapSuccessPayload<RawAuthContext>(json))
     }
   } else if (authMeResponse.status !== 404) {
-    const json = await authMeResponse.json().catch(() => ({})) as ApiEnvelope<RawCurrentUser>
+    const json = await authMeResponse.json().catch(() => ({})) as ApiEnvelope<RawAuthContext>
     throw new ApiError(
       String(json.error?.code ?? 'UNKNOWN_ERROR'),
       String(json.error?.message ?? `HTTP ${authMeResponse.status}`),
@@ -294,13 +382,45 @@ export const api = {
       const user = normalized.user ?? await fetchCurrentUser(normalized.accessToken)
       return { ...normalized, user }
     },
+    signup: async (input: { fullName: string; workspaceName: string; email: string; password: string }) => {
+      const result = await apiFetch<RawLoginResult>('/v1/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      })
+
+      const normalized = normalizeLoginPayload(result)
+      if (!normalized.accessToken || !normalized.refreshToken) {
+        throw new ApiError('INVALID_AUTH_RESPONSE', 'Signup response did not include tokens', 500)
+      }
+
+      const user = normalized.user ?? await fetchCurrentUser(normalized.accessToken)
+      return { ...normalized, user }
+    },
     logout: () =>
       apiFetch<void>('/v1/auth/logout', {
         method: 'POST',
         body:   JSON.stringify({ refresh_token: tokenStorage.getRefresh() }),
       }),
     me: async () =>
-      normalizeCurrentUser(await apiFetch<RawCurrentUser>('/v1/auth/me')),
+      normalizeAuthContext(await apiFetch<RawAuthContext>('/v1/auth/me')),
+  },
+
+  onboarding: {
+    status: async (): Promise<OnboardingStatusResponse> => {
+      const payload = await apiFetch<RawOnboardingStatus>('/v1/onboarding/status')
+      return {
+        tenantId: String(payload.tenantId ?? payload.tenant_id ?? ''),
+        onboardingStatus: String(payload.onboardingStatus ?? payload.onboarding_status ?? 'pending'),
+        steps: Array.isArray(payload.steps)
+          ? payload.steps.map((step) => ({
+              stepKey: String(step.stepKey ?? step.step_key ?? ''),
+              isComplete: Boolean(step.isComplete ?? step.is_complete ?? false),
+              payload: step.payload ?? null,
+              updatedAt: step.updatedAt ?? step.updated_at ?? null,
+            }))
+          : [],
+      }
+    },
   },
 
   // ── Alerts ────────────────────────────────
@@ -466,10 +586,41 @@ export interface LoginResult {
 export interface CurrentUser {
   id:         string
   email:      string
+  fullName:   string
   name:       string
   role:       string
+  status:     string
+  emailVerified: boolean
   tenantId:   string
+  tenant?:    TenantContext
+  membership?: MembershipContext
+  onboardingStatus?: string
   mfaEnabled: boolean
+}
+
+export interface TenantContext {
+  id: string
+  name: string
+  slug: string
+  plan: string
+  onboardingStatus: string
+}
+
+export interface MembershipContext {
+  role: string
+}
+
+export interface OnboardingStep {
+  stepKey: string
+  isComplete: boolean
+  payload: unknown
+  updatedAt: string | null
+}
+
+export interface OnboardingStatusResponse {
+  tenantId: string
+  onboardingStatus: string
+  steps: OnboardingStep[]
 }
 
 export interface PaginatedResult<T> {

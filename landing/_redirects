@@ -70,6 +70,8 @@ https://app.zonforge.com/*      https://zonforge.com/app/index.html  200!
 /supply-chain/*      /app/index.html  200
 # ── Marketing static pages ────────────────────────────────────────────────────
 /signup              /app/index.html  200!
+/onboarding          /app/index.html  200!
+/onboarding/*        /app/index.html  200!
 /pricing             /index.html      200
 # ── Backend API proxy — must be BEFORE the wildcard ─────────────────────────
 # Netlify proxies /api/* → api.zonforge.com so SPA fetch('/api/...') calls work

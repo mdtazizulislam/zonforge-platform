@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { initDatabase, getPool } from './db.js';
-import { registerUser, loginUser, verifyJWT, getTenantIdForUser, rotateRefreshToken, revokeRefreshToken } from './auth.js';
+import { AuthFlowError, createWorkspaceSignup, loginUser, verifyJWT, getTenantIdForUser, rotateRefreshToken, revokeRefreshToken } from './auth.js';
 import {
   createCheckoutSessionForTenant,
   getTenantBillingStatus,
@@ -50,6 +50,12 @@ import { createCustomerSecurityRouter } from './customerSecurity.js';
 const app = new Hono();
 const API_PREFIX = '/v1';
 const customerSecurityRouter = createCustomerSecurityRouter(requireAuthUserId);
+const ALLOWED_WEB_ORIGINS = new Set([
+  'https://zonforge.com',
+  'https://www.zonforge.com',
+  'https://app.zonforge.com',
+  'https://admin.zonforge.com',
+]);
 
 function normalizeAppError(error: unknown): AppError {
   if (error instanceof AppError) {
@@ -132,7 +138,16 @@ app.use(`${API_PREFIX}/billing/*`, authBillingRateLimitMiddleware);
 // Enable CORS
 app.use('*', cors({
   origin: (origin) => {
-    if (!origin || origin === 'https://zonforge.com') {
+    if (!origin) {
+      return 'https://zonforge.com';
+    }
+
+    try {
+      const parsed = new URL(origin);
+      if (ALLOWED_WEB_ORIGINS.has(parsed.origin)) {
+        return parsed.origin;
+      }
+    } catch {
       return 'https://zonforge.com';
     }
 
@@ -172,6 +187,7 @@ function resolveFrontendOrigin(c: any): string {
     c.req.header('origin'),
     c.req.header('referer'),
     process.env.ZONFORGE_PUBLIC_APP_URL,
+    'https://app.zonforge.com',
     'https://zonforge.com',
   ];
 
@@ -191,6 +207,124 @@ function resolveFrontendOrigin(c: any): string {
   }
 
   return 'https://zonforge.com';
+}
+
+function assertValidFullName(value: unknown): string {
+  const fullName = typeof value === 'string' ? value.trim() : '';
+  if (fullName.length < 2) {
+    throw new AppError(400, 'invalid_full_name', 'Full name must be at least 2 characters.');
+  }
+  return fullName;
+}
+
+function assertValidWorkspaceName(value: unknown): string {
+  const workspaceName = typeof value === 'string' ? value.trim() : '';
+  if (workspaceName.length < 2) {
+    throw new AppError(400, 'invalid_workspace_name', 'Workspace name must be at least 2 characters.');
+  }
+  return workspaceName;
+}
+
+async function handleSignupRequest(c: any, legacyRoute = false) {
+  const body = await c.req.json().catch(() => ({}));
+  const email = assertValidEmail(body.email);
+  const password = assertValidPassword(body.password);
+  const clientIp = getClientIp(c);
+  const userAgent = c.req.header('user-agent') ?? null;
+  const fallbackName = email.split('@')[0] || 'Workspace Owner';
+  const fullName = assertValidFullName(body.fullName ?? body.full_name ?? body.name ?? fallbackName);
+  const workspaceName = assertValidWorkspaceName(
+    body.workspaceName ?? body.workspace_name ?? body.company ?? body.companyName ?? body.workspace ?? `${fallbackName} Workspace`,
+  );
+
+  const signup = await createWorkspaceSignup(
+    {
+      fullName,
+      workspaceName,
+      email,
+      password,
+    },
+    {
+      ip: clientIp,
+      userAgent,
+    },
+  );
+
+  const tenantId = Number(signup.context.tenant.id);
+
+  try {
+    const usage = await getUsageSummary(tenantId);
+    await assertQuota(tenantId, 'IDENTITIES', usage.usage.IDENTITIES, 1);
+    await incrementUsage(tenantId, 'IDENTITIES', 1);
+  } catch (error) {
+    console.warn('Signup usage initialization failed:', error);
+  }
+
+  await writeAuditLog({
+    eventType: legacyRoute ? 'auth.register' : 'auth.signup',
+    message: 'Customer workspace created',
+    userId: signup.userId,
+    tenantId,
+    source: 'auth',
+    payload: {
+      email,
+      workspaceName,
+      workspaceSlug: signup.context.tenant.slug,
+      clientIp,
+    },
+  });
+
+  await trackConversionEvent({
+    eventName: 'signup',
+    userId: signup.userId,
+    tenantId,
+    source: legacyRoute ? 'auth_register_api' : 'auth_signup_api',
+    metadata: {
+      emailDomain: email.split('@')[1] ?? null,
+      workspaceSlug: signup.context.tenant.slug,
+    },
+  });
+
+  try {
+    const verificationToken = await createEmailVerificationToken(signup.userId);
+    const verificationUrl = `https://zonforge.com/success.html?verify_token=${verificationToken}`;
+
+    await sendProductEmail({
+      toEmail: email,
+      emailType: 'verification',
+      subject: 'Verify your ZonForge email',
+      payload: { verificationUrl, userId: signup.userId },
+    });
+
+    await sendProductEmail({
+      toEmail: email,
+      emailType: 'welcome',
+      subject: 'Welcome to ZonForge Sentinel',
+      payload: {
+        workspaceName,
+        firstActionUrl: 'https://app.zonforge.com/onboarding',
+        onboarding: ['connect_environment', 'invite_team', 'review_dashboard'],
+      },
+    });
+  } catch (error) {
+    console.warn('Signup email workflow failed:', error);
+  }
+
+  return c.json({
+    success: true,
+    userId: signup.userId,
+    user: signup.context.user,
+    tenant: signup.context.tenant,
+    membership: signup.context.membership,
+    accessToken: signup.tokens.accessToken,
+    refreshToken: signup.tokens.refreshToken,
+    token: signup.tokens.accessToken,
+    access_token: signup.tokens.accessToken,
+    refresh_token: signup.tokens.refreshToken,
+    expires_in: signup.tokens.expiresInSeconds,
+    refresh_expires_at: signup.tokens.refreshExpiresAt,
+    redirectUrl: signup.context.tenant.onboardingStatus === 'pending' ? '/onboarding' : '/customer-dashboard',
+  });
 }
 
 app.route('/', customerSecurityRouter);
@@ -267,86 +401,27 @@ async function handleCheckoutRequest(c: any) {
 }
 
 // Auth routes
+app.post(`${API_PREFIX}/auth/signup`, async (c) => {
+  try {
+    return await handleSignupRequest(c);
+  } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
+    }
+
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
 app.post(`${API_PREFIX}/auth/register`, async (c) => {
   try {
-    const body = await c.req.json();
-    const email = assertValidEmail(body.email);
-    const password = assertValidPassword(body.password);
-    const clientIp = getClientIp(c);
-    const userAgent = c.req.header('user-agent') ?? null;
-
-    const { userId, tokens } = await registerUser(email, password, {
-      ip: clientIp,
-      userAgent,
-    });
-    const pool = getPool();
-
-    // Ensure one tenant exists for self-serve users (additive, backward compatible).
-    const tenantRows = await pool.query('SELECT id FROM tenants WHERE user_id = $1 LIMIT 1', [userId]);
-    let tenantId = tenantRows.rows[0]?.id as number | undefined;
-
-    if (!tenantId) {
-      const tenantInsert = await pool.query(
-        'INSERT INTO tenants (name, plan, user_id) VALUES ($1, $2, $3) RETURNING id',
-        [email.split('@')[0] + '-tenant', 'starter', userId],
-      );
-      tenantId = tenantInsert.rows[0]?.id as number | undefined;
-    }
-
-    if (tenantId) {
-      const usage = await getUsageSummary(tenantId)
-      await assertQuota(tenantId, 'IDENTITIES', usage.usage.IDENTITIES, 1)
-      await incrementUsage(tenantId, 'IDENTITIES', 1)
-    }
-
-    await writeAuditLog({
-      eventType: 'auth.register',
-      message: 'User registered',
-      userId,
-      tenantId: tenantId ?? null,
-      source: 'auth',
-      payload: { email, clientIp },
-    });
-
-    await trackConversionEvent({
-      eventName: 'signup',
-      userId,
-      tenantId: tenantId ?? null,
-      source: 'auth_api',
-      metadata: { emailDomain: email.split('@')[1] ?? null },
-    });
-
-    const verificationToken = await createEmailVerificationToken(userId);
-    const verificationUrl = `https://zonforge.com/success.html?verify_token=${verificationToken}`;
-
-    await sendProductEmail({
-      toEmail: email,
-      emailType: 'verification',
-      subject: 'Verify your ZonForge email',
-      payload: { verificationUrl, userId },
-    });
-
-    await sendProductEmail({
-      toEmail: email,
-      emailType: 'welcome',
-      subject: 'Welcome to ZonForge Sentinel',
-      payload: {
-        firstActionUrl: 'https://zonforge.com/#demo',
-        onboarding: ['connect_source', 'run_first_detection', 'invite_team'],
-      },
-    });
-
-    return c.json({
-      success: true,
-      userId,
-      token: tokens.accessToken,
-      access_token: tokens.accessToken,
-      refresh_token: tokens.refreshToken,
-      expires_in: tokens.expiresInSeconds,
-      refresh_expires_at: tokens.refreshExpiresAt,
-      redirectUrl: '/success',
-    });
+    return await handleSignupRequest(c, true);
   } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
+    }
+
     const normalized = normalizeAppError(error);
     return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
@@ -363,7 +438,7 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
     const clientIp = getClientIp(c);
     const userAgent = c.req.header('user-agent') ?? null;
 
-    const { userId, tokens } = await loginUser(email, password, {
+    const { userId, tokens, context } = await loginUser(email, password, {
       ip: clientIp,
       userAgent,
     });
@@ -389,6 +464,11 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
     return c.json({
       success: true,
       userId,
+      user: context?.user,
+      tenant: context?.tenant,
+      membership: context?.membership,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       token: tokens.accessToken,
       access_token: tokens.accessToken,
       refresh_token: tokens.refreshToken,
@@ -396,8 +476,6 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
       refresh_expires_at: tokens.refreshExpiresAt,
     });
   } catch (error) {
-    const normalized = normalizeAppError(error);
-
     if ((error as Error).message === 'Invalid credentials') {
       await writeAuditLog({
         eventType: 'auth.login_failed',
@@ -416,6 +494,7 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
       return sendError(c, 401, 'invalid_credentials', 'Invalid email or password.');
     }
 
+    const normalized = normalizeAppError(error);
     return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
   }
 });

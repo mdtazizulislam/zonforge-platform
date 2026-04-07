@@ -115,7 +115,7 @@ function hitRateLimit(key: string, limit: number, windowMs: number) {
 }
 
 function resolveRateLimitPolicy(path: string) {
-  if (path.endsWith('/auth/register')) {
+  if (path.endsWith('/auth/register') || path.endsWith('/auth/signup')) {
     return { limit: 5, windowMs: 10 * ONE_MINUTE_MS };
   }
 
@@ -218,17 +218,15 @@ export function assertValidPassword(password: unknown): string {
     throw new AppError(400, 'invalid_password', 'Password must be a string.');
   }
 
-  if (password.length < 12 || password.length > 128) {
-    throw new AppError(400, 'invalid_password', 'Password must be between 12 and 128 characters.');
+  if (password.length < 10 || password.length > 128) {
+    throw new AppError(400, 'invalid_password', 'Password must be between 10 and 128 characters.');
   }
 
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
+  const hasLetter = /[A-Za-z]/.test(password);
   const hasDigit = /\d/.test(password);
-  const hasSpecial = /[^A-Za-z0-9]/.test(password);
 
-  if (!hasUpper || !hasLower || !hasDigit || !hasSpecial) {
-    throw new AppError(400, 'invalid_password', 'Password must include upper, lower, number, and special character.');
+  if (!hasLetter || !hasDigit) {
+    throw new AppError(400, 'invalid_password', 'Password must include at least one letter and one number.');
   }
 
   return password;
@@ -310,16 +308,21 @@ export async function recordMonitoringSignal(kind: '5xx_spike' | 'failed_login' 
 export function validateProductionSecurityConfig() {
   const nodeEnv = process.env.NODE_ENV ?? 'production';
   const frontend = process.env.ZONFORGE_PUBLIC_APP_URL ?? 'https://zonforge.com';
+  const allowedHostnames = new Set([
+    'zonforge.com',
+    'www.zonforge.com',
+    'app.zonforge.com',
+    'admin.zonforge.com',
+  ]);
 
   if (nodeEnv === 'production') {
     if (!frontend.startsWith('https://')) {
       throw new Error('ZONFORGE_PUBLIC_APP_URL must be https in production');
     }
 
-    const allowedHostnames = new Set(['zonforge.com', 'www.zonforge.com']);
     const frontendHost = new URL(frontend).hostname;
     if (!allowedHostnames.has(frontendHost)) {
-      throw new Error('ZONFORGE_PUBLIC_APP_URL must point to zonforge.com in production');
+      throw new Error('ZONFORGE_PUBLIC_APP_URL must point to an approved ZonForge production host');
     }
 
     const stripeSuccess = process.env.STRIPE_SUCCESS_URL;

@@ -1,11 +1,18 @@
 import { Hono } from 'hono';
-import { getPool } from './db.js';
+import { getPool, getUserWorkspaceContext } from './db.js';
 import { sendError } from './security.js';
 
 type TenantAccess = {
   userId: number;
   tenantId: number;
   email: string;
+  fullName: string;
+  tenantName: string;
+  tenantSlug: string;
+  tenantPlan: string;
+  onboardingStatus: string;
+  membershipRole: string;
+  emailVerified: boolean;
 };
 
 type AlertRow = {
@@ -309,25 +316,22 @@ async function getTenantAccess(c: any, requireAuthUserId: (c: any) => number | n
     return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
 
-  const pool = getPool();
-  const result = await pool.query(
-    `SELECT u.id, u.email, t.id AS tenant_id
-     FROM users u
-     LEFT JOIN tenants t ON t.user_id = u.id
-     WHERE u.id = $1
-     LIMIT 1`,
-    [userId],
-  );
-
-  const row = result.rows[0] as { id?: number; email?: string; tenant_id?: number } | undefined;
-  if (!row?.tenant_id || !row.email) {
+  const context = await getUserWorkspaceContext(userId);
+  if (!context) {
     return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
   }
 
   return {
     userId,
-    tenantId: Number(row.tenant_id),
-    email: row.email,
+    tenantId: context.tenant.id,
+    email: context.user.email,
+    fullName: context.user.fullName?.trim() || context.user.email.split('@')[0] || 'User',
+    tenantName: context.tenant.name,
+    tenantSlug: context.tenant.slug ?? '',
+    tenantPlan: context.tenant.plan ?? 'starter',
+    onboardingStatus: context.tenant.onboardingStatus ?? 'pending',
+    membershipRole: context.membership?.role ?? 'owner',
+    emailVerified: context.user.emailVerified,
   };
 }
 
@@ -488,12 +492,57 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     if (access instanceof Response) return access;
 
     return c.json({
+      user: {
+        id: String(access.userId),
+        email: access.email,
+        fullName: access.fullName,
+        name: access.fullName,
+        status: 'active',
+        emailVerified: access.emailVerified,
+      },
+      tenant: {
+        id: String(access.tenantId),
+        name: access.tenantName,
+        slug: access.tenantSlug,
+        plan: access.tenantPlan,
+        onboardingStatus: access.onboardingStatus,
+      },
+      membership: {
+        role: access.membershipRole,
+      },
       id: String(access.userId),
       email: access.email,
-      name: access.email.split('@')[0] ?? 'User',
-      role: 'owner',
+      name: access.fullName,
+      role: access.membershipRole,
       tenantId: String(access.tenantId),
       mfaEnabled: false,
+    });
+  });
+
+  router.get('/v1/onboarding/status', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const pool = getPool();
+    const stepsResult = await pool.query(
+      `SELECT step_key, is_complete, payload_json, updated_at
+       FROM onboarding_progress
+       WHERE tenant_id = $1
+       ORDER BY created_at ASC, id ASC`,
+      [access.tenantId],
+    );
+
+    const steps = stepsResult.rows.map((row: any) => ({
+      stepKey: String(row.step_key),
+      isComplete: Boolean(row.is_complete),
+      payload: row.payload_json ?? null,
+      updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+    }));
+
+    return c.json({
+      tenantId: String(access.tenantId),
+      onboardingStatus: access.onboardingStatus,
+      steps,
     });
   });
 

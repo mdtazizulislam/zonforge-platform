@@ -4,6 +4,27 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+export type UserWorkspaceContext = {
+  user: {
+    id: number;
+    email: string;
+    fullName: string | null;
+    status: string | null;
+    emailVerified: boolean;
+  };
+  tenant: {
+    id: number;
+    name: string;
+    slug: string | null;
+    plan: string | null;
+    onboardingStatus: string | null;
+  };
+  membership: {
+    id: number;
+    role: string;
+  } | null;
+};
+
 export async function initDatabase() {
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
@@ -55,8 +76,115 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'active'
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT false
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+
+    await client.query(`
+      UPDATE users
+      SET email_verified = true
+      WHERE email_verified_at IS NOT NULL AND email_verified = false
+    `);
+
+    await client.query(`
       ALTER TABLE subscriptions
       ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ
+    `);
+
+    await client.query(`
+      ALTER TABLE tenants
+      ADD COLUMN IF NOT EXISTS slug VARCHAR(255)
+    `);
+
+    await client.query(`
+      ALTER TABLE tenants
+      ADD COLUMN IF NOT EXISTS onboarding_status VARCHAR(32) NOT NULL DEFAULT 'pending'
+    `);
+
+    await client.query(`
+      ALTER TABLE tenants
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+
+    await client.query(`
+      UPDATE tenants
+      SET slug = CONCAT(
+        TRIM(BOTH '-' FROM REGEXP_REPLACE(LOWER(COALESCE(name, 'workspace')), '[^a-z0-9]+', '-', 'g')),
+        '-',
+        id
+      )
+      WHERE slug IS NULL OR slug = ''
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_tenants_slug
+      ON tenants(slug)
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tenant_memberships (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(32) NOT NULL DEFAULT 'member',
+        invited_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(tenant_id, user_id)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ix_tenant_memberships_user
+      ON tenant_memberships(user_id, created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ix_tenant_memberships_tenant
+      ON tenant_memberships(tenant_id, created_at DESC)
+    `);
+
+    await client.query(`
+      INSERT INTO tenant_memberships (tenant_id, user_id, role)
+      SELECT t.id, t.user_id, 'owner'
+      FROM tenants t
+      LEFT JOIN tenant_memberships tm
+        ON tm.tenant_id = t.id
+       AND tm.user_id = t.user_id
+      WHERE tm.id IS NULL
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS onboarding_progress (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        step_key VARCHAR(64) NOT NULL,
+        is_complete BOOLEAN NOT NULL DEFAULT false,
+        payload_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(tenant_id, step_key)
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ix_onboarding_progress_tenant
+      ON onboarding_progress(tenant_id, updated_at DESC)
     `);
 
     // ─── BILLING PLANS TABLE ───
@@ -596,6 +724,17 @@ export async function getTenantSubscription(tenantId: number) {
 }
 
 export async function getTenantByUserId(userId: number) {
+  const context = await getUserWorkspaceContext(userId);
+  if (context?.tenant) {
+    return {
+      id: context.tenant.id,
+      name: context.tenant.name,
+      slug: context.tenant.slug,
+      plan: context.tenant.plan,
+      onboarding_status: context.tenant.onboardingStatus,
+    };
+  }
+
   const result = await pool.query('SELECT * FROM tenants WHERE user_id = $1 LIMIT 1', [userId]);
   return result.rows[0] || null;
 }
@@ -603,4 +742,123 @@ export async function getTenantByUserId(userId: number) {
 export async function getTenantById(tenantId: number) {
   const result = await pool.query('SELECT * FROM tenants WHERE id = $1', [tenantId]);
   return result.rows[0] || null;
+}
+
+export async function getUserWorkspaceContext(userId: number): Promise<UserWorkspaceContext | null> {
+  const membershipResult = await pool.query(
+    `SELECT
+       u.id AS user_id,
+       u.email,
+       u.full_name,
+       u.status AS user_status,
+       COALESCE(u.email_verified, u.email_verified_at IS NOT NULL, false) AS email_verified,
+       t.id AS tenant_id,
+       t.name AS tenant_name,
+       t.slug AS tenant_slug,
+       t.plan AS tenant_plan,
+       t.onboarding_status,
+       tm.id AS membership_id,
+       tm.role AS membership_role
+     FROM users u
+     JOIN tenant_memberships tm ON tm.user_id = u.id
+     JOIN tenants t ON t.id = tm.tenant_id
+     WHERE u.id = $1
+     ORDER BY tm.created_at ASC, tm.id ASC
+     LIMIT 1`,
+    [userId],
+  );
+
+  const membershipRow = membershipResult.rows[0] as {
+    user_id?: number;
+    email?: string;
+    full_name?: string | null;
+    user_status?: string | null;
+    email_verified?: boolean;
+    tenant_id?: number;
+    tenant_name?: string;
+    tenant_slug?: string | null;
+    tenant_plan?: string | null;
+    onboarding_status?: string | null;
+    membership_id?: number;
+    membership_role?: string | null;
+  } | undefined;
+
+  if (membershipRow?.tenant_id && membershipRow.email && membershipRow.tenant_name) {
+    return {
+      user: {
+        id: Number(membershipRow.user_id),
+        email: membershipRow.email,
+        fullName: membershipRow.full_name ?? null,
+        status: membershipRow.user_status ?? null,
+        emailVerified: Boolean(membershipRow.email_verified),
+      },
+      tenant: {
+        id: Number(membershipRow.tenant_id),
+        name: membershipRow.tenant_name,
+        slug: membershipRow.tenant_slug ?? null,
+        plan: membershipRow.tenant_plan ?? null,
+        onboardingStatus: membershipRow.onboarding_status ?? null,
+      },
+      membership: membershipRow.membership_id
+        ? {
+            id: Number(membershipRow.membership_id),
+            role: membershipRow.membership_role ?? 'member',
+          }
+        : null,
+    };
+  }
+
+  const legacyResult = await pool.query(
+    `SELECT
+       u.id AS user_id,
+       u.email,
+       u.full_name,
+       u.status AS user_status,
+       COALESCE(u.email_verified, u.email_verified_at IS NOT NULL, false) AS email_verified,
+       t.id AS tenant_id,
+       t.name AS tenant_name,
+       t.slug AS tenant_slug,
+       t.plan AS tenant_plan,
+       t.onboarding_status
+     FROM users u
+     LEFT JOIN tenants t ON t.user_id = u.id
+     WHERE u.id = $1
+     LIMIT 1`,
+    [userId],
+  );
+
+  const legacyRow = legacyResult.rows[0] as {
+    user_id?: number;
+    email?: string;
+    full_name?: string | null;
+    user_status?: string | null;
+    email_verified?: boolean;
+    tenant_id?: number;
+    tenant_name?: string;
+    tenant_slug?: string | null;
+    tenant_plan?: string | null;
+    onboarding_status?: string | null;
+  } | undefined;
+
+  if (!legacyRow?.tenant_id || !legacyRow.email || !legacyRow.tenant_name) {
+    return null;
+  }
+
+  return {
+    user: {
+      id: Number(legacyRow.user_id),
+      email: legacyRow.email,
+      fullName: legacyRow.full_name ?? null,
+      status: legacyRow.user_status ?? null,
+      emailVerified: Boolean(legacyRow.email_verified),
+    },
+    tenant: {
+      id: Number(legacyRow.tenant_id),
+      name: legacyRow.tenant_name,
+      slug: legacyRow.tenant_slug ?? null,
+      plan: legacyRow.tenant_plan ?? null,
+      onboardingStatus: legacyRow.onboarding_status ?? null,
+    },
+    membership: null,
+  };
 }
