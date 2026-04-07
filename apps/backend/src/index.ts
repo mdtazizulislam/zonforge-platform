@@ -46,10 +46,13 @@ import {
 } from './growth.js';
 import { sendProductEmail } from './email.js';
 import { createCustomerSecurityRouter } from './customerSecurity.js';
+import { createEventPipelineRouter, createEventPipelineRuntime } from './eventIngestion.js';
 
 const app = new Hono();
 const API_PREFIX = '/v1';
 const customerSecurityRouter = createCustomerSecurityRouter(requireAuthUserId);
+const eventPipelineRuntime = createEventPipelineRuntime({ writeAuditLog });
+const eventPipelineRouter = createEventPipelineRouter(requireAuthUserId, eventPipelineRuntime);
 const ALLOWED_WEB_ORIGINS = new Set([
   'https://zonforge.com',
   'https://www.zonforge.com',
@@ -331,6 +334,7 @@ async function handleSignupRequest(c: any, legacyRoute = false) {
   });
 }
 
+app.route('/', eventPipelineRouter);
 app.route('/', customerSecurityRouter);
 
 function normalizeCheckoutRequest(body: Record<string, unknown>) {
@@ -1222,6 +1226,7 @@ app.post(`${API_PREFIX}/reports/export`, async (c) => {
 async function start() {
   try {
     await initDatabase();
+    await eventPipelineRuntime.start();
     if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 64) {
       throw new Error('JWT_SECRET must be set to a strong value (minimum 64 characters)');
     }
@@ -1233,6 +1238,26 @@ async function start() {
     serve({
       fetch: app.fetch,
       port,
+    });
+
+    const shutdown = async (signal: string) => {
+      console.log(`\n[shutdown] received ${signal}, closing ingestion runtime...`);
+      await eventPipelineRuntime.close();
+      process.exit(0);
+    };
+
+    process.once('SIGINT', () => {
+      shutdown('SIGINT').catch((error) => {
+        console.error('[shutdown] failed:', error);
+        process.exit(1);
+      });
+    });
+
+    process.once('SIGTERM', () => {
+      shutdown('SIGTERM').catch((error) => {
+        console.error('[shutdown] failed:', error);
+        process.exit(1);
+      });
     });
 
     console.log(`\n✓ ZonForge SaaS Backend starting on port ${port}\n`);

@@ -14,6 +14,9 @@ import {
   type UserRiskProfile,
   type AssetRiskScore,
   type ConnectorSummary,
+  type EventDetail,
+  type EventListResponse,
+  type EventQueryParams,
   type MttdMetrics,
   type PipelineHealth,
   type AttackCoverageResult,
@@ -66,6 +69,8 @@ export const QK = {
   riskAsset:       (id: string)              => ['risk', 'asset', id],
   mttd:                                         ['metrics', 'mttd'],
   connectors:                                   ['connectors'],
+  events:          (params?: EventQueryParams)  => ['events', params],
+  event:           (id: string)                 => ['events', id],
   pipelineHealth:                               ['health', 'pipeline'],
   attackCoverage:  (gapsOnly: boolean)       => ['compliance', 'attack', gapsOnly],
   auditLog:        (cursor?: string)         => ['compliance', 'audit', cursor],
@@ -225,6 +230,28 @@ export function useConnectors() {
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
+  })
+}
+
+export function useEvents(params?: EventQueryParams) {
+  return useQuery({
+    queryKey: QK.events(params),
+    queryFn: async (): Promise<WithData<EventListResponse, EventListResponse>> => {
+      const result = await api.events.list(params)
+      return { ...result, data: result }
+    },
+    staleTime: 15_000,
+  })
+}
+
+export function useEvent(id: string) {
+  return useQuery({
+    queryKey: QK.event(id),
+    queryFn: async (): Promise<WithData<EventDetail, EventDetail>> => {
+      const result = await api.events.get(id)
+      return { ...result, data: result }
+    },
+    enabled: !!id,
   })
 }
 

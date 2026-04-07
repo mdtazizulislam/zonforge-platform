@@ -795,6 +795,13 @@ export const api = {
       }),
   },
 
+  events: {
+    list: (params?: EventQueryParams) =>
+      apiFetch<EventListResponse>(`/v1/events${buildQueryString(params as Record<string, unknown> | undefined)}`),
+    get: (id: string) =>
+      apiFetch<EventDetail>(`/v1/events/${id}`),
+  },
+
   // ── Health ────────────────────────────────
 
   health: {
@@ -1181,6 +1188,48 @@ export interface ValidationResult {
   checkedAt:        string
   errors:           string[]
   checks:           ConnectorCheck[]
+}
+
+export interface EventQueryParams {
+  page?: number
+  limit?: number
+  sourceType?: string
+  eventType?: string
+  startDate?: string
+  endDate?: string
+}
+
+export interface EventListItem {
+  id: string
+  tenantId: string
+  connectorId: string | null
+  sourceType: string
+  canonicalEventType: string
+  actorEmail: string | null
+  actorIp: string | null
+  targetResource: string | null
+  eventTime: string | null
+  ingestedAt: string | null
+  severity: string | null
+  rawEventId: string | null
+  sourceEventId: string | null
+  normalizedPayload: Record<string, unknown>
+}
+
+export interface EventDetail extends EventListItem {
+  raw: {
+    status: string | null
+    errorMessage: string | null
+    payload: Record<string, unknown> | null
+  }
+}
+
+export interface EventListResponse {
+  items: EventListItem[]
+  page: number
+  limit: number
+  total: number
+  hasMore: boolean
 }
 
 export interface PipelineHealth {

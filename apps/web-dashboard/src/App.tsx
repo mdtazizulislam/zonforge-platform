@@ -22,6 +22,7 @@ const AlertsPage        = lazy(() => import('@/pages/AlertsPage'))
 const AlertDetailPage   = lazy(() => import('@/pages/AlertDetailPage'))
 const RiskPage          = lazy(() => import('@/pages/RiskPage'))
 const ConnectorsPage    = lazy(() => import('@/pages/ConnectorsPage'))
+const EventsPage        = lazy(() => import('@/pages/EventsPage'))
 const CompliancePage    = lazy(() => import('@/pages/CompliancePage'))
 const PlaybooksPage     = lazy(() => import('@/pages/PlaybooksPage'))
 const AuditLogPage      = lazy(() => import('@/pages/AuditLogPage'))
@@ -257,6 +258,16 @@ const router = createBrowserRouter([
       <RequireAuth>
         <Suspense fallback={<PageLoader />}>
           <ConnectorsPage />
+        </Suspense>
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/events',
+    element: (
+      <RequireAuth>
+        <Suspense fallback={<PageLoader />}>
+          <EventsPage />
         </Suspense>
       </RequireAuth>
     ),

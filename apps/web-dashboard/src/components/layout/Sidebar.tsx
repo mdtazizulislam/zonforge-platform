@@ -9,6 +9,7 @@ import {
   ChevronRight, LogOut, Shield, CreditCard, Building2,
   Search, FlaskConical, Brain, Network, Sparkles, Cpu,
   MessageSquare, FileSearch,
+  Activity,
 } from 'lucide-react'
 
 interface NavItem { label: string; href: string; icon: React.ElementType; exact?: boolean }
@@ -22,6 +23,7 @@ const NAV_MAIN: NavItem[] = [
   { label: 'AI Assistant',      href: '/ai-assistant',       icon: MessageSquare },
   { label: 'Investigations',    href: '/investigations',     icon: FileSearch },
   { label: 'Risk',              href: '/risk',               icon: BarChart3 },
+  { label: 'Events',            href: '/events',             icon: Activity },
   { label: 'Threat Hunting',    href: '/threat-hunting',     icon: Search },
   { label: 'Security Validation', href: '/security-validation', icon: FlaskConical },
   { label: 'Supply Chain',      href: '/supply-chain',       icon: Network },

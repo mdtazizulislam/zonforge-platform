@@ -101,6 +101,7 @@ function ConnectorStatusRow({ connector }: { connector: {
   status: string
   lastEventAt: string | null
   isHealthy: boolean
+  eventRatePerHour?: number
 } }) {
   const status = connector.status.toLowerCase()
 
@@ -121,11 +122,16 @@ function ConnectorStatusRow({ connector }: { connector: {
         </div>
         <div className="flex-shrink-0 text-right">
           {connector.lastEventAt ? (
-            <p className="text-xs text-gray-400">
-              {new Date(connector.lastEventAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
+            <div>
+              <p className="text-xs text-gray-400">
+                {new Date(connector.lastEventAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <p className="text-[11px] text-gray-600">
+                {(connector.eventRatePerHour ?? 0) > 0 ? `${connector.eventRatePerHour} events/hr` : 'Ingestion active'}
+              </p>
+            </div>
           ) : (
-            <p className="text-xs text-gray-600">No events</p>
+            <p className="text-xs text-gray-600">No ingested events</p>
           )}
           <p className={clsx('mt-0.5 text-xs font-medium', {
             'text-green-400': status === 'connected' && connector.isHealthy,
