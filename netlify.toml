@@ -6,6 +6,24 @@
   VITE_API_URL = "/api"
   NODE_VERSION = "20"
 
+[[redirects]]
+  from = "https://app.zonforge.com/api/*"
+  to = "https://api.zonforge.com/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://app.zonforge.com/app/*"
+  to = "/app/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "https://app.zonforge.com/*"
+  to = "/app/index.html"
+  status = 200
+  force = true
+
 [[headers]]
   for = "/*"
   [headers.values]
