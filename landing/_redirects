@@ -1,6 +1,7 @@
 # ── app.zonforge.com → dashboard SPA ─────────────────────────────────────────
 # Keep API proxying and static /app assets intact on the app subdomain, then
 # rewrite all remaining app-subdomain routes to the dashboard entrypoint.
+https://app.zonforge.com       https://zonforge.com/app/index.html  200!
 https://app.zonforge.com/      https://zonforge.com/app/index.html  200!
 https://app.zonforge.com/api/*  https://api.zonforge.com/:splat  200
 https://app.zonforge.com/app/*  https://zonforge.com/app/:splat  200!
