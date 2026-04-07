@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
+import { createHash, randomBytes } from 'node:crypto';
 import { getPool, getUserWorkspaceContext } from './db.js';
-import { sendError } from './security.js';
+import { assertValidEmail, sendError } from './security.js';
+import { sendProductEmail } from './email.js';
+import { assertTenantInviteRole, normalizeTenantRole, type TenantInviteRole, type TenantMembershipRole } from './auth.js';
 
 type TenantAccess = {
   userId: number;
@@ -30,6 +33,35 @@ type OnboardingStepRow = {
   updated_at: string | Date | null;
 };
 
+type TeamMemberRow = {
+  membership_id: number;
+  user_id: number;
+  email: string;
+  full_name: string | null;
+  status: string | null;
+  role: string;
+  invited_by_user_id: number | null;
+  invited_by_email: string | null;
+  invited_by_full_name: string | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+type TeamInviteRow = {
+  id: number;
+  email: string;
+  role: string;
+  invited_by_user_id: number | null;
+  invited_by_email: string | null;
+  invited_by_full_name: string | null;
+  accepted_by_user_id: number | null;
+  expires_at: string | Date;
+  accepted_at: string | Date | null;
+  revoked_at: string | Date | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
 const DEFAULT_ONBOARDING_STEPS: OnboardingStepDefinition[] = [
   {
     stepKey: 'welcome',
@@ -47,6 +79,15 @@ const DEFAULT_ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     description: 'Trigger the first guided scan action and land in the dashboard.',
   },
 ];
+
+const TEAM_MANAGERS: TenantMembershipRole[] = ['owner', 'admin'];
+const INCIDENT_RESPONDERS: TenantMembershipRole[] = ['owner', 'admin', 'analyst'];
+const ROLE_PRIORITY: Record<TenantMembershipRole, number> = {
+  viewer: 1,
+  analyst: 2,
+  admin: 3,
+  owner: 4,
+};
 
 type AlertRow = {
   alert_id: string;
@@ -129,6 +170,128 @@ function normalizeOnboardingStatus(status: string | null | undefined): 'pending'
     default:
       return 'pending';
   }
+}
+
+function inviteStatus(row: Pick<TeamInviteRow, 'accepted_at' | 'revoked_at' | 'expires_at'>): 'pending' | 'accepted' | 'revoked' | 'expired' {
+  if (row.accepted_at) return 'accepted';
+  if (row.revoked_at) return 'revoked';
+  if (new Date(row.expires_at).getTime() <= Date.now()) return 'expired';
+  return 'pending';
+}
+
+function displayPersonName(fullName: string | null | undefined, email: string | null | undefined): string {
+  if (fullName?.trim()) {
+    return fullName.trim();
+  }
+
+  return email?.split('@')[0] ?? 'User';
+}
+
+function hashInviteToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function resolveFrontendOrigin(c: any): string {
+  const candidates = [
+    c.req.header('origin'),
+    c.req.header('referer'),
+    process.env.ZONFORGE_PUBLIC_APP_URL,
+    'https://app.zonforge.com',
+    'https://zonforge.com',
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.origin;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return 'https://zonforge.com';
+}
+
+function canAssignRole(actorRole: TenantMembershipRole, targetRole: TenantInviteRole): boolean {
+  if (actorRole === 'owner') {
+    return ['admin', 'analyst', 'viewer'].includes(targetRole);
+  }
+
+  if (actorRole === 'admin') {
+    return targetRole === 'analyst' || targetRole === 'viewer';
+  }
+
+  return false;
+}
+
+function canManageMembership(actorRole: TenantMembershipRole, targetRole: TenantMembershipRole): boolean {
+  if (actorRole === 'owner') {
+    return targetRole !== 'owner';
+  }
+
+  if (actorRole === 'admin') {
+    return ROLE_PRIORITY[targetRole] < ROLE_PRIORITY.admin;
+  }
+
+  return false;
+}
+
+function requireRole(c: any, access: TenantAccess, roles: TenantMembershipRole[], message: string): Response | null {
+  const role = normalizeTenantRole(access.membershipRole);
+  if (roles.includes(role)) {
+    return null;
+  }
+
+  return sendError(c, 403, 'forbidden', message);
+}
+
+function serializeTeamMember(row: TeamMemberRow, currentUserId: number) {
+  const role = normalizeTenantRole(row.role);
+
+  return {
+    membershipId: String(row.membership_id),
+    userId: String(row.user_id),
+    email: row.email,
+    fullName: displayPersonName(row.full_name, row.email),
+    status: row.status ?? 'active',
+    role,
+    invitedBy: row.invited_by_user_id && row.invited_by_email
+      ? {
+          userId: String(row.invited_by_user_id),
+          email: row.invited_by_email,
+          fullName: displayPersonName(row.invited_by_full_name, row.invited_by_email),
+        }
+      : null,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    isCurrentUser: row.user_id === currentUserId,
+  };
+}
+
+function serializeTeamInvite(row: TeamInviteRow) {
+  return {
+    id: String(row.id),
+    email: row.email,
+    role: assertTenantInviteRole(row.role),
+    status: inviteStatus(row),
+    expiresAt: new Date(row.expires_at).toISOString(),
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    acceptedAt: toIso(row.accepted_at),
+    revokedAt: toIso(row.revoked_at),
+    invitedBy: row.invited_by_user_id && row.invited_by_email
+      ? {
+          userId: String(row.invited_by_user_id),
+          email: row.invited_by_email,
+          fullName: displayPersonName(row.invited_by_full_name, row.invited_by_email),
+        }
+      : null,
+    acceptedByUserId: row.accepted_by_user_id ? String(row.accepted_by_user_id) : null,
+  };
 }
 
 function isOnboardingStepKey(value: string): value is OnboardingStepDefinition['stepKey'] {
@@ -380,7 +543,7 @@ async function getTenantAccess(c: any, requireAuthUserId: (c: any) => number | n
     onboardingStatus: context.tenant.onboardingStatus ?? 'pending',
     onboardingStartedAt: context.tenant.onboardingStartedAt ?? null,
     onboardingCompletedAt: context.tenant.onboardingCompletedAt ?? null,
-    membershipRole: context.membership?.role ?? 'owner',
+    membershipRole: normalizeTenantRole(context.membership?.role),
     emailVerified: context.user.emailVerified,
   };
 }
@@ -390,6 +553,7 @@ async function writeTenantAuditLog(input: {
   userId: number;
   eventType: string;
   message: string;
+  source?: string;
   payload?: Record<string, unknown> | null;
 }) {
   const pool = getPool();
@@ -406,7 +570,7 @@ async function writeTenantAuditLog(input: {
       input.tenantId,
       input.userId,
       input.eventType,
-      'onboarding',
+      input.source ?? 'onboarding',
       input.message,
       input.payload ? JSON.stringify(input.payload) : null,
     ],
@@ -667,6 +831,413 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     });
   });
 
+  router.get('/v1/team/members', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT
+         tm.id AS membership_id,
+         tm.user_id,
+         u.email,
+         u.full_name,
+         u.status,
+         tm.role,
+         tm.invited_by_user_id,
+         inviter.email AS invited_by_email,
+         inviter.full_name AS invited_by_full_name,
+         tm.created_at,
+         tm.updated_at
+       FROM tenant_memberships tm
+       JOIN users u ON u.id = tm.user_id
+       LEFT JOIN users inviter ON inviter.id = tm.invited_by_user_id
+       WHERE tm.tenant_id = $1
+       ORDER BY CASE LOWER(tm.role)
+         WHEN 'owner' THEN 1
+         WHEN 'admin' THEN 2
+         WHEN 'analyst' THEN 3
+         ELSE 4
+       END, tm.created_at ASC, tm.id ASC`,
+      [access.tenantId],
+    );
+
+    const items = (result.rows as TeamMemberRow[]).map((row) => serializeTeamMember(row, access.userId));
+
+    return c.json({
+      items,
+      permissions: {
+        canManageTeam: TEAM_MANAGERS.includes(normalizeTenantRole(access.membershipRole)),
+        currentRole: normalizeTenantRole(access.membershipRole),
+      },
+    });
+  });
+
+  router.get('/v1/team/invites', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can view team invitations.');
+    if (denied) return denied;
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT
+         ti.id,
+         ti.email,
+         ti.role,
+         ti.invited_by_user_id,
+         inviter.email AS invited_by_email,
+         inviter.full_name AS invited_by_full_name,
+         ti.accepted_by_user_id,
+         ti.expires_at,
+         ti.accepted_at,
+         ti.revoked_at,
+         ti.created_at,
+         ti.updated_at
+       FROM tenant_invitations ti
+       LEFT JOIN users inviter ON inviter.id = ti.invited_by_user_id
+       WHERE ti.tenant_id = $1
+       ORDER BY ti.created_at DESC
+       LIMIT 100`,
+      [access.tenantId],
+    );
+
+    return c.json({ items: (result.rows as TeamInviteRow[]).map(serializeTeamInvite) });
+  });
+
+  router.post('/v1/team/invites', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can invite team members.');
+    if (denied) return denied;
+
+    const body = await c.req.json().catch(() => ({}));
+    const email = assertValidEmail(body.email);
+    const role = assertTenantInviteRole(body.role);
+    const actorRole = normalizeTenantRole(access.membershipRole);
+
+    if (!canAssignRole(actorRole, role)) {
+      return sendError(c, 403, 'forbidden', 'Your role cannot assign this team role.');
+    }
+
+    const pool = getPool();
+    const existingUserResult = await pool.query('SELECT id FROM users WHERE email = $1 LIMIT 1', [email]);
+    const existingUser = existingUserResult.rows[0] as { id: number } | undefined;
+
+    if (existingUser) {
+      const existingWorkspace = await getUserWorkspaceContext(Number(existingUser.id));
+      if (existingWorkspace?.tenant.id && existingWorkspace.tenant.id !== access.tenantId) {
+        return sendError(c, 409, 'workspace_membership_conflict', 'This email already belongs to another workspace.');
+      }
+
+      const existingMembership = await pool.query(
+        `SELECT id
+         FROM tenant_memberships
+         WHERE tenant_id = $1 AND user_id = $2
+         LIMIT 1`,
+        [access.tenantId, existingUser.id],
+      );
+
+      if (existingMembership.rows.length > 0) {
+        return sendError(c, 409, 'already_member', 'This user is already a member of the workspace.');
+      }
+    }
+
+    await pool.query(
+      `UPDATE tenant_invitations
+       SET revoked_at = NOW(),
+           revoked_reason = 'replaced',
+           updated_at = NOW()
+       WHERE tenant_id = $1
+         AND LOWER(email) = LOWER($2)
+         AND accepted_at IS NULL
+         AND revoked_at IS NULL`,
+      [access.tenantId, email],
+    );
+
+    const rawToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const insertResult = await pool.query(
+      `INSERT INTO tenant_invitations (
+         tenant_id,
+         email,
+         role,
+         token_hash,
+         invited_by_user_id,
+         expires_at,
+         created_at,
+         updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
+       RETURNING id, email, role, invited_by_user_id, accepted_by_user_id, expires_at, accepted_at, revoked_at, created_at, updated_at`,
+      [access.tenantId, email, role, hashInviteToken(rawToken), access.userId, expiresAt],
+    );
+
+    const inviteRow = insertResult.rows[0] as TeamInviteRow;
+    const invitationUrl = `${resolveFrontendOrigin(c)}/invite/accept?token=${rawToken}`;
+    const emailDelivery = await sendProductEmail({
+      toEmail: email,
+      emailType: 'team_invite',
+      subject: `${access.fullName} invited you to ${access.tenantName} on ZonForge`,
+      payload: {
+        invitationUrl,
+        workspaceName: access.tenantName,
+        role,
+        inviterName: access.fullName,
+        inviterEmail: access.email,
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'team.invite.created',
+      source: 'team',
+      message: 'Team invitation created',
+      payload: {
+        inviteId: inviteRow.id,
+        email,
+        role,
+        expiresAt: expiresAt.toISOString(),
+        emailStatus: emailDelivery.status,
+      },
+    });
+
+    return c.json({
+      invite: serializeTeamInvite({
+        ...inviteRow,
+        invited_by_email: access.email,
+        invited_by_full_name: access.fullName,
+      }),
+      invitationUrl,
+      emailStatus: emailDelivery.status,
+    }, 201);
+  });
+
+  router.patch('/v1/team/members/:membershipId', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update team roles.');
+    if (denied) return denied;
+
+    const membershipId = Number(c.req.param('membershipId'));
+    if (!Number.isFinite(membershipId)) {
+      return sendError(c, 400, 'invalid_membership_id', 'membershipId is invalid');
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const nextRole = assertTenantInviteRole(body.role);
+    const actorRole = normalizeTenantRole(access.membershipRole);
+
+    if (!canAssignRole(actorRole, nextRole)) {
+      return sendError(c, 403, 'forbidden', 'Your role cannot assign this team role.');
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT
+         tm.id AS membership_id,
+         tm.user_id,
+         u.email,
+         u.full_name,
+         u.status,
+         tm.role,
+         tm.invited_by_user_id,
+         inviter.email AS invited_by_email,
+         inviter.full_name AS invited_by_full_name,
+         tm.created_at,
+         tm.updated_at
+       FROM tenant_memberships tm
+       JOIN users u ON u.id = tm.user_id
+       LEFT JOIN users inviter ON inviter.id = tm.invited_by_user_id
+       WHERE tm.tenant_id = $1 AND tm.id = $2
+       LIMIT 1`,
+      [access.tenantId, membershipId],
+    );
+
+    const membership = result.rows[0] as TeamMemberRow | undefined;
+    if (!membership) {
+      return sendError(c, 404, 'not_found', 'Team member not found');
+    }
+
+    const currentRole = normalizeTenantRole(membership.role);
+    if (membership.user_id === access.userId) {
+      return sendError(c, 409, 'self_role_change_forbidden', 'You cannot change your own workspace role.');
+    }
+
+    if (!canManageMembership(actorRole, currentRole)) {
+      return sendError(c, 403, 'forbidden', 'Your role cannot manage this member.');
+    }
+
+    await pool.query(
+      `UPDATE tenant_memberships
+       SET role = $3,
+           updated_at = NOW()
+       WHERE tenant_id = $1 AND id = $2`,
+      [access.tenantId, membershipId, nextRole],
+    );
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'team.member.role_updated',
+      source: 'team',
+      message: 'Team member role updated',
+      payload: {
+        membershipId,
+        targetUserId: membership.user_id,
+        email: membership.email,
+        previousRole: currentRole,
+        nextRole,
+      },
+    });
+
+    return c.json({ updated: true });
+  });
+
+  router.delete('/v1/team/members/:membershipId', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can remove team members.');
+    if (denied) return denied;
+
+    const membershipId = Number(c.req.param('membershipId'));
+    if (!Number.isFinite(membershipId)) {
+      return sendError(c, 400, 'invalid_membership_id', 'membershipId is invalid');
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT
+         tm.id AS membership_id,
+         tm.user_id,
+         u.email,
+         u.full_name,
+         u.status,
+         tm.role,
+         tm.invited_by_user_id,
+         inviter.email AS invited_by_email,
+         inviter.full_name AS invited_by_full_name,
+         tm.created_at,
+         tm.updated_at
+       FROM tenant_memberships tm
+       JOIN users u ON u.id = tm.user_id
+       LEFT JOIN users inviter ON inviter.id = tm.invited_by_user_id
+       WHERE tm.tenant_id = $1 AND tm.id = $2
+       LIMIT 1`,
+      [access.tenantId, membershipId],
+    );
+
+    const membership = result.rows[0] as TeamMemberRow | undefined;
+    if (!membership) {
+      return sendError(c, 404, 'not_found', 'Team member not found');
+    }
+
+    const actorRole = normalizeTenantRole(access.membershipRole);
+    const targetRole = normalizeTenantRole(membership.role);
+    if (membership.user_id === access.userId) {
+      return sendError(c, 409, 'self_removal_forbidden', 'You cannot remove yourself from the workspace.');
+    }
+
+    if (!canManageMembership(actorRole, targetRole)) {
+      return sendError(c, 403, 'forbidden', 'Your role cannot remove this member.');
+    }
+
+    await pool.query(
+      `DELETE FROM tenant_memberships
+       WHERE tenant_id = $1 AND id = $2`,
+      [access.tenantId, membershipId],
+    );
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'team.member.removed',
+      source: 'team',
+      message: 'Team member removed',
+      payload: {
+        membershipId,
+        targetUserId: membership.user_id,
+        email: membership.email,
+        role: targetRole,
+      },
+    });
+
+    return c.json({ removed: true });
+  });
+
+  router.delete('/v1/team/invites/:inviteId', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can revoke team invitations.');
+    if (denied) return denied;
+
+    const inviteId = Number(c.req.param('inviteId'));
+    if (!Number.isFinite(inviteId)) {
+      return sendError(c, 400, 'invalid_invite_id', 'inviteId is invalid');
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT
+         ti.id,
+         ti.email,
+         ti.role,
+         ti.invited_by_user_id,
+         inviter.email AS invited_by_email,
+         inviter.full_name AS invited_by_full_name,
+         ti.accepted_by_user_id,
+         ti.expires_at,
+         ti.accepted_at,
+         ti.revoked_at,
+         ti.created_at,
+         ti.updated_at
+       FROM tenant_invitations ti
+       LEFT JOIN users inviter ON inviter.id = ti.invited_by_user_id
+       WHERE ti.tenant_id = $1 AND ti.id = $2
+       LIMIT 1`,
+      [access.tenantId, inviteId],
+    );
+
+    const invite = result.rows[0] as TeamInviteRow | undefined;
+    if (!invite) {
+      return sendError(c, 404, 'not_found', 'Invitation not found');
+    }
+
+    if (invite.accepted_at) {
+      return sendError(c, 409, 'invite_already_accepted', 'Accepted invitations cannot be revoked.');
+    }
+
+    await pool.query(
+      `UPDATE tenant_invitations
+       SET revoked_at = NOW(),
+           revoked_reason = 'manual',
+           updated_at = NOW()
+       WHERE tenant_id = $1 AND id = $2`,
+      [access.tenantId, inviteId],
+    );
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'team.invite.revoked',
+      source: 'team',
+      message: 'Team invitation revoked',
+      payload: {
+        inviteId,
+        email: invite.email,
+        role: assertTenantInviteRole(invite.role),
+      },
+    });
+
+    return c.json({ revoked: true });
+  });
+
   router.get('/v1/onboarding/status', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
@@ -684,6 +1255,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
   router.patch('/v1/onboarding/status', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update onboarding state.');
+    if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));
     const requestedStatus = body.status != null ? normalizeOnboardingStatus(String(body.status)) : null;
@@ -855,6 +1429,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can update alerts.');
+    if (denied) return denied;
+
     const alertId = c.req.param('id');
     const body = await c.req.json().catch(() => ({}));
     const status = normalizeAlertStatus(String(body.status ?? 'open'));
@@ -881,6 +1458,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can record alert feedback.');
+    if (denied) return denied;
+
     const alert = await getAlertForTenant(access.tenantId, c.req.param('id'));
     if (!alert) {
       return sendError(c, 404, 'not_found', 'Alert not found');
@@ -892,6 +1472,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
   router.post('/v1/alerts/:id/assign', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can assign alerts.');
+    if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));
     const analystId = typeof body.analystId === 'string' ? body.analystId.trim() : '';
@@ -975,6 +1558,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can create connectors.');
+    if (denied) return denied;
+
     const body = await c.req.json().catch(() => ({}));
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     const type = typeof body.type === 'string' ? body.type.trim() : '';
@@ -1004,6 +1590,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can validate connectors.');
+    if (denied) return denied;
+
     const pool = getPool();
     const result = await pool.query(
       `SELECT *
@@ -1032,6 +1621,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
   router.patch('/v1/connectors/:id', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update connectors.');
+    if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));
     const updates: string[] = [];
@@ -1215,6 +1807,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can create investigations.');
+    if (denied) return denied;
+
     const body = await c.req.json().catch(() => ({}));
     const alertId = typeof body.alertId === 'string' ? body.alertId.trim() : '';
     if (!alertId) {
@@ -1278,6 +1873,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
   router.post('/v1/investigations/:id/review', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can review investigations.');
+    if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));
     const verdict = typeof body.verdict === 'string' ? body.verdict.trim() : '';

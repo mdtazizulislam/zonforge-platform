@@ -6,6 +6,7 @@ import {
   Search,
   Settings,
   ShieldAlert,
+  Users,
 } from 'lucide-react'
 
 const items = [
@@ -14,6 +15,7 @@ const items = [
   { label: 'Investigations', to: '/customer-investigations', icon: Search },
   { label: 'AI Assistant', to: '/customer-ai-assistant', icon: Bot },
   { label: 'Billing', to: '/customer-billing', icon: Briefcase },
+  { label: 'Team', to: '/customer-settings/team', icon: Users },
   { label: 'Settings', to: '/customer-settings', icon: Settings },
 ]
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { getPool, getTenantByUserId, getUserWorkspaceContext } from './db.js';
+import { assertValidPassword } from './security.js';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -20,6 +21,9 @@ const DEFAULT_ONBOARDING_STEPS = [
   { stepKey: 'connect_environment', isComplete: false, payload: null },
   { stepKey: 'first_scan', isComplete: false, payload: null },
 ] as const;
+
+export type TenantMembershipRole = 'owner' | 'admin' | 'analyst' | 'viewer';
+export type TenantInviteRole = Exclude<TenantMembershipRole, 'owner'>;
 
 type Queryable = {
   query: (text: string, params?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }>;
@@ -67,6 +71,32 @@ export interface WorkspaceSignupInput {
   password: string;
 }
 
+export interface TeamInvitePreview {
+  id: string;
+  email: string;
+  role: TenantInviteRole;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  expiresAt: string;
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  inviter: {
+    id: string;
+    email: string;
+    fullName: string;
+  } | null;
+  existingUser: boolean;
+}
+
+export interface TeamInviteAcceptanceResult {
+  userId: number;
+  tokens: AuthTokenBundle;
+  context: AuthenticatedUserContext;
+  invite: TeamInvitePreview;
+}
+
 export class AuthFlowError extends Error {
   constructor(
     public readonly status: number,
@@ -83,6 +113,30 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, passwordHash: string): Promise<boolean> {
   return bcrypt.compare(password, passwordHash);
+}
+
+export function normalizeTenantRole(role: string | null | undefined): TenantMembershipRole {
+  switch ((role ?? '').trim().toLowerCase()) {
+    case 'owner':
+      return 'owner';
+    case 'admin':
+      return 'admin';
+    case 'analyst':
+      return 'analyst';
+    case 'viewer':
+    case 'member':
+    default:
+      return 'viewer';
+  }
+}
+
+export function assertTenantInviteRole(role: unknown): TenantInviteRole {
+  const normalized = normalizeTenantRole(typeof role === 'string' ? role : 'viewer');
+  if (normalized === 'owner') {
+    throw new AuthFlowError(400, 'invalid_role', 'owner cannot be assigned through invitations.');
+  }
+
+  return normalized;
 }
 
 function accessTokenTtlSeconds(): number {
@@ -210,6 +264,124 @@ async function issueAuthTokens(target: Queryable, userId: number, email: string,
   };
 }
 
+function inviteStatus(row: { accepted_at: string | Date | null; revoked_at: string | Date | null; expires_at: string | Date }): TeamInvitePreview['status'] {
+  if (row.accepted_at) {
+    return 'accepted';
+  }
+
+  if (row.revoked_at) {
+    return 'revoked';
+  }
+
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    return 'expired';
+  }
+
+  return 'pending';
+}
+
+function hashInvitationToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function requireFullName(value: string | null | undefined): string {
+  const fullName = value?.trim() ?? '';
+  if (fullName.length < 2) {
+    throw new AuthFlowError(400, 'invalid_full_name', 'Full name must be at least 2 characters.');
+  }
+
+  return fullName;
+}
+
+async function writeTeamAudit(
+  target: Queryable,
+  input: { tenantId: number; userId: number; eventType: string; message: string; payload?: Record<string, unknown> | null },
+) {
+  await target.query(
+    `INSERT INTO billing_audit_logs (
+      tenant_id,
+      user_id,
+      event_type,
+      source,
+      message,
+      payload_json
+    ) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [
+      input.tenantId,
+      input.userId,
+      input.eventType,
+      'team',
+      input.message,
+      input.payload ? JSON.stringify(input.payload) : null,
+    ],
+  );
+}
+
+type InviteLookupRow = {
+  id: number;
+  tenant_id: number;
+  tenant_name: string;
+  tenant_slug: string | null;
+  email: string;
+  role: string;
+  expires_at: string | Date;
+  accepted_at: string | Date | null;
+  revoked_at: string | Date | null;
+  invited_by_user_id: number | null;
+  inviter_email: string | null;
+  inviter_full_name: string | null;
+};
+
+async function fetchInviteByTokenHash(target: Queryable, tokenHash: string, forUpdate = false): Promise<InviteLookupRow | null> {
+  const result = await target.query(
+    `SELECT
+       ti.id,
+       ti.tenant_id,
+       t.name AS tenant_name,
+       t.slug AS tenant_slug,
+       LOWER(ti.email) AS email,
+       ti.role,
+       ti.expires_at,
+       ti.accepted_at,
+       ti.revoked_at,
+       ti.invited_by_user_id,
+       inviter.email AS inviter_email,
+       inviter.full_name AS inviter_full_name
+     FROM tenant_invitations ti
+     JOIN tenants t ON t.id = ti.tenant_id
+     LEFT JOIN users inviter ON inviter.id = ti.invited_by_user_id
+     WHERE ti.token_hash = $1
+     ${forUpdate ? 'FOR UPDATE OF ti' : ''}
+     LIMIT 1`,
+    [tokenHash],
+  );
+
+  return (result.rows[0] as InviteLookupRow | undefined) ?? null;
+}
+
+function toInvitePreview(row: InviteLookupRow, existingUser: boolean): TeamInvitePreview {
+  return {
+    id: String(row.id),
+    email: row.email,
+    role: assertTenantInviteRole(row.role),
+    status: inviteStatus(row),
+    expiresAt: new Date(row.expires_at).toISOString(),
+    tenant: {
+      id: String(row.tenant_id),
+      name: row.tenant_name,
+      slug: row.tenant_slug ?? '',
+    },
+    inviter: row.invited_by_user_id && row.inviter_email
+      ? {
+          id: String(row.invited_by_user_id),
+          email: row.inviter_email,
+          fullName: displayName(row.inviter_full_name, row.inviter_email),
+        }
+      : null,
+    existingUser,
+  };
+}
+
 function normalizePgError(error: unknown): never {
   const pgError = error as { code?: string; constraint?: string; detail?: string };
 
@@ -257,9 +429,196 @@ export async function buildAuthenticatedUserContext(userId: number): Promise<Aut
       onboardingStatus,
     },
     membership: context.membership
-      ? { role: context.membership.role }
+      ? { role: normalizeTenantRole(context.membership.role) }
       : null,
   };
+}
+
+export async function getTeamInvitePreview(token: string): Promise<TeamInvitePreview> {
+  const normalizedToken = token.trim();
+  if (!normalizedToken) {
+    throw new AuthFlowError(400, 'invite_token_required', 'Invite token is required.');
+  }
+
+  const pool = getPool();
+  const invite = await fetchInviteByTokenHash(pool, hashInvitationToken(normalizedToken));
+  if (!invite) {
+    throw new AuthFlowError(404, 'invite_not_found', 'Invitation not found.');
+  }
+
+  const existingUser = await pool.query('SELECT id FROM users WHERE email = $1 LIMIT 1', [invite.email]);
+  return toInvitePreview(invite, existingUser.rows.length > 0);
+}
+
+export async function acceptTeamInvite(input: {
+  token: string;
+  password?: string | null;
+  fullName?: string | null;
+  authUserId?: number | null;
+  metadata?: { ip?: string | null; userAgent?: string | null };
+}): Promise<TeamInviteAcceptanceResult> {
+  const normalizedToken = input.token.trim();
+  if (!normalizedToken) {
+    throw new AuthFlowError(400, 'invite_token_required', 'Invite token is required.');
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const invite = await fetchInviteByTokenHash(client, hashInvitationToken(normalizedToken), true);
+    if (!invite) {
+      throw new AuthFlowError(404, 'invite_not_found', 'Invitation not found.');
+    }
+
+    if (inviteStatus(invite) !== 'pending') {
+      throw new AuthFlowError(409, 'invite_not_active', 'This invitation is no longer active.');
+    }
+
+    const inviteRole = assertTenantInviteRole(invite.role);
+    let userId: number;
+    let userEmail = invite.email;
+
+    if (input.authUserId) {
+      const authenticatedUserResult = await client.query(
+        'SELECT id, email FROM users WHERE id = $1 LIMIT 1',
+        [input.authUserId],
+      );
+
+      const authenticatedUser = authenticatedUserResult.rows[0] as { id: number; email: string } | undefined;
+      if (!authenticatedUser) {
+        throw new AuthFlowError(401, 'unauthorized', 'Unauthorized');
+      }
+
+      if (authenticatedUser.email.toLowerCase() !== invite.email) {
+        throw new AuthFlowError(403, 'invite_email_mismatch', 'This invitation belongs to a different email address.');
+      }
+
+      userId = Number(authenticatedUser.id);
+      userEmail = authenticatedUser.email;
+    } else {
+      const existingUserResult = await client.query(
+        'SELECT id, email, password_hash FROM users WHERE email = $1 LIMIT 1',
+        [invite.email],
+      );
+
+      const existingUser = existingUserResult.rows[0] as { id: number; email: string; password_hash: string } | undefined;
+      if (existingUser) {
+        const password = input.password?.trim() ?? '';
+        if (!password) {
+          throw new AuthFlowError(400, 'password_required', 'Password is required to accept this invitation.');
+        }
+
+        if (!(await verifyPassword(password, existingUser.password_hash))) {
+          throw new AuthFlowError(401, 'invalid_credentials', 'Invalid email or password.');
+        }
+
+        userId = Number(existingUser.id);
+        userEmail = existingUser.email;
+      } else {
+        const fullName = requireFullName(input.fullName ?? null);
+        const password = assertValidPassword(input.password ?? '');
+        const passwordHash = await hashPassword(password);
+        const insertUser = await client.query(
+          `INSERT INTO users (
+            email,
+            password_hash,
+            full_name,
+            status,
+            email_verified,
+            created_at,
+            updated_at
+          ) VALUES ($1,$2,$3,$4,$5,NOW(),NOW())
+          RETURNING id, email`,
+          [invite.email, passwordHash, fullName, 'active', false],
+        );
+
+        userId = Number(insertUser.rows[0].id);
+        userEmail = String(insertUser.rows[0].email);
+      }
+    }
+
+    const existingContext = await getUserWorkspaceContext(userId);
+    if (existingContext?.tenant.id && existingContext.tenant.id !== invite.tenant_id) {
+      throw new AuthFlowError(
+        409,
+        'workspace_membership_conflict',
+        'This email already belongs to another workspace and cannot accept this invitation.',
+      );
+    }
+
+    const existingMembership = await client.query(
+      `SELECT id
+       FROM tenant_memberships
+       WHERE tenant_id = $1 AND user_id = $2
+       LIMIT 1`,
+      [invite.tenant_id, userId],
+    );
+
+    if (existingMembership.rows.length > 0) {
+      throw new AuthFlowError(409, 'already_member', 'This user is already a member of the workspace.');
+    }
+
+    await client.query(
+      `INSERT INTO tenant_memberships (
+        tenant_id,
+        user_id,
+        role,
+        invited_by_user_id,
+        created_at,
+        updated_at
+      ) VALUES ($1,$2,$3,$4,NOW(),NOW())`,
+      [invite.tenant_id, userId, inviteRole, invite.invited_by_user_id],
+    );
+
+    await client.query(
+      `UPDATE tenant_invitations
+       SET accepted_by_user_id = $2,
+           accepted_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [invite.id, userId],
+    );
+
+    await writeTeamAudit(client, {
+      tenantId: invite.tenant_id,
+      userId,
+      eventType: 'team.invite.accepted',
+      message: 'Team invitation accepted',
+      payload: {
+        inviteId: invite.id,
+        email: invite.email,
+        role: inviteRole,
+      },
+    });
+
+    const tokens = await issueAuthTokens(client, userId, userEmail, input.metadata);
+
+    await client.query('COMMIT');
+
+    const context = await buildAuthenticatedUserContext(userId);
+    if (!context) {
+      throw new AuthFlowError(500, 'invite_accept_failed', 'Unable to establish a session for the invited user.');
+    }
+
+    return {
+      userId,
+      tokens,
+      context,
+      invite: toInvitePreview(invite, true),
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error instanceof AuthFlowError) {
+      throw error;
+    }
+
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function createWorkspaceSignup(

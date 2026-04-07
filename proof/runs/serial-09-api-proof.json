@@ -1,0 +1,434 @@
+{
+  "metadata": {
+    "timestamp": "2026-04-07T12:39:12.9379342-04:00",
+    "ownerEmail": "serial09.owner.1775579951@example.com",
+    "analystEmail": "serial09.analyst.1775579951@example.com",
+    "viewerEmail": "serial09.viewer.1775579951@example.com",
+    "extraEmail": "serial09.extra.1775579951@example.com"
+  },
+  "ownerSignup": {
+    "StatusCode": 200,
+    "Body": {
+      "success": true,
+      "userId": 3,
+      "user": {
+        "id": "3",
+        "email": "serial09.owner.1775579951@example.com",
+        "fullName": "Serial 09 Owner",
+        "name": "Serial 09 Owner",
+        "status": "active",
+        "emailVerified": false
+      },
+      "tenant": {
+        "id": "3",
+        "name": "Serial 09 Workspace 1775579951",
+        "slug": "serial-09-workspace-1775579951",
+        "plan": "starter",
+        "onboardingStatus": "pending"
+      },
+      "membership": {
+        "role": "owner"
+      },
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic2VyaWFsMDkub3duZXIuMTc3NTU3OTk1MUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6ImFiMzQ1YTA5LWE5OWQtNGRlYy05MzhhLWY3ZjQ1YWZmZmI3MSIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU3OTk1MiwiZXhwIjoxNzc1NTgwODUyfQ.-6m54N4gMTIoO-p4EYg0522qChoqne-zBaKTeSXcQGU",
+      "refreshToken": "d9c2988de81a79e527a4613685f1d1ac90456e1c3e5e1459b3a28c1b5c718271fe4b144a8adb1997dbe3bd48813c925b",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic2VyaWFsMDkub3duZXIuMTc3NTU3OTk1MUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6ImFiMzQ1YTA5LWE5OWQtNGRlYy05MzhhLWY3ZjQ1YWZmZmI3MSIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU3OTk1MiwiZXhwIjoxNzc1NTgwODUyfQ.-6m54N4gMTIoO-p4EYg0522qChoqne-zBaKTeSXcQGU",
+      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic2VyaWFsMDkub3duZXIuMTc3NTU3OTk1MUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6ImFiMzQ1YTA5LWE5OWQtNGRlYy05MzhhLWY3ZjQ1YWZmZmI3MSIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU3OTk1MiwiZXhwIjoxNzc1NTgwODUyfQ.-6m54N4gMTIoO-p4EYg0522qChoqne-zBaKTeSXcQGU",
+      "refresh_token": "d9c2988de81a79e527a4613685f1d1ac90456e1c3e5e1459b3a28c1b5c718271fe4b144a8adb1997dbe3bd48813c925b",
+      "expires_in": 900,
+      "refresh_expires_at": "Thu May 07 2026 12:39:12 GMT-0400 (Eastern Daylight Time)",
+      "redirectUrl": "/onboarding"
+    }
+  },
+  "inviteAnalyst": {
+    "StatusCode": 201,
+    "Body": {
+      "invite": {
+        "id": "5",
+        "email": "serial09.analyst.1775579951@example.com",
+        "role": "analyst",
+        "status": "pending",
+        "expiresAt": "2026-04-14T16:39:12.49Z",
+        "createdAt": "2026-04-07T16:39:12.49Z",
+        "updatedAt": "2026-04-07T16:39:12.49Z",
+        "acceptedAt": null,
+        "revokedAt": null,
+        "invitedBy": {
+          "userId": "3",
+          "email": "serial09.owner.1775579951@example.com",
+          "fullName": "Serial 09 Owner"
+        },
+        "acceptedByUserId": null
+      },
+      "invitationUrl": "http://127.0.0.1:4173/invite/accept?token=48a18708d743315114c31a6f55cae893d078f1f33687fab654e3e733a8faceac",
+      "emailStatus": "queued"
+    }
+  },
+  "inviteViewer": {
+    "StatusCode": 201,
+    "Body": {
+      "invite": {
+        "id": "6",
+        "email": "serial09.viewer.1775579951@example.com",
+        "role": "viewer",
+        "status": "pending",
+        "expiresAt": "2026-04-14T16:39:12.508Z",
+        "createdAt": "2026-04-07T16:39:12.508Z",
+        "updatedAt": "2026-04-07T16:39:12.508Z",
+        "acceptedAt": null,
+        "revokedAt": null,
+        "invitedBy": {
+          "userId": "3",
+          "email": "serial09.owner.1775579951@example.com",
+          "fullName": "Serial 09 Owner"
+        },
+        "acceptedByUserId": null
+      },
+      "invitationUrl": "http://127.0.0.1:4173/invite/accept?token=f2b048ab79b11955dff0e1d419439879c6a3a0d4a901ae9833b93548006e7905",
+      "emailStatus": "queued"
+    }
+  },
+  "previewViewer": {
+    "StatusCode": 200,
+    "Body": {
+      "success": true,
+      "invite": {
+        "id": "6",
+        "email": "serial09.viewer.1775579951@example.com",
+        "role": "viewer",
+        "status": "pending",
+        "expiresAt": "2026-04-14T16:39:12.508Z",
+        "tenant": {
+          "id": "3",
+          "name": "Serial 09 Workspace 1775579951",
+          "slug": "serial-09-workspace-1775579951"
+        },
+        "inviter": {
+          "id": "3",
+          "email": "serial09.owner.1775579951@example.com",
+          "fullName": "Serial 09 Owner"
+        },
+        "existingUser": false
+      }
+    }
+  },
+  "acceptAnalyst": {
+    "StatusCode": 200,
+    "Body": {
+      "success": true,
+      "userId": 4,
+      "user": {
+        "id": "4",
+        "email": "serial09.analyst.1775579951@example.com",
+        "fullName": "Serial 09 Analyst",
+        "name": "Serial 09 Analyst",
+        "status": "active",
+        "emailVerified": false
+      },
+      "tenant": {
+        "id": "3",
+        "name": "Serial 09 Workspace 1775579951",
+        "slug": "serial-09-workspace-1775579951",
+        "plan": "starter",
+        "onboardingStatus": "pending"
+      },
+      "membership": {
+        "role": "analyst"
+      },
+      "invite": {
+        "id": "5",
+        "email": "serial09.analyst.1775579951@example.com",
+        "role": "analyst",
+        "status": "pending",
+        "expiresAt": "2026-04-14T16:39:12.49Z",
+        "tenant": {
+          "id": "3",
+          "name": "Serial 09 Workspace 1775579951",
+          "slug": "serial-09-workspace-1775579951"
+        },
+        "inviter": {
+          "id": "3",
+          "email": "serial09.owner.1775579951@example.com",
+          "fullName": "Serial 09 Owner"
+        },
+        "existingUser": true
+      },
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsImVtYWlsIjoic2VyaWFsMDkuYW5hbHlzdC4xNzc1NTc5OTUxQGV4YW1wbGUuY29tIiwic2Vzc2lvbklkIjoiNWZmNDE1ZTAtMGU5Yi00NDNmLWJhYWMtZjg1ZjEzMTlkMzE5IiwidG9rZW5UeXBlIjoiYWNjZXNzIiwiaWF0IjoxNzc1NTc5OTUyLCJleHAiOjE3NzU1ODA4NTJ9.kWQ5xlNYvJ0THLfxYpPOeuUHfivhnposlXmFS7hBeS4",
+      "refreshToken": "f4c739c1dcfa9d91a0007a42e42de5639728d7f7a9998e9e7d7ad4e695ac92a1b1579280747f7a5a3cc0fb1491ba6b92",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsImVtYWlsIjoic2VyaWFsMDkuYW5hbHlzdC4xNzc1NTc5OTUxQGV4YW1wbGUuY29tIiwic2Vzc2lvbklkIjoiNWZmNDE1ZTAtMGU5Yi00NDNmLWJhYWMtZjg1ZjEzMTlkMzE5IiwidG9rZW5UeXBlIjoiYWNjZXNzIiwiaWF0IjoxNzc1NTc5OTUyLCJleHAiOjE3NzU1ODA4NTJ9.kWQ5xlNYvJ0THLfxYpPOeuUHfivhnposlXmFS7hBeS4",
+      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsImVtYWlsIjoic2VyaWFsMDkuYW5hbHlzdC4xNzc1NTc5OTUxQGV4YW1wbGUuY29tIiwic2Vzc2lvbklkIjoiNWZmNDE1ZTAtMGU5Yi00NDNmLWJhYWMtZjg1ZjEzMTlkMzE5IiwidG9rZW5UeXBlIjoiYWNjZXNzIiwiaWF0IjoxNzc1NTc5OTUyLCJleHAiOjE3NzU1ODA4NTJ9.kWQ5xlNYvJ0THLfxYpPOeuUHfivhnposlXmFS7hBeS4",
+      "refresh_token": "f4c739c1dcfa9d91a0007a42e42de5639728d7f7a9998e9e7d7ad4e695ac92a1b1579280747f7a5a3cc0fb1491ba6b92",
+      "expires_in": 900,
+      "refresh_expires_at": "Thu May 07 2026 12:39:12 GMT-0400 (Eastern Daylight Time)",
+      "redirectUrl": "/onboarding"
+    }
+  },
+  "acceptViewer": {
+    "StatusCode": 200,
+    "Body": {
+      "success": true,
+      "userId": 5,
+      "user": {
+        "id": "5",
+        "email": "serial09.viewer.1775579951@example.com",
+        "fullName": "Serial 09 Viewer",
+        "name": "Serial 09 Viewer",
+        "status": "active",
+        "emailVerified": false
+      },
+      "tenant": {
+        "id": "3",
+        "name": "Serial 09 Workspace 1775579951",
+        "slug": "serial-09-workspace-1775579951",
+        "plan": "starter",
+        "onboardingStatus": "pending"
+      },
+      "membership": {
+        "role": "viewer"
+      },
+      "invite": {
+        "id": "6",
+        "email": "serial09.viewer.1775579951@example.com",
+        "role": "viewer",
+        "status": "pending",
+        "expiresAt": "2026-04-14T16:39:12.508Z",
+        "tenant": {
+          "id": "3",
+          "name": "Serial 09 Workspace 1775579951",
+          "slug": "serial-09-workspace-1775579951"
+        },
+        "inviter": {
+          "id": "3",
+          "email": "serial09.owner.1775579951@example.com",
+          "fullName": "Serial 09 Owner"
+        },
+        "existingUser": true
+      },
+      "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUsImVtYWlsIjoic2VyaWFsMDkudmlld2VyLjE3NzU1Nzk5NTFAZXhhbXBsZS5jb20iLCJzZXNzaW9uSWQiOiJmNWRmZjk2My1mMWNkLTQ4NmYtYmQzMi0zOTk2YjJkN2VjNzMiLCJ0b2tlblR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU1Nzk5NTIsImV4cCI6MTc3NTU4MDg1Mn0.uE-XZSq2POjB0q_7esNlJ90QSBg0J1CXw1LQ0vpP5XY",
+      "refreshToken": "d6ba045e4900ab6e96ac4a92239034fc2d78f0ab729d5fa767fc40996087e7cd6358bef5c40d0010dd1119b4ae3a6650",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUsImVtYWlsIjoic2VyaWFsMDkudmlld2VyLjE3NzU1Nzk5NTFAZXhhbXBsZS5jb20iLCJzZXNzaW9uSWQiOiJmNWRmZjk2My1mMWNkLTQ4NmYtYmQzMi0zOTk2YjJkN2VjNzMiLCJ0b2tlblR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU1Nzk5NTIsImV4cCI6MTc3NTU4MDg1Mn0.uE-XZSq2POjB0q_7esNlJ90QSBg0J1CXw1LQ0vpP5XY",
+      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUsImVtYWlsIjoic2VyaWFsMDkudmlld2VyLjE3NzU1Nzk5NTFAZXhhbXBsZS5jb20iLCJzZXNzaW9uSWQiOiJmNWRmZjk2My1mMWNkLTQ4NmYtYmQzMi0zOTk2YjJkN2VjNzMiLCJ0b2tlblR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU1Nzk5NTIsImV4cCI6MTc3NTU4MDg1Mn0.uE-XZSq2POjB0q_7esNlJ90QSBg0J1CXw1LQ0vpP5XY",
+      "refresh_token": "d6ba045e4900ab6e96ac4a92239034fc2d78f0ab729d5fa767fc40996087e7cd6358bef5c40d0010dd1119b4ae3a6650",
+      "expires_in": 900,
+      "refresh_expires_at": "Thu May 07 2026 12:39:12 GMT-0400 (Eastern Daylight Time)",
+      "redirectUrl": "/onboarding"
+    }
+  },
+  "membersInitial": {
+    "StatusCode": 200,
+    "Body": {
+      "items": [
+        {
+          "membershipId": "3",
+          "userId": "3",
+          "email": "serial09.owner.1775579951@example.com",
+          "fullName": "Serial 09 Owner",
+          "status": "active",
+          "role": "owner",
+          "invitedBy": null,
+          "createdAt": "2026-04-07T16:39:12.047Z",
+          "updatedAt": "2026-04-07T16:39:12.047Z",
+          "isCurrentUser": true
+        },
+        {
+          "membershipId": "4",
+          "userId": "4",
+          "email": "serial09.analyst.1775579951@example.com",
+          "fullName": "Serial 09 Analyst",
+          "status": "active",
+          "role": "analyst",
+          "invitedBy": {
+            "userId": "3",
+            "email": "serial09.owner.1775579951@example.com",
+            "fullName": "Serial 09 Owner"
+          },
+          "createdAt": "2026-04-07T16:39:12.529Z",
+          "updatedAt": "2026-04-07T16:39:12.529Z",
+          "isCurrentUser": false
+        },
+        {
+          "membershipId": "5",
+          "userId": "5",
+          "email": "serial09.viewer.1775579951@example.com",
+          "fullName": "Serial 09 Viewer",
+          "status": "active",
+          "role": "viewer",
+          "invitedBy": {
+            "userId": "3",
+            "email": "serial09.owner.1775579951@example.com",
+            "fullName": "Serial 09 Owner"
+          },
+          "createdAt": "2026-04-07T16:39:12.673Z",
+          "updatedAt": "2026-04-07T16:39:12.673Z",
+          "isCurrentUser": false
+        }
+      ],
+      "permissions": {
+        "canManageTeam": true,
+        "currentRole": "owner"
+      }
+    }
+  },
+  "promoteAnalyst": {
+    "StatusCode": 200,
+    "Body": {
+      "updated": true
+    }
+  },
+  "viewerDeniedInvite": {
+    "StatusCode": 403,
+    "Body": {
+      "error": {
+        "code": "forbidden",
+        "message": "Only owners and admins can invite team members.",
+        "status": 403,
+        "request_id": "1775579952879-d761ec8b35",
+        "details": null
+      }
+    }
+  },
+  "viewerDeniedOnboarding": {
+    "StatusCode": 403,
+    "Body": {
+      "error": {
+        "code": "forbidden",
+        "message": "Only owners and admins can update onboarding state.",
+        "status": 403,
+        "request_id": "1775579952886-d3b1e7362c",
+        "details": null
+      }
+    }
+  },
+  "adminInvite": {
+    "StatusCode": 201,
+    "Body": {
+      "invite": {
+        "id": "7",
+        "email": "serial09.extra.1775579951@example.com",
+        "role": "viewer",
+        "status": "pending",
+        "expiresAt": "2026-04-14T16:39:12.898Z",
+        "createdAt": "2026-04-07T16:39:12.898Z",
+        "updatedAt": "2026-04-07T16:39:12.898Z",
+        "acceptedAt": null,
+        "revokedAt": null,
+        "invitedBy": {
+          "userId": "4",
+          "email": "serial09.analyst.1775579951@example.com",
+          "fullName": "Serial 09 Analyst"
+        },
+        "acceptedByUserId": null
+      },
+      "invitationUrl": "http://127.0.0.1:4173/invite/accept?token=c8b5ed4f6d17ea325dc097da276227e4d2809a9d44e915cce7cc67bd13052839",
+      "emailStatus": "queued"
+    }
+  },
+  "revokeExtra": {
+    "StatusCode": 200,
+    "Body": {
+      "revoked": true
+    }
+  },
+  "removeViewer": {
+    "StatusCode": 200,
+    "Body": {
+      "removed": true
+    }
+  },
+  "membersFinal": {
+    "StatusCode": 200,
+    "Body": {
+      "items": [
+        {
+          "membershipId": "3",
+          "userId": "3",
+          "email": "serial09.owner.1775579951@example.com",
+          "fullName": "Serial 09 Owner",
+          "status": "active",
+          "role": "owner",
+          "invitedBy": null,
+          "createdAt": "2026-04-07T16:39:12.047Z",
+          "updatedAt": "2026-04-07T16:39:12.047Z",
+          "isCurrentUser": true
+        },
+        {
+          "membershipId": "4",
+          "userId": "4",
+          "email": "serial09.analyst.1775579951@example.com",
+          "fullName": "Serial 09 Analyst",
+          "status": "active",
+          "role": "admin",
+          "invitedBy": {
+            "userId": "3",
+            "email": "serial09.owner.1775579951@example.com",
+            "fullName": "Serial 09 Owner"
+          },
+          "createdAt": "2026-04-07T16:39:12.529Z",
+          "updatedAt": "2026-04-07T16:39:12.874Z",
+          "isCurrentUser": false
+        }
+      ],
+      "permissions": {
+        "canManageTeam": true,
+        "currentRole": "owner"
+      }
+    }
+  },
+  "invitesFinal": {
+    "StatusCode": 200,
+    "Body": {
+      "items": [
+        {
+          "id": "7",
+          "email": "serial09.extra.1775579951@example.com",
+          "role": "viewer",
+          "status": "revoked",
+          "expiresAt": "2026-04-14T16:39:12.898Z",
+          "createdAt": "2026-04-07T16:39:12.898Z",
+          "updatedAt": "2026-04-07T16:39:12.911Z",
+          "acceptedAt": null,
+          "revokedAt": "2026-04-07T16:39:12.911Z",
+          "invitedBy": {
+            "userId": "4",
+            "email": "serial09.analyst.1775579951@example.com",
+            "fullName": "Serial 09 Analyst"
+          },
+          "acceptedByUserId": null
+        },
+        {
+          "id": "6",
+          "email": "serial09.viewer.1775579951@example.com",
+          "role": "viewer",
+          "status": "accepted",
+          "expiresAt": "2026-04-14T16:39:12.508Z",
+          "createdAt": "2026-04-07T16:39:12.508Z",
+          "updatedAt": "2026-04-07T16:39:12.673Z",
+          "acceptedAt": "2026-04-07T16:39:12.673Z",
+          "revokedAt": null,
+          "invitedBy": {
+            "userId": "3",
+            "email": "serial09.owner.1775579951@example.com",
+            "fullName": "Serial 09 Owner"
+          },
+          "acceptedByUserId": "5"
+        },
+        {
+          "id": "5",
+          "email": "serial09.analyst.1775579951@example.com",
+          "role": "analyst",
+          "status": "accepted",
+          "expiresAt": "2026-04-14T16:39:12.49Z",
+          "createdAt": "2026-04-07T16:39:12.49Z",
+          "updatedAt": "2026-04-07T16:39:12.529Z",
+          "acceptedAt": "2026-04-07T16:39:12.529Z",
+          "revokedAt": null,
+          "invitedBy": {
+            "userId": "3",
+            "email": "serial09.owner.1775579951@example.com",
+            "fullName": "Serial 09 Owner"
+          },
+          "acceptedByUserId": "4"
+        }
+      ]
+    }
+  }
+}

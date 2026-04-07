@@ -154,6 +154,98 @@ type RawOnboardingStatus = {
   steps?: RawOnboardingStep[]
 }
 
+type RawTeamActor = {
+  userId?: string | number | null
+  user_id?: string | number | null
+  email?: string | null
+  fullName?: string | null
+  full_name?: string | null
+}
+
+type RawTeamMember = {
+  membershipId?: string | number
+  membership_id?: string | number
+  userId?: string | number
+  user_id?: string | number
+  email?: string
+  fullName?: string | null
+  full_name?: string | null
+  status?: string | null
+  role?: string
+  createdAt?: string | null
+  created_at?: string | null
+  updatedAt?: string | null
+  updated_at?: string | null
+  isCurrentUser?: boolean
+  is_current_user?: boolean
+  invitedBy?: RawTeamActor | null
+  invited_by?: RawTeamActor | null
+}
+
+type RawTeamInvite = {
+  id?: string | number
+  email?: string
+  role?: string
+  status?: string
+  expiresAt?: string | null
+  expires_at?: string | null
+  createdAt?: string | null
+  created_at?: string | null
+  updatedAt?: string | null
+  updated_at?: string | null
+  acceptedAt?: string | null
+  accepted_at?: string | null
+  revokedAt?: string | null
+  revoked_at?: string | null
+  acceptedByUserId?: string | number | null
+  accepted_by_user_id?: string | number | null
+  invitedBy?: RawTeamActor | null
+  invited_by?: RawTeamActor | null
+}
+
+type RawTeamPermissions = {
+  canManageTeam?: boolean
+  can_manage_team?: boolean
+  currentRole?: string
+  current_role?: string
+}
+
+type RawTeamMembersResponse = {
+  items?: RawTeamMember[]
+  permissions?: RawTeamPermissions
+}
+
+type RawTeamInvitesResponse = {
+  items?: RawTeamInvite[]
+}
+
+type RawTeamInviteCreateResponse = {
+  invite?: RawTeamInvite
+  invitationUrl?: string
+  invitation_url?: string
+  emailStatus?: string
+  email_status?: string
+}
+
+type RawInvitePreview = {
+  id?: string | number
+  email?: string
+  role?: string
+  status?: string
+  expiresAt?: string | null
+  expires_at?: string | null
+  existingUser?: boolean
+  existing_user?: boolean
+  tenant?: RawTenant
+  inviter?: RawTeamActor | null
+}
+
+type RawInviteAcceptResult = RawLoginResult & {
+  invite?: RawInvitePreview
+  redirectUrl?: string
+  redirect_url?: string
+}
+
 function toDisplayName(email?: string, name?: string): string {
   if (name?.trim()) return name.trim()
   const localPart = email?.split('@')[0]?.trim()
@@ -196,6 +288,83 @@ function normalizeOnboardingPayload(payload: RawOnboardingStatus): OnboardingSta
           updatedAt: step.updatedAt ?? step.updated_at ?? null,
         }))
       : [],
+  }
+}
+
+function normalizeTeamActor(actor?: RawTeamActor | null): TeamActor | null {
+  if (!actor || (!actor.email && actor.userId == null && actor.user_id == null)) {
+    return null
+  }
+
+  const email = actor.email ?? ''
+  return {
+    userId: String(actor.userId ?? actor.user_id ?? ''),
+    email,
+    fullName: String(actor.fullName ?? actor.full_name ?? toDisplayName(email, undefined)),
+  }
+}
+
+function normalizeTeamMember(member: RawTeamMember): TeamMember {
+  return {
+    membershipId: String(member.membershipId ?? member.membership_id ?? ''),
+    userId: String(member.userId ?? member.user_id ?? ''),
+    email: String(member.email ?? ''),
+    fullName: String(member.fullName ?? member.full_name ?? toDisplayName(member.email, undefined)),
+    status: String(member.status ?? 'active'),
+    role: String(member.role ?? 'viewer'),
+    createdAt: member.createdAt ?? member.created_at ?? null,
+    updatedAt: member.updatedAt ?? member.updated_at ?? null,
+    isCurrentUser: Boolean(member.isCurrentUser ?? member.is_current_user ?? false),
+    invitedBy: normalizeTeamActor(member.invitedBy ?? member.invited_by ?? null),
+  }
+}
+
+function normalizeTeamInvite(invite: RawTeamInvite): TeamInvite {
+  return {
+    id: String(invite.id ?? ''),
+    email: String(invite.email ?? ''),
+    role: String(invite.role ?? 'viewer'),
+    status: String(invite.status ?? 'pending'),
+    expiresAt: invite.expiresAt ?? invite.expires_at ?? null,
+    createdAt: invite.createdAt ?? invite.created_at ?? null,
+    updatedAt: invite.updatedAt ?? invite.updated_at ?? null,
+    acceptedAt: invite.acceptedAt ?? invite.accepted_at ?? null,
+    revokedAt: invite.revokedAt ?? invite.revoked_at ?? null,
+    acceptedByUserId: invite.acceptedByUserId != null || invite.accepted_by_user_id != null
+      ? String(invite.acceptedByUserId ?? invite.accepted_by_user_id ?? '')
+      : null,
+    invitedBy: normalizeTeamActor(invite.invitedBy ?? invite.invited_by ?? null),
+  }
+}
+
+function normalizeTeamMembersResponse(payload: RawTeamMembersResponse): TeamMembersResponse {
+  return {
+    items: Array.isArray(payload.items) ? payload.items.map(normalizeTeamMember) : [],
+    permissions: {
+      canManageTeam: Boolean(payload.permissions?.canManageTeam ?? payload.permissions?.can_manage_team ?? false),
+      currentRole: String(payload.permissions?.currentRole ?? payload.permissions?.current_role ?? 'viewer'),
+    },
+  }
+}
+
+function normalizeInvitePreview(payload: RawInvitePreview): TeamInvitePreview {
+  return {
+    id: String(payload.id ?? ''),
+    email: String(payload.email ?? ''),
+    role: String(payload.role ?? 'viewer'),
+    status: String(payload.status ?? 'pending'),
+    expiresAt: payload.expiresAt ?? payload.expires_at ?? null,
+    existingUser: Boolean(payload.existingUser ?? payload.existing_user ?? false),
+    tenant: normalizeTenantContext(payload.tenant) ?? {
+      id: '',
+      name: 'Workspace',
+      slug: '',
+      plan: 'starter',
+      onboardingStatus: 'pending',
+      onboardingStartedAt: null,
+      onboardingCompletedAt: null,
+    },
+    inviter: normalizeTeamActor(payload.inviter ?? null),
   }
 }
 
@@ -434,6 +603,77 @@ export const api = {
       }),
     me: async () =>
       normalizeAuthContext(await apiFetch<RawAuthContext>('/v1/auth/me')),
+    invitePreview: async (token: string): Promise<TeamInvitePreview> => {
+      const payload = await apiFetch<{ invite: RawInvitePreview }>(`/v1/auth/invite${buildQueryString({ token })}`)
+      return normalizeInvitePreview(payload.invite)
+    },
+    acceptInvite: async (input: { token: string; fullName?: string; password?: string }) => {
+      const payload = await apiFetch<RawInviteAcceptResult>('/v1/auth/invite/accept', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      })
+
+      const normalized = normalizeLoginPayload(payload)
+      if (!normalized.accessToken || !normalized.refreshToken) {
+        throw new ApiError('INVALID_AUTH_RESPONSE', 'Invite acceptance response did not include tokens', 500)
+      }
+
+      const user = normalized.user ?? await fetchCurrentUser(normalized.accessToken)
+      return {
+        ...normalized,
+        user,
+        invite: payload.invite ? normalizeInvitePreview(payload.invite) : undefined,
+        redirectUrl: String(payload.redirectUrl ?? payload.redirect_url ?? '/customer-dashboard'),
+      }
+    },
+  },
+
+  team: {
+    members: async (): Promise<TeamMembersResponse> => {
+      const payload = await apiFetch<RawTeamMembersResponse>('/v1/team/members')
+      return normalizeTeamMembersResponse(payload)
+    },
+    invites: async (): Promise<TeamInvite[]> => {
+      const payload = await apiFetch<RawTeamInvitesResponse>('/v1/team/invites')
+      return Array.isArray(payload.items) ? payload.items.map(normalizeTeamInvite) : []
+    },
+    createInvite: async (input: { email: string; role: TeamRole }): Promise<TeamInviteCreateResult> => {
+      const payload = await apiFetch<RawTeamInviteCreateResponse>('/v1/team/invites', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      })
+
+      return {
+        invite: payload.invite ? normalizeTeamInvite(payload.invite) : {
+          id: '',
+          email: input.email,
+          role: input.role,
+          status: 'pending',
+          expiresAt: null,
+          createdAt: null,
+          updatedAt: null,
+          acceptedAt: null,
+          revokedAt: null,
+          acceptedByUserId: null,
+          invitedBy: null,
+        },
+        invitationUrl: String(payload.invitationUrl ?? payload.invitation_url ?? ''),
+        emailStatus: String(payload.emailStatus ?? payload.email_status ?? 'queued'),
+      }
+    },
+    updateMemberRole: (membershipId: string, role: TeamRole) =>
+      apiFetch<{ updated: boolean }>(`/v1/team/members/${membershipId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      }),
+    removeMember: (membershipId: string) =>
+      apiFetch<{ removed: boolean }>(`/v1/team/members/${membershipId}`, {
+        method: 'DELETE',
+      }),
+    revokeInvite: (inviteId: string) =>
+      apiFetch<{ revoked: boolean }>(`/v1/team/invites/${inviteId}`, {
+        method: 'DELETE',
+      }),
   },
 
   onboarding: {
@@ -646,6 +886,66 @@ export interface TenantContext {
 
 export interface MembershipContext {
   role: string
+}
+
+export type TeamRole = 'owner' | 'admin' | 'analyst' | 'viewer'
+
+export interface TeamActor {
+  userId: string
+  email: string
+  fullName: string
+}
+
+export interface TeamMember {
+  membershipId: string
+  userId: string
+  email: string
+  fullName: string
+  status: string
+  role: string
+  createdAt: string | null
+  updatedAt: string | null
+  isCurrentUser: boolean
+  invitedBy: TeamActor | null
+}
+
+export interface TeamInvite {
+  id: string
+  email: string
+  role: string
+  status: string
+  expiresAt: string | null
+  createdAt: string | null
+  updatedAt: string | null
+  acceptedAt: string | null
+  revokedAt: string | null
+  acceptedByUserId: string | null
+  invitedBy: TeamActor | null
+}
+
+export interface TeamMembersResponse {
+  items: TeamMember[]
+  permissions: {
+    canManageTeam: boolean
+    currentRole: string
+  }
+}
+
+export interface TeamInviteCreateResult {
+  invite: TeamInvite
+  invitationUrl: string
+  emailStatus: string
+}
+
+export interface TeamInvitePreview {
+  id: string
+  email: string
+  role: string
+  status: string
+  expiresAt: string | null
+  existingUser: boolean
+  tenant: TenantContext
+  inviter: TeamActor | null
 }
 
 export interface OnboardingStep {

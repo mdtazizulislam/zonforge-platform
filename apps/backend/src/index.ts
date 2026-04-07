@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { initDatabase, getPool } from './db.js';
-import { AuthFlowError, createWorkspaceSignup, loginUser, verifyJWT, getTenantIdForUser, rotateRefreshToken, revokeRefreshToken } from './auth.js';
+import { AuthFlowError, acceptTeamInvite, createWorkspaceSignup, getTeamInvitePreview, loginUser, verifyJWT, getTenantIdForUser, rotateRefreshToken, revokeRefreshToken } from './auth.js';
 import {
   createCheckoutSessionForTenant,
   getTenantBillingStatus,
@@ -496,6 +496,96 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
       });
 
       return sendError(c, 401, 'invalid_credentials', 'Invalid email or password.');
+    }
+
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.get(`${API_PREFIX}/auth/invite`, async (c) => {
+  try {
+    const token = c.req.query('token')?.trim() ?? '';
+    const invite = await getTeamInvitePreview(token);
+    return c.json({ success: true, invite });
+  } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
+    }
+
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
+app.post(`${API_PREFIX}/auth/invite/accept`, async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const clientIp = getClientIp(c);
+    const userAgent = c.req.header('user-agent') ?? null;
+    const accepted = await acceptTeamInvite({
+      token: typeof body.token === 'string'
+        ? body.token
+        : typeof body.inviteToken === 'string'
+          ? body.inviteToken
+          : '',
+      fullName: typeof body.fullName === 'string'
+        ? body.fullName
+        : typeof body.full_name === 'string'
+          ? body.full_name
+          : null,
+      password: typeof body.password === 'string' ? body.password : null,
+      authUserId: requireAuthUserId(c),
+      metadata: {
+        ip: clientIp,
+        userAgent,
+      },
+    });
+
+    const tenantId = Number(accepted.context.tenant.id);
+
+    await writeAuditLog({
+      eventType: 'auth.invite_accepted',
+      message: 'Team invitation accepted',
+      userId: accepted.userId,
+      tenantId,
+      source: 'auth',
+      payload: {
+        email: accepted.context.user.email,
+        role: accepted.context.membership?.role ?? null,
+        clientIp,
+      },
+    });
+
+    await trackConversionEvent({
+      eventName: 'invite_accept',
+      userId: accepted.userId,
+      tenantId,
+      source: 'auth_invite_accept_api',
+      metadata: {
+        role: accepted.context.membership?.role ?? null,
+      },
+    });
+
+    return c.json({
+      success: true,
+      userId: accepted.userId,
+      user: accepted.context.user,
+      tenant: accepted.context.tenant,
+      membership: accepted.context.membership,
+      invite: accepted.invite,
+      accessToken: accepted.tokens.accessToken,
+      refreshToken: accepted.tokens.refreshToken,
+      token: accepted.tokens.accessToken,
+      access_token: accepted.tokens.accessToken,
+      refresh_token: accepted.tokens.refreshToken,
+      expires_in: accepted.tokens.expiresInSeconds,
+      refresh_expires_at: accepted.tokens.refreshExpiresAt,
+      redirectUrl: accepted.context.tenant.onboardingStatus === 'completed' ? '/customer-dashboard' : '/onboarding',
+    });
+  } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
     }
 
     const normalized = normalizeAppError(error);

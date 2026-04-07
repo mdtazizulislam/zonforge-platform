@@ -1,6 +1,6 @@
 import { getPool } from './db.js';
 
-export type ConversionEventName = 'signup' | 'login' | 'checkout_started' | 'checkout_completed';
+export type ConversionEventName = 'signup' | 'login' | 'invite_accept' | 'checkout_started' | 'checkout_completed';
 
 export async function trackConversionEvent(input: {
   eventName: ConversionEventName;

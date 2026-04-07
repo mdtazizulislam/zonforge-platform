@@ -153,7 +153,7 @@ export async function initDatabase() {
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        role VARCHAR(32) NOT NULL DEFAULT 'member',
+        role VARCHAR(32) NOT NULL DEFAULT 'viewer',
         invited_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -172,6 +172,17 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      ALTER TABLE tenant_memberships
+      ALTER COLUMN role SET DEFAULT 'viewer'
+    `);
+
+    await client.query(`
+      UPDATE tenant_memberships
+      SET role = 'viewer', updated_at = NOW()
+      WHERE LOWER(role) = 'member'
+    `);
+
+    await client.query(`
       INSERT INTO tenant_memberships (tenant_id, user_id, role)
       SELECT t.id, t.user_id, 'owner'
       FROM tenants t
@@ -179,6 +190,46 @@ export async function initDatabase() {
         ON tm.tenant_id = t.id
        AND tm.user_id = t.user_id
       WHERE tm.id IS NULL
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tenant_invitations (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        email VARCHAR(255) NOT NULL,
+        role VARCHAR(32) NOT NULL DEFAULT 'viewer',
+        token_hash VARCHAR(128) NOT NULL UNIQUE,
+        invited_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        accepted_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        accepted_at TIMESTAMPTZ,
+        revoked_at TIMESTAMPTZ,
+        revoked_reason VARCHAR(64),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      UPDATE tenant_invitations
+      SET role = 'viewer', updated_at = NOW()
+      WHERE LOWER(role) = 'member'
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ix_tenant_invitations_tenant
+      ON tenant_invitations(tenant_id, created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ix_tenant_invitations_email
+      ON tenant_invitations(LOWER(email), created_at DESC)
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_tenant_invitations_active_email
+      ON tenant_invitations(tenant_id, LOWER(email))
+      WHERE accepted_at IS NULL AND revoked_at IS NULL
     `);
 
     await client.query(`

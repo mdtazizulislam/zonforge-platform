@@ -9,7 +9,7 @@ import { getPool } from './db.js';
 
 interface EmailInput {
   toEmail: string;
-  emailType: 'verification' | 'welcome' | 'payment_success' | 'payment_failed' | 'support_received';
+  emailType: 'verification' | 'welcome' | 'payment_success' | 'payment_failed' | 'support_received' | 'team_invite';
   subject: string;
   payload?: Record<string, unknown> | null;
 }
