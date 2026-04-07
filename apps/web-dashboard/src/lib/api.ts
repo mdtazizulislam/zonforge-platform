@@ -774,16 +774,24 @@ export const api = {
     list: () =>
       apiFetch<ConnectorSummary[]>('/v1/connectors'),
     create: (body: CreateConnectorBody) =>
-      apiFetch<{ connectorId: string }>('/v1/connectors', {
+      apiFetch<{ connectorId: string; status: ConnectorStatus | string }>('/v1/connectors', {
         method: 'POST',
         body:   JSON.stringify(body),
       }),
     validate: (id: string) =>
       apiFetch<ValidationResult>(`/v1/connectors/${id}/validate`),
-    update: (id: string, updates: Partial<CreateConnectorBody>) =>
-      apiFetch<{ updated: boolean }>(`/v1/connectors/${id}`, {
+    test: (id: string) =>
+      apiFetch<ValidationResult>(`/v1/connectors/${id}/test`, {
+        method: 'POST',
+      }),
+    update: (id: string, updates: UpdateConnectorBody) =>
+      apiFetch<{ updated: boolean; status: ConnectorStatus | string }>(`/v1/connectors/${id}`, {
         method: 'PATCH',
         body:   JSON.stringify(updates),
+      }),
+    remove: (id: string) =>
+      apiFetch<{ deleted: boolean }>(`/v1/connectors/${id}`, {
+        method: 'DELETE',
       }),
   },
 
@@ -1112,35 +1120,67 @@ export interface MttdMetrics {
   [priority: string]: { p50: number; p75: number; p95: number; count: number }
 }
 
+export type ConnectorType = 'aws' | 'microsoft_365' | 'google_workspace'
+export type ConnectorStatus = 'pending' | 'connected' | 'failed' | 'disabled'
+
+export interface ConnectorCheck {
+  key: string
+  label: string
+  passed: boolean
+  detail: string
+}
+
 export interface ConnectorSummary {
-  id:               string
-  name:             string
-  type:             string
-  status:           string
-  lastPollAt:       string | null
-  lastEventAt:      string | null
+  id:                string
+  name:              string
+  type:              ConnectorType | string
+  typeLabel:         string
+  status:            ConnectorStatus | string
+  settings:          Record<string, unknown>
+  hasStoredSecrets:  boolean
+  lastPollAt:        string | null
+  lastEventAt:       string | null
+  lastValidatedAt:   string | null
   lastErrorMessage: string | null
   consecutiveErrors: number
-  eventRatePerHour: number
-  isHealthy:        boolean
-  lagMinutes:       number | null
+  eventRatePerHour:  number
+  isHealthy:         boolean
+  lagMinutes:        number | null
+  pollIntervalMinutes: number
+  createdAt:         string | null
+  updatedAt:         string | null
 }
 
 export interface CreateConnectorBody {
-  name:                string
-  type:                string
-  config:              Record<string, unknown>
+  name: string
+  type: ConnectorType | string
+  settings?: Record<string, unknown>
+  config?: Record<string, unknown>
+  secrets?: Record<string, string>
   pollIntervalMinutes?: number
+  enabled?: boolean
+}
+
+export interface UpdateConnectorBody {
+  name?: string
+  type?: ConnectorType | string
+  settings?: Record<string, unknown>
+  config?: Record<string, unknown>
+  secrets?: Record<string, string>
+  pollIntervalMinutes?: number
+  enabled?: boolean
 }
 
 export interface ValidationResult {
   valid:            boolean
-  status:           string
+  status:           ConnectorStatus | string
   message:          string
   latencyMs:        number
   sampleEventCount: number
   lastEventAt:      string | null
+  checkedAt:        string
   errors:           string[]
+  checks:           ConnectorCheck[]
 }
 
 export interface PipelineHealth {
@@ -1149,6 +1189,7 @@ export interface PipelineHealth {
     healthy:  number
     degraded: number
     error:    number
+    disabled: number
     details:  ConnectorSummary[]
   }
   queues:  Record<string, { waiting: number; active: number; failed: number; lagEstimateMs: number }>

@@ -102,15 +102,17 @@ function ConnectorStatusRow({ connector }: { connector: {
   lastEventAt: string | null
   isHealthy: boolean
 } }) {
+  const status = connector.status.toLowerCase()
+
   return (
     <div className="border-b border-gray-800 py-2.5 last:border-0">
       <div className="flex items-center justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className={clsx('h-2 w-2 flex-shrink-0 rounded-full', {
-            'bg-green-400': connector.status === 'active' && connector.isHealthy,
-            'bg-yellow-400': connector.status === 'active' && !connector.isHealthy,
-            'bg-red-400': connector.status === 'error',
-            'bg-gray-600': connector.status === 'paused' || connector.status === 'pending_auth',
+            'bg-green-400': status === 'connected' && connector.isHealthy,
+            'bg-yellow-400': status === 'pending',
+            'bg-red-400': status === 'failed',
+            'bg-gray-600': status === 'disabled',
           })} />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-gray-200">{connector.name}</p>
@@ -126,15 +128,14 @@ function ConnectorStatusRow({ connector }: { connector: {
             <p className="text-xs text-gray-600">No events</p>
           )}
           <p className={clsx('mt-0.5 text-xs font-medium', {
-            'text-green-400': connector.status === 'active' && connector.isHealthy,
-            'text-yellow-400': connector.status === 'active' && !connector.isHealthy,
-            'text-red-400': connector.status === 'error',
-            'text-gray-500': connector.status === 'paused',
+            'text-green-400': status === 'connected' && connector.isHealthy,
+            'text-yellow-400': status === 'pending',
+            'text-red-400': status === 'failed',
+            'text-gray-500': status === 'disabled',
           })}>
-            {connector.status === 'active' && connector.isHealthy ? 'Healthy'
-              : connector.status === 'active' ? 'Lagging'
-              : connector.status === 'error' ? 'Error'
-              : connector.status === 'paused' ? 'Paused' : 'Pending'}
+            {status === 'connected' ? 'Connected'
+              : status === 'failed' ? 'Failed'
+              : status === 'disabled' ? 'Disabled' : 'Pending'}
           </p>
         </div>
       </div>

@@ -483,11 +483,14 @@ export async function initDatabase() {
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         name VARCHAR(255) NOT NULL,
         type VARCHAR(128) NOT NULL,
-        status VARCHAR(32) NOT NULL DEFAULT 'configured',
+        status VARCHAR(32) NOT NULL DEFAULT 'pending',
         config_json JSONB,
+        secret_ciphertext TEXT,
+        secret_key_version INTEGER NOT NULL DEFAULT 1,
         poll_interval_minutes INTEGER DEFAULT 15,
         last_poll_at TIMESTAMPTZ,
         last_event_at TIMESTAMPTZ,
+        last_validated_at TIMESTAMPTZ,
         last_error_message TEXT,
         consecutive_errors INTEGER NOT NULL DEFAULT 0,
         event_rate_per_hour INTEGER NOT NULL DEFAULT 0,
@@ -547,17 +550,33 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS name VARCHAR(255)`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS type VARCHAR(128)`);
-    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'configured'`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'pending'`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS config_json JSONB`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_ciphertext TEXT`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_key_version INTEGER NOT NULL DEFAULT 1`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS poll_interval_minutes INTEGER DEFAULT 15`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_event_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_validated_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_error_message TEXT`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS consecutive_errors INTEGER NOT NULL DEFAULT 0`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS event_rate_per_hour INTEGER NOT NULL DEFAULT 0`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN NOT NULL DEFAULT true`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE connector_configs ALTER COLUMN status SET DEFAULT 'pending'`);
+    await client.query(`
+      UPDATE connector_configs
+      SET status = CASE
+        WHEN is_enabled = false THEN 'disabled'
+        WHEN LOWER(COALESCE(status, '')) IN ('active', 'degraded', 'connected') THEN 'connected'
+        WHEN LOWER(COALESCE(status, '')) IN ('error', 'failed') THEN 'failed'
+        WHEN LOWER(COALESCE(status, '')) IN ('paused', 'disabled') THEN 'disabled'
+        ELSE 'pending'
+      END
+      WHERE status IS NULL
+         OR LOWER(COALESCE(status, '')) IN ('configured', 'pending_auth', 'active', 'degraded', 'error', 'paused', 'connected', 'failed', 'disabled')
+    `);
 
     await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS alert_id VARCHAR(255)`);
@@ -584,6 +603,7 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_security_alerts_tenant ON security_alerts(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_security_alerts_status ON security_alerts(tenant_id, status, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_connector_configs_tenant ON connector_configs(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_connector_configs_type_status ON connector_configs(tenant_id, type, status, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_ai_investigations_tenant ON ai_investigations(tenant_id, created_at DESC)`);
 
     // ─── LEGACY BILLING_SUBSCRIPTIONS (USER-BASED, FOR BACKWARD COMPAT) ───

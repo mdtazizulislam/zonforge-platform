@@ -5,6 +5,7 @@ import {
   api,
   type AlertListParams,
   type CreateConnectorBody,
+  type UpdateConnectorBody,
   type AlertSummary,
   type AlertDetail,
   type OrgPosture,
@@ -233,6 +234,40 @@ export function useCreateConnector() {
     mutationFn: (body: CreateConnectorBody) => api.connectors.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.connectors })
+      qc.invalidateQueries({ queryKey: QK.pipelineHealth })
+    },
+  })
+}
+
+export function useUpdateConnector() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: UpdateConnectorBody }) => api.connectors.update(id, updates),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.connectors })
+      qc.invalidateQueries({ queryKey: QK.pipelineHealth })
+    },
+  })
+}
+
+export function useTestConnector() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.connectors.test(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.connectors })
+      qc.invalidateQueries({ queryKey: QK.pipelineHealth })
+    },
+  })
+}
+
+export function useDeleteConnector() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.connectors.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.connectors })
+      qc.invalidateQueries({ queryKey: QK.pipelineHealth })
     },
   })
 }

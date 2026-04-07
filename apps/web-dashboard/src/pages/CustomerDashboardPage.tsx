@@ -517,6 +517,7 @@ function queryKey(suffix: string) {
 }
 
 export default function CustomerDashboardPage() {
+  const user = useAuthStore((state) => state.user)
   const [searchValue, setSearchValue] = useState('')
 
   const [riskQuery, alertsQuery, investigationsQuery, pipelineQuery] = useQueries({

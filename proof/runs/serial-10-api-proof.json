@@ -1,0 +1,576 @@
+{
+    "metadata":  {
+                     "timestamp":  "2026-04-07T13:15:22.7937856-04:00",
+                     "base":  "http://127.0.0.1:3110/v1",
+                     "ownerEmail":  "serial10.owner.1775582121@example.com",
+                     "adminEmail":  "serial10.admin.1775582121@example.com",
+                     "analystEmail":  "serial10.analyst.1775582121@example.com",
+                     "viewerEmail":  "serial10.viewer.1775582121@example.com"
+                 },
+    "ownerSignup":  {
+                        "StatusCode":  200,
+                        "Body":  {
+                                     "success":  true,
+                                     "userId":  2,
+                                     "user":  {
+                                                  "id":  "2",
+                                                  "email":  "serial10.owner.1775582121@example.com",
+                                                  "fullName":  "Serial 10 Owner",
+                                                  "name":  "Serial 10 Owner",
+                                                  "status":  "active",
+                                                  "emailVerified":  false
+                                              },
+                                     "tenant":  {
+                                                    "id":  "2",
+                                                    "name":  "Serial 10 Workspace 1775582121",
+                                                    "slug":  "serial-10-workspace-1775582121",
+                                                    "plan":  "starter",
+                                                    "onboardingStatus":  "pending"
+                                                },
+                                     "membership":  {
+                                                        "role":  "owner"
+                                                    },
+                                     "accessToken":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoic2VyaWFsMTAub3duZXIuMTc3NTU4MjEyMUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6IjQ1NjU3Nzk3LTBkMmItNDZkYS05ZjlmLTUxNTgwZWM3ZTE3NiIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU4MjEyMSwiZXhwIjoxNzc1NTgzMDIxfQ.AFr2KxcqIn9iNdX-0GMjaY3AbpYUJM_RQIxwem_z1dc",
+                                     "refreshToken":  "af8a65048201e17eafbd3d645a4725eecad7eec0ff16ea2f078bdba9d163584057ecd82a86555bf697eb4251b104c09e",
+                                     "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoic2VyaWFsMTAub3duZXIuMTc3NTU4MjEyMUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6IjQ1NjU3Nzk3LTBkMmItNDZkYS05ZjlmLTUxNTgwZWM3ZTE3NiIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU4MjEyMSwiZXhwIjoxNzc1NTgzMDIxfQ.AFr2KxcqIn9iNdX-0GMjaY3AbpYUJM_RQIxwem_z1dc",
+                                     "access_token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoic2VyaWFsMTAub3duZXIuMTc3NTU4MjEyMUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6IjQ1NjU3Nzk3LTBkMmItNDZkYS05ZjlmLTUxNTgwZWM3ZTE3NiIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU4MjEyMSwiZXhwIjoxNzc1NTgzMDIxfQ.AFr2KxcqIn9iNdX-0GMjaY3AbpYUJM_RQIxwem_z1dc",
+                                     "refresh_token":  "af8a65048201e17eafbd3d645a4725eecad7eec0ff16ea2f078bdba9d163584057ecd82a86555bf697eb4251b104c09e",
+                                     "expires_in":  900,
+                                     "refresh_expires_at":  "Thu May 07 2026 13:15:21 GMT-0400 (Eastern Daylight Time)",
+                                     "redirectUrl":  "/onboarding"
+                                 }
+                    },
+    "inviteAdmin":  {
+                        "StatusCode":  201,
+                        "Body":  {
+                                     "invite":  {
+                                                    "id":  "2",
+                                                    "email":  "serial10.admin.1775582121@example.com",
+                                                    "role":  "admin",
+                                                    "status":  "pending",
+                                                    "expiresAt":  "2026-04-14T17:15:21.707Z",
+                                                    "createdAt":  "2026-04-07T17:15:21.708Z",
+                                                    "updatedAt":  "2026-04-07T17:15:21.708Z",
+                                                    "acceptedAt":  null,
+                                                    "revokedAt":  null,
+                                                    "invitedBy":  {
+                                                                      "userId":  "2",
+                                                                      "email":  "serial10.owner.1775582121@example.com",
+                                                                      "fullName":  "Serial 10 Owner"
+                                                                  },
+                                                    "acceptedByUserId":  null
+                                                },
+                                     "invitationUrl":  "https://app.zonforge.com/invite/accept?token=aad921a9a8d8b7982b8be3bf3977041d102cfae36f8b9383020695ea9cd1467f",
+                                     "emailStatus":  "queued"
+                                 }
+                    },
+    "inviteAnalyst":  {
+                          "StatusCode":  201,
+                          "Body":  {
+                                       "invite":  {
+                                                      "id":  "3",
+                                                      "email":  "serial10.analyst.1775582121@example.com",
+                                                      "role":  "analyst",
+                                                      "status":  "pending",
+                                                      "expiresAt":  "2026-04-14T17:15:21.762Z",
+                                                      "createdAt":  "2026-04-07T17:15:21.763Z",
+                                                      "updatedAt":  "2026-04-07T17:15:21.763Z",
+                                                      "acceptedAt":  null,
+                                                      "revokedAt":  null,
+                                                      "invitedBy":  {
+                                                                        "userId":  "2",
+                                                                        "email":  "serial10.owner.1775582121@example.com",
+                                                                        "fullName":  "Serial 10 Owner"
+                                                                    },
+                                                      "acceptedByUserId":  null
+                                                  },
+                                       "invitationUrl":  "https://app.zonforge.com/invite/accept?token=ea8521bc7bbfbf314ed0defeda7eef279918afc4114393c1a525bd0a11c11dbf",
+                                       "emailStatus":  "queued"
+                                   }
+                      },
+    "inviteViewer":  {
+                         "StatusCode":  201,
+                         "Body":  {
+                                      "invite":  {
+                                                     "id":  "4",
+                                                     "email":  "serial10.viewer.1775582121@example.com",
+                                                     "role":  "viewer",
+                                                     "status":  "pending",
+                                                     "expiresAt":  "2026-04-14T17:15:21.801Z",
+                                                     "createdAt":  "2026-04-07T17:15:21.802Z",
+                                                     "updatedAt":  "2026-04-07T17:15:21.802Z",
+                                                     "acceptedAt":  null,
+                                                     "revokedAt":  null,
+                                                     "invitedBy":  {
+                                                                       "userId":  "2",
+                                                                       "email":  "serial10.owner.1775582121@example.com",
+                                                                       "fullName":  "Serial 10 Owner"
+                                                                   },
+                                                     "acceptedByUserId":  null
+                                                 },
+                                      "invitationUrl":  "https://app.zonforge.com/invite/accept?token=8241ebe7e84e2dcbe55381a0d97a910c25f7a654ec77ae61edd662ca38f64ee9",
+                                      "emailStatus":  "queued"
+                                  }
+                     },
+    "acceptAdmin":  {
+                        "StatusCode":  200,
+                        "Body":  {
+                                     "success":  true,
+                                     "userId":  3,
+                                     "user":  {
+                                                  "id":  "3",
+                                                  "email":  "serial10.admin.1775582121@example.com",
+                                                  "fullName":  "Serial 10 Admin",
+                                                  "name":  "Serial 10 Admin",
+                                                  "status":  "active",
+                                                  "emailVerified":  false
+                                              },
+                                     "tenant":  {
+                                                    "id":  "2",
+                                                    "name":  "Serial 10 Workspace 1775582121",
+                                                    "slug":  "serial-10-workspace-1775582121",
+                                                    "plan":  "starter",
+                                                    "onboardingStatus":  "pending"
+                                                },
+                                     "membership":  {
+                                                        "role":  "admin"
+                                                    },
+                                     "invite":  {
+                                                    "id":  "2",
+                                                    "email":  "serial10.admin.1775582121@example.com",
+                                                    "role":  "admin",
+                                                    "status":  "pending",
+                                                    "expiresAt":  "2026-04-14T17:15:21.707Z",
+                                                    "tenant":  {
+                                                                   "id":  "2",
+                                                                   "name":  "Serial 10 Workspace 1775582121",
+                                                                   "slug":  "serial-10-workspace-1775582121"
+                                                               },
+                                                    "inviter":  {
+                                                                    "id":  "2",
+                                                                    "email":  "serial10.owner.1775582121@example.com",
+                                                                    "fullName":  "Serial 10 Owner"
+                                                                },
+                                                    "existingUser":  true
+                                                },
+                                     "accessToken":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic2VyaWFsMTAuYWRtaW4uMTc3NTU4MjEyMUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6Ijc2OWQ0ZTVhLWM4MTItNGNkYi04ZGI1LWI3YjY2YTYxOTc2NCIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU4MjEyMSwiZXhwIjoxNzc1NTgzMDIxfQ.fNgOIBlw4ZgQFzrTC1x8aOi70gfEcLZjNQ6Bu5bwYmI",
+                                     "refreshToken":  "26281a47631cd6d8dc1f01ff0a1792553415a032b25fe9f2f32f7d0dc51914e1348b0f2060bf122deac725ac1c7e310f",
+                                     "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic2VyaWFsMTAuYWRtaW4uMTc3NTU4MjEyMUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6Ijc2OWQ0ZTVhLWM4MTItNGNkYi04ZGI1LWI3YjY2YTYxOTc2NCIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU4MjEyMSwiZXhwIjoxNzc1NTgzMDIxfQ.fNgOIBlw4ZgQFzrTC1x8aOi70gfEcLZjNQ6Bu5bwYmI",
+                                     "access_token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjMsImVtYWlsIjoic2VyaWFsMTAuYWRtaW4uMTc3NTU4MjEyMUBleGFtcGxlLmNvbSIsInNlc3Npb25JZCI6Ijc2OWQ0ZTVhLWM4MTItNGNkYi04ZGI1LWI3YjY2YTYxOTc2NCIsInRva2VuVHlwZSI6ImFjY2VzcyIsImlhdCI6MTc3NTU4MjEyMSwiZXhwIjoxNzc1NTgzMDIxfQ.fNgOIBlw4ZgQFzrTC1x8aOi70gfEcLZjNQ6Bu5bwYmI",
+                                     "refresh_token":  "26281a47631cd6d8dc1f01ff0a1792553415a032b25fe9f2f32f7d0dc51914e1348b0f2060bf122deac725ac1c7e310f",
+                                     "expires_in":  900,
+                                     "refresh_expires_at":  "Thu May 07 2026 13:15:21 GMT-0400 (Eastern Daylight Time)",
+                                     "redirectUrl":  "/onboarding"
+                                 }
+                    },
+    "acceptAnalyst":  {
+                          "StatusCode":  200,
+                          "Body":  {
+                                       "success":  true,
+                                       "userId":  4,
+                                       "user":  {
+                                                    "id":  "4",
+                                                    "email":  "serial10.analyst.1775582121@example.com",
+                                                    "fullName":  "Serial 10 Analyst",
+                                                    "name":  "Serial 10 Analyst",
+                                                    "status":  "active",
+                                                    "emailVerified":  false
+                                                },
+                                       "tenant":  {
+                                                      "id":  "2",
+                                                      "name":  "Serial 10 Workspace 1775582121",
+                                                      "slug":  "serial-10-workspace-1775582121",
+                                                      "plan":  "starter",
+                                                      "onboardingStatus":  "pending"
+                                                  },
+                                       "membership":  {
+                                                          "role":  "analyst"
+                                                      },
+                                       "invite":  {
+                                                      "id":  "3",
+                                                      "email":  "serial10.analyst.1775582121@example.com",
+                                                      "role":  "analyst",
+                                                      "status":  "pending",
+                                                      "expiresAt":  "2026-04-14T17:15:21.762Z",
+                                                      "tenant":  {
+                                                                     "id":  "2",
+                                                                     "name":  "Serial 10 Workspace 1775582121",
+                                                                     "slug":  "serial-10-workspace-1775582121"
+                                                                 },
+                                                      "inviter":  {
+                                                                      "id":  "2",
+                                                                      "email":  "serial10.owner.1775582121@example.com",
+                                                                      "fullName":  "Serial 10 Owner"
+                                                                  },
+                                                      "existingUser":  true
+                                                  },
+                                       "accessToken":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsImVtYWlsIjoic2VyaWFsMTAuYW5hbHlzdC4xNzc1NTgyMTIxQGV4YW1wbGUuY29tIiwic2Vzc2lvbklkIjoiZTBjOTEzY2QtNzQ5MC00NWNmLWI5NTItMWEwZjc5ODM0YzRiIiwidG9rZW5UeXBlIjoiYWNjZXNzIiwiaWF0IjoxNzc1NTgyMTIyLCJleHAiOjE3NzU1ODMwMjJ9.tEKVdBMT1kqSpdXksyOhqaNo6eRutEiHtbktwNu9V5g",
+                                       "refreshToken":  "c47a13b16744742f00a895144fbe7e9b9b6e7c9d2da4f9001ca99bc9c1380cf0c385cbc1146df4b693a444460918a7a2",
+                                       "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsImVtYWlsIjoic2VyaWFsMTAuYW5hbHlzdC4xNzc1NTgyMTIxQGV4YW1wbGUuY29tIiwic2Vzc2lvbklkIjoiZTBjOTEzY2QtNzQ5MC00NWNmLWI5NTItMWEwZjc5ODM0YzRiIiwidG9rZW5UeXBlIjoiYWNjZXNzIiwiaWF0IjoxNzc1NTgyMTIyLCJleHAiOjE3NzU1ODMwMjJ9.tEKVdBMT1kqSpdXksyOhqaNo6eRutEiHtbktwNu9V5g",
+                                       "access_token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsImVtYWlsIjoic2VyaWFsMTAuYW5hbHlzdC4xNzc1NTgyMTIxQGV4YW1wbGUuY29tIiwic2Vzc2lvbklkIjoiZTBjOTEzY2QtNzQ5MC00NWNmLWI5NTItMWEwZjc5ODM0YzRiIiwidG9rZW5UeXBlIjoiYWNjZXNzIiwiaWF0IjoxNzc1NTgyMTIyLCJleHAiOjE3NzU1ODMwMjJ9.tEKVdBMT1kqSpdXksyOhqaNo6eRutEiHtbktwNu9V5g",
+                                       "refresh_token":  "c47a13b16744742f00a895144fbe7e9b9b6e7c9d2da4f9001ca99bc9c1380cf0c385cbc1146df4b693a444460918a7a2",
+                                       "expires_in":  900,
+                                       "refresh_expires_at":  "Thu May 07 2026 13:15:22 GMT-0400 (Eastern Daylight Time)",
+                                       "redirectUrl":  "/onboarding"
+                                   }
+                      },
+    "acceptViewer":  {
+                         "StatusCode":  200,
+                         "Body":  {
+                                      "success":  true,
+                                      "userId":  5,
+                                      "user":  {
+                                                   "id":  "5",
+                                                   "email":  "serial10.viewer.1775582121@example.com",
+                                                   "fullName":  "Serial 10 Viewer",
+                                                   "name":  "Serial 10 Viewer",
+                                                   "status":  "active",
+                                                   "emailVerified":  false
+                                               },
+                                      "tenant":  {
+                                                     "id":  "2",
+                                                     "name":  "Serial 10 Workspace 1775582121",
+                                                     "slug":  "serial-10-workspace-1775582121",
+                                                     "plan":  "starter",
+                                                     "onboardingStatus":  "pending"
+                                                 },
+                                      "membership":  {
+                                                         "role":  "viewer"
+                                                     },
+                                      "invite":  {
+                                                     "id":  "4",
+                                                     "email":  "serial10.viewer.1775582121@example.com",
+                                                     "role":  "viewer",
+                                                     "status":  "pending",
+                                                     "expiresAt":  "2026-04-14T17:15:21.801Z",
+                                                     "tenant":  {
+                                                                    "id":  "2",
+                                                                    "name":  "Serial 10 Workspace 1775582121",
+                                                                    "slug":  "serial-10-workspace-1775582121"
+                                                                },
+                                                     "inviter":  {
+                                                                     "id":  "2",
+                                                                     "email":  "serial10.owner.1775582121@example.com",
+                                                                     "fullName":  "Serial 10 Owner"
+                                                                 },
+                                                     "existingUser":  true
+                                                 },
+                                      "accessToken":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUsImVtYWlsIjoic2VyaWFsMTAudmlld2VyLjE3NzU1ODIxMjFAZXhhbXBsZS5jb20iLCJzZXNzaW9uSWQiOiIwYjg2YTc1My1iMTlkLTQ5ZTYtYTdmNS1lZTFlNDEwMDQyNWYiLCJ0b2tlblR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU1ODIxMjIsImV4cCI6MTc3NTU4MzAyMn0.STX_ruwCSOeddFdgZxBTjUGEDh2JiTjI9uU8AnpwLcc",
+                                      "refreshToken":  "4cda257106bbafbc730ab1a10e50d3e5672768a5f54760b693417c16eed1f1dde05ab49c1c54ce23e2e5df38aa9356cf",
+                                      "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUsImVtYWlsIjoic2VyaWFsMTAudmlld2VyLjE3NzU1ODIxMjFAZXhhbXBsZS5jb20iLCJzZXNzaW9uSWQiOiIwYjg2YTc1My1iMTlkLTQ5ZTYtYTdmNS1lZTFlNDEwMDQyNWYiLCJ0b2tlblR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU1ODIxMjIsImV4cCI6MTc3NTU4MzAyMn0.STX_ruwCSOeddFdgZxBTjUGEDh2JiTjI9uU8AnpwLcc",
+                                      "access_token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjUsImVtYWlsIjoic2VyaWFsMTAudmlld2VyLjE3NzU1ODIxMjFAZXhhbXBsZS5jb20iLCJzZXNzaW9uSWQiOiIwYjg2YTc1My1iMTlkLTQ5ZTYtYTdmNS1lZTFlNDEwMDQyNWYiLCJ0b2tlblR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3NzU1ODIxMjIsImV4cCI6MTc3NTU4MzAyMn0.STX_ruwCSOeddFdgZxBTjUGEDh2JiTjI9uU8AnpwLcc",
+                                      "refresh_token":  "4cda257106bbafbc730ab1a10e50d3e5672768a5f54760b693417c16eed1f1dde05ab49c1c54ce23e2e5df38aa9356cf",
+                                      "expires_in":  900,
+                                      "refresh_expires_at":  "Thu May 07 2026 13:15:22 GMT-0400 (Eastern Daylight Time)",
+                                      "redirectUrl":  "/onboarding"
+                                  }
+                     },
+    "createAws":  {
+                      "StatusCode":  201,
+                      "Body":  {
+                                   "connectorId":  "1",
+                                   "status":  "pending"
+                               }
+                  },
+    "createM365":  {
+                       "StatusCode":  201,
+                       "Body":  {
+                                    "connectorId":  "2",
+                                    "status":  "pending"
+                                }
+                   },
+    "createGoogle":  {
+                         "StatusCode":  201,
+                         "Body":  {
+                                      "connectorId":  "3",
+                                      "status":  "pending"
+                                  }
+                     },
+    "analystDeniedCreate":  {
+                                "StatusCode":  403,
+                                "Body":  null
+                            },
+    "viewerDeniedUpdate":  {
+                               "StatusCode":  403,
+                               "Body":  null
+                           },
+    "ownerValidateAws":  {
+                             "StatusCode":  200,
+                             "Body":  {
+                                          "valid":  true,
+                                          "status":  "connected",
+                                          "message":  "Stored configuration passed all local readiness checks.",
+                                          "latencyMs":  0,
+                                          "sampleEventCount":  0,
+                                          "lastEventAt":  null,
+                                          "checkedAt":  "2026-04-07T17:15:22.587Z",
+                                          "errors":  [
+
+                                                     ],
+                                          "checks":  [
+                                                         {
+                                                             "key":  "account_id",
+                                                             "label":  "Account ID",
+                                                             "passed":  true,
+                                                             "detail":  "123456789012"
+                                                         },
+                                                         {
+                                                             "key":  "role_arn",
+                                                             "label":  "Role ARN",
+                                                             "passed":  true,
+                                                             "detail":  "arn:aws:iam::123456789012:role/ZonForgeCollector"
+                                                         },
+                                                         {
+                                                             "key":  "credentials",
+                                                             "label":  "Credential Pair",
+                                                             "passed":  true,
+                                                             "detail":  "present"
+                                                         }
+                                                     ]
+                                      }
+                         },
+    "adminTestM365":  {
+                          "StatusCode":  200,
+                          "Body":  {
+                                       "valid":  true,
+                                       "status":  "connected",
+                                       "message":  "Stored configuration passed all local readiness checks.",
+                                       "latencyMs":  0,
+                                       "sampleEventCount":  0,
+                                       "lastEventAt":  null,
+                                       "checkedAt":  "2026-04-07T17:15:22.618Z",
+                                       "errors":  [
+
+                                                  ],
+                                       "checks":  [
+                                                      {
+                                                          "key":  "tenant_id",
+                                                          "label":  "Tenant ID",
+                                                          "passed":  true,
+                                                          "detail":  "serial10-tenant-id"
+                                                      },
+                                                      {
+                                                          "key":  "client_id",
+                                                          "label":  "Client ID",
+                                                          "passed":  true,
+                                                          "detail":  "serial10-client-id"
+                                                      },
+                                                      {
+                                                          "key":  "client_secret",
+                                                          "label":  "Client Secret",
+                                                          "passed":  true,
+                                                          "detail":  "encrypted secret present"
+                                                      }
+                                                  ]
+                                   }
+                      },
+    "ownerDisableM365":  {
+                             "StatusCode":  200,
+                             "Body":  {
+                                          "updated":  true,
+                                          "status":  "disabled"
+                                      }
+                         },
+    "ownerDeleteGoogle":  {
+                              "StatusCode":  200,
+                              "Body":  {
+                                           "deleted":  true
+                                       }
+                          },
+    "viewerList":  {
+                       "StatusCode":  200,
+                       "Body":  {
+                                    "value":  [
+                                                  {
+                                                      "id":  "2",
+                                                      "name":  "Serial 10 M365 1775582121",
+                                                      "type":  "microsoft_365",
+                                                      "typeLabel":  "Microsoft 365",
+                                                      "status":  "disabled",
+                                                      "settings":  {
+                                                                       "clientId":  "serial10-client-id",
+                                                                       "tenantId":  "serial10-tenant-id",
+                                                                       "defaultDomain":  "serial10.onmicrosoft.com"
+                                                                   },
+                                                      "hasStoredSecrets":  true,
+                                                      "lastPollAt":  null,
+                                                      "lastEventAt":  null,
+                                                      "lastValidatedAt":  "2026-04-07T17:15:22.614Z",
+                                                      "lastErrorMessage":  null,
+                                                      "consecutiveErrors":  0,
+                                                      "eventRatePerHour":  0,
+                                                      "isHealthy":  false,
+                                                      "lagMinutes":  null,
+                                                      "pollIntervalMinutes":  30,
+                                                      "createdAt":  "2026-04-07T17:15:22.455Z",
+                                                      "updatedAt":  "2026-04-07T17:15:22.646Z"
+                                                  },
+                                                  {
+                                                      "id":  "1",
+                                                      "name":  "Serial 10 AWS 1775582121",
+                                                      "type":  "aws",
+                                                      "typeLabel":  "AWS",
+                                                      "status":  "connected",
+                                                      "settings":  {
+                                                                       "regions":  [
+                                                                                       "us-east-1",
+                                                                                       "us-west-2"
+                                                                                   ],
+                                                                       "roleArn":  "arn:aws:iam::123456789012:role/ZonForgeCollector",
+                                                                       "accountId":  "123456789012",
+                                                                       "externalId":  "serial10-1775582121"
+                                                                   },
+                                                      "hasStoredSecrets":  true,
+                                                      "lastPollAt":  null,
+                                                      "lastEventAt":  null,
+                                                      "lastValidatedAt":  "2026-04-07T17:15:22.584Z",
+                                                      "lastErrorMessage":  null,
+                                                      "consecutiveErrors":  0,
+                                                      "eventRatePerHour":  0,
+                                                      "isHealthy":  true,
+                                                      "lagMinutes":  null,
+                                                      "pollIntervalMinutes":  15,
+                                                      "createdAt":  "2026-04-07T17:15:22.424Z",
+                                                      "updatedAt":  "2026-04-07T17:15:22.584Z"
+                                                  }
+                                              ],
+                                    "Count":  2
+                                }
+                   },
+    "pipelineHealth":  {
+                           "StatusCode":  200,
+                           "Body":  {
+                                        "connectors":  {
+                                                           "total":  2,
+                                                           "healthy":  1,
+                                                           "degraded":  0,
+                                                           "error":  0,
+                                                           "disabled":  1,
+                                                           "details":  [
+                                                                           {
+                                                                               "id":  "2",
+                                                                               "name":  "Serial 10 M365 1775582121",
+                                                                               "type":  "microsoft_365",
+                                                                               "typeLabel":  "Microsoft 365",
+                                                                               "status":  "disabled",
+                                                                               "settings":  {
+                                                                                                "clientId":  "serial10-client-id",
+                                                                                                "tenantId":  "serial10-tenant-id",
+                                                                                                "defaultDomain":  "serial10.onmicrosoft.com"
+                                                                                            },
+                                                                               "hasStoredSecrets":  true,
+                                                                               "lastPollAt":  null,
+                                                                               "lastEventAt":  null,
+                                                                               "lastValidatedAt":  "2026-04-07T17:15:22.614Z",
+                                                                               "lastErrorMessage":  null,
+                                                                               "consecutiveErrors":  0,
+                                                                               "eventRatePerHour":  0,
+                                                                               "isHealthy":  false,
+                                                                               "lagMinutes":  null,
+                                                                               "pollIntervalMinutes":  30,
+                                                                               "createdAt":  "2026-04-07T17:15:22.455Z",
+                                                                               "updatedAt":  "2026-04-07T17:15:22.646Z"
+                                                                           },
+                                                                           {
+                                                                               "id":  "1",
+                                                                               "name":  "Serial 10 AWS 1775582121",
+                                                                               "type":  "aws",
+                                                                               "typeLabel":  "AWS",
+                                                                               "status":  "connected",
+                                                                               "settings":  {
+                                                                                                "regions":  [
+                                                                                                                "us-east-1",
+                                                                                                                "us-west-2"
+                                                                                                            ],
+                                                                                                "roleArn":  "arn:aws:iam::123456789012:role/ZonForgeCollector",
+                                                                                                "accountId":  "123456789012",
+                                                                                                "externalId":  "serial10-1775582121"
+                                                                                            },
+                                                                               "hasStoredSecrets":  true,
+                                                                               "lastPollAt":  null,
+                                                                               "lastEventAt":  null,
+                                                                               "lastValidatedAt":  "2026-04-07T17:15:22.584Z",
+                                                                               "lastErrorMessage":  null,
+                                                                               "consecutiveErrors":  0,
+                                                                               "eventRatePerHour":  0,
+                                                                               "isHealthy":  true,
+                                                                               "lagMinutes":  null,
+                                                                               "pollIntervalMinutes":  15,
+                                                                               "createdAt":  "2026-04-07T17:15:22.424Z",
+                                                                               "updatedAt":  "2026-04-07T17:15:22.584Z"
+                                                                           }
+                                                                       ]
+                                                       },
+                                        "queues":  {
+
+                                                   },
+                                        "summary":  {
+                                                        "overallStatus":  "healthy"
+                                                    }
+                                    }
+                       },
+    "auditLog":  {
+                     "StatusCode":  404,
+                     "Body":  null
+                 },
+    "connectorsFinal":  {
+                            "StatusCode":  200,
+                            "Body":  {
+                                         "value":  [
+                                                       {
+                                                           "id":  "2",
+                                                           "name":  "Serial 10 M365 1775582121",
+                                                           "type":  "microsoft_365",
+                                                           "typeLabel":  "Microsoft 365",
+                                                           "status":  "disabled",
+                                                           "settings":  {
+                                                                            "clientId":  "serial10-client-id",
+                                                                            "tenantId":  "serial10-tenant-id",
+                                                                            "defaultDomain":  "serial10.onmicrosoft.com"
+                                                                        },
+                                                           "hasStoredSecrets":  true,
+                                                           "lastPollAt":  null,
+                                                           "lastEventAt":  null,
+                                                           "lastValidatedAt":  "2026-04-07T17:15:22.614Z",
+                                                           "lastErrorMessage":  null,
+                                                           "consecutiveErrors":  0,
+                                                           "eventRatePerHour":  0,
+                                                           "isHealthy":  false,
+                                                           "lagMinutes":  null,
+                                                           "pollIntervalMinutes":  30,
+                                                           "createdAt":  "2026-04-07T17:15:22.455Z",
+                                                           "updatedAt":  "2026-04-07T17:15:22.646Z"
+                                                       },
+                                                       {
+                                                           "id":  "1",
+                                                           "name":  "Serial 10 AWS 1775582121",
+                                                           "type":  "aws",
+                                                           "typeLabel":  "AWS",
+                                                           "status":  "connected",
+                                                           "settings":  {
+                                                                            "regions":  [
+                                                                                            "us-east-1",
+                                                                                            "us-west-2"
+                                                                                        ],
+                                                                            "roleArn":  "arn:aws:iam::123456789012:role/ZonForgeCollector",
+                                                                            "accountId":  "123456789012",
+                                                                            "externalId":  "serial10-1775582121"
+                                                                        },
+                                                           "hasStoredSecrets":  true,
+                                                           "lastPollAt":  null,
+                                                           "lastEventAt":  null,
+                                                           "lastValidatedAt":  "2026-04-07T17:15:22.584Z",
+                                                           "lastErrorMessage":  null,
+                                                           "consecutiveErrors":  0,
+                                                           "eventRatePerHour":  0,
+                                                           "isHealthy":  true,
+                                                           "lagMinutes":  null,
+                                                           "pollIntervalMinutes":  15,
+                                                           "createdAt":  "2026-04-07T17:15:22.424Z",
+                                                           "updatedAt":  "2026-04-07T17:15:22.584Z"
+                                                       }
+                                                   ],
+                                         "Count":  2
+                                     }
+                        }
+}

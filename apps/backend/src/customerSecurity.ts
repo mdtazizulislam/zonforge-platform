@@ -1,5 +1,14 @@
 import { Hono } from 'hono';
 import { createHash, randomBytes } from 'node:crypto';
+import {
+  decryptConnectorSecrets,
+  encryptConnectorSecrets,
+  normalizeConnectorStatus,
+  normalizeConnectorType,
+  parseConnectorPayload,
+  validateConnectorConfiguration,
+  type SupportedConnectorType,
+} from './connectorFoundation.js';
 import { getPool, getUserWorkspaceContext } from './db.js';
 import { assertValidEmail, sendError } from './security.js';
 import { sendProductEmail } from './email.js';
@@ -82,6 +91,11 @@ const DEFAULT_ONBOARDING_STEPS: OnboardingStepDefinition[] = [
 
 const TEAM_MANAGERS: TenantMembershipRole[] = ['owner', 'admin'];
 const INCIDENT_RESPONDERS: TenantMembershipRole[] = ['owner', 'admin', 'analyst'];
+const CONNECTOR_TYPE_LABELS: Record<SupportedConnectorType, string> = {
+  aws: 'AWS',
+  microsoft_365: 'Microsoft 365',
+  google_workspace: 'Google Workspace',
+};
 const ROLE_PRIORITY: Record<TenantMembershipRole, number> = {
   viewer: 1,
   analyst: 2,
@@ -121,13 +135,17 @@ type ConnectorRow = {
   type: string;
   status: string;
   config_json: Record<string, unknown> | null;
+  secret_ciphertext: string | null;
+  secret_key_version: number | null;
   poll_interval_minutes: number | null;
   last_poll_at: string | Date | null;
   last_event_at: string | Date | null;
+  last_validated_at: string | Date | null;
   last_error_message: string | null;
   consecutive_errors: number | null;
   event_rate_per_hour: number | null;
   is_enabled: boolean;
+  created_at: string | Date;
   updated_at: string | Date;
 };
 
@@ -326,33 +344,32 @@ function normalizeAlertStatus(status: string): string {
   return 'open';
 }
 
-function normalizeConnectorStatus(status: string, isEnabled: boolean): string {
-  if (!isEnabled) return 'paused';
-  const normalized = (status ?? '').toLowerCase();
-  if (['active', 'degraded', 'error', 'configured', 'paused'].includes(normalized)) {
-    return normalized;
-  }
-  return 'configured';
-}
-
 function connectorSummary(row: ConnectorRow) {
   const status = normalizeConnectorStatus(row.status, row.is_enabled);
   const lagMinutes = row.last_event_at
     ? Math.max(0, Math.round((Date.now() - new Date(row.last_event_at).getTime()) / 60_000))
     : null;
+  const normalizedType = normalizeConnectorType(row.type);
 
   return {
     id: String(row.id),
     name: row.name,
-    type: row.type,
+    type: normalizedType ?? row.type,
+    typeLabel: normalizedType ? CONNECTOR_TYPE_LABELS[normalizedType] : row.type,
     status,
+    settings: row.config_json ?? {},
+    hasStoredSecrets: Boolean(row.secret_ciphertext),
     lastPollAt: toIso(row.last_poll_at),
     lastEventAt: toIso(row.last_event_at),
+    lastValidatedAt: toIso(row.last_validated_at),
     lastErrorMessage: row.last_error_message,
     consecutiveErrors: Number(row.consecutive_errors ?? 0),
     eventRatePerHour: Number(row.event_rate_per_hour ?? 0),
-    isHealthy: status === 'active' && Number(row.consecutive_errors ?? 0) === 0,
+    isHealthy: status === 'connected' && Number(row.consecutive_errors ?? 0) === 0,
     lagMinutes,
+    pollIntervalMinutes: Number(row.poll_interval_minutes ?? 15),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
   };
 }
 
@@ -667,6 +684,115 @@ async function getConnectorsForTenant(tenantId: number): Promise<ConnectorRow[]>
     [tenantId],
   );
   return result.rows as ConnectorRow[];
+}
+
+async function getConnectorForTenant(tenantId: number, connectorId: number): Promise<ConnectorRow | null> {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT *
+     FROM connector_configs
+     WHERE tenant_id = $1 AND id = $2
+     LIMIT 1`,
+    [tenantId, connectorId],
+  );
+
+  return (result.rows[0] as ConnectorRow | undefined) ?? null;
+}
+
+function evaluateConnectorReadiness(row: ConnectorRow) {
+  const type = normalizeConnectorType(row.type);
+  if (!type) {
+    return {
+      valid: false,
+      status: normalizeConnectorStatus(row.status, row.is_enabled),
+      message: 'Connector type is not supported by the SERIAL 10 foundation.',
+      errors: ['Unsupported connector type.'],
+      checks: [
+        {
+          key: 'connector_type',
+          label: 'Connector Type',
+          passed: false,
+          detail: row.type,
+        },
+      ],
+    };
+  }
+
+  try {
+    const secrets = decryptConnectorSecrets(row.secret_ciphertext);
+    return validateConnectorConfiguration({
+      type,
+      settings: row.config_json,
+      secrets,
+      enabled: row.is_enabled,
+    });
+  } catch {
+    return {
+      valid: false,
+      status: row.is_enabled ? 'failed' : 'disabled',
+      message: 'Stored connector credentials could not be decrypted.',
+      errors: ['Encrypted credential payload is invalid.'],
+      checks: [
+        {
+          key: 'credential_payload',
+          label: 'Credential Payload',
+          passed: false,
+          detail: 'decryption failed',
+        },
+      ],
+    };
+  }
+}
+
+async function testConnectorConnection(access: TenantAccess, connectorId: number) {
+  const row = await getConnectorForTenant(access.tenantId, connectorId);
+  if (!row) {
+    return { error: 'not_found' as const };
+  }
+
+  const validation = evaluateConnectorReadiness(row);
+  const pool = getPool();
+  await pool.query(
+    `UPDATE connector_configs
+     SET status = $3,
+         last_validated_at = NOW(),
+         last_error_message = $4,
+         consecutive_errors = CASE WHEN $5 THEN 0 ELSE COALESCE(consecutive_errors, 0) + 1 END,
+         updated_at = NOW()
+     WHERE tenant_id = $1 AND id = $2`,
+    [access.tenantId, connectorId, validation.status, validation.valid ? null : validation.message, validation.valid],
+  );
+
+  await writeTenantAuditLog({
+    tenantId: access.tenantId,
+    userId: access.userId,
+    eventType: 'connector.tested',
+    source: 'connector',
+    message: 'Connector connection tested',
+    payload: {
+      connectorId,
+      name: row.name,
+      type: row.type,
+      status: validation.status,
+      valid: validation.valid,
+      errors: validation.errors,
+    },
+  });
+
+  return {
+    error: null,
+    payload: {
+      valid: validation.valid,
+      status: validation.status,
+      message: validation.message,
+      latencyMs: 0,
+      sampleEventCount: 0,
+      lastEventAt: toIso(row.last_event_at),
+      checkedAt: new Date().toISOString(),
+      errors: validation.errors,
+      checks: validation.checks,
+    },
+  };
 }
 
 async function buildRiskSummary(tenantId: number) {
@@ -1563,59 +1689,102 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
 
     const body = await c.req.json().catch(() => ({}));
     const name = typeof body.name === 'string' ? body.name.trim() : '';
-    const type = typeof body.type === 'string' ? body.type.trim() : '';
-    if (!name || !type) {
+    if (!name || typeof body.type !== 'string') {
       return sendError(c, 400, 'invalid_connector', 'name and type are required');
     }
+
+    let connectorInput;
+    try {
+      connectorInput = parseConnectorPayload({
+        type: body.type,
+        settings: body.settings ?? body.config,
+        secrets: body.secrets,
+        pollIntervalMinutes: body.pollIntervalMinutes,
+      });
+    } catch (error) {
+      return sendError(c, 400, 'invalid_connector', error instanceof Error ? error.message : 'Invalid connector payload');
+    }
+
+    const enabled = body.enabled !== false;
+    const status = enabled ? 'pending' : 'disabled';
+    const secretCiphertext = encryptConnectorSecrets(connectorInput.secrets);
 
     const pool = getPool();
     const result = await pool.query(
       `INSERT INTO connector_configs (
-         tenant_id, name, type, status, config_json, poll_interval_minutes, is_enabled
-       ) VALUES ($1, $2, $3, 'configured', $4, $5, true)
-       RETURNING id`,
+         tenant_id, name, type, status, config_json, secret_ciphertext, secret_key_version,
+         poll_interval_minutes, is_enabled, last_error_message, consecutive_errors
+       ) VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, NULL, 0)
+       RETURNING *`,
       [
         access.tenantId,
         name,
-        type,
-        typeof body.config === 'object' && body.config ? JSON.stringify(body.config) : JSON.stringify({}),
-        Number(body.pollIntervalMinutes ?? 15),
+        connectorInput.type,
+        status,
+        JSON.stringify(connectorInput.settings),
+        secretCiphertext,
+        connectorInput.pollIntervalMinutes,
+        enabled,
       ],
     );
 
-    return c.json({ connectorId: String(result.rows[0].id) }, 201);
+    const created = result.rows[0] as ConnectorRow;
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'connector.created',
+      source: 'connector',
+      message: 'Connector created',
+      payload: {
+        connectorId: created.id,
+        name,
+        type: connectorInput.type,
+        status,
+        hasStoredSecrets: Boolean(secretCiphertext),
+      },
+    });
+
+    return c.json({ connectorId: String(created.id), status }, 201);
   });
 
   router.get('/v1/connectors/:id/validate', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can validate connectors.');
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can test connector connections.');
     if (denied) return denied;
 
-    const pool = getPool();
-    const result = await pool.query(
-      `SELECT *
-       FROM connector_configs
-       WHERE tenant_id = $1 AND id = $2
-       LIMIT 1`,
-      [access.tenantId, Number(c.req.param('id'))],
-    );
+    const connectorId = Number(c.req.param('id'));
+    if (!Number.isFinite(connectorId) || connectorId <= 0) {
+      return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
+    }
 
-    const row = result.rows[0] as ConnectorRow | undefined;
-    if (!row) {
+    const result = await testConnectorConnection(access, connectorId);
+    if (result.error === 'not_found') {
       return sendError(c, 404, 'not_found', 'Connector not found');
     }
 
-    return c.json({
-      valid: true,
-      status: normalizeConnectorStatus(row.status, row.is_enabled),
-      message: row.last_error_message ? 'Connector has recorded an error state.' : 'Connector configuration is reachable.',
-      latencyMs: 0,
-      sampleEventCount: 0,
-      lastEventAt: toIso(row.last_event_at),
-      errors: row.last_error_message ? [row.last_error_message] : [],
-    });
+    return c.json(result.payload);
+  });
+
+  router.post('/v1/connectors/:id/test', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can test connector connections.');
+    if (denied) return denied;
+
+    const connectorId = Number(c.req.param('id'));
+    if (!Number.isFinite(connectorId) || connectorId <= 0) {
+      return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
+    }
+
+    const result = await testConnectorConnection(access, connectorId);
+    if (result.error === 'not_found') {
+      return sendError(c, 404, 'not_found', 'Connector not found');
+    }
+
+    return c.json(result.payload);
   });
 
   router.patch('/v1/connectors/:id', async (c) => {
@@ -1625,46 +1794,171 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update connectors.');
     if (denied) return denied;
 
-    const body = await c.req.json().catch(() => ({}));
-    const updates: string[] = [];
-    const params: unknown[] = [access.tenantId, Number(c.req.param('id'))];
-
-    if (typeof body.name === 'string' && body.name.trim()) {
-      params.push(body.name.trim());
-      updates.push(`name = $${params.length}`);
-    }
-    if (typeof body.status === 'string' && body.status.trim()) {
-      params.push(body.status.trim().toLowerCase());
-      updates.push(`status = $${params.length}`);
-    }
-    if (typeof body.config === 'object' && body.config) {
-      params.push(JSON.stringify(body.config));
-      updates.push(`config_json = $${params.length}`);
-    }
-    if (typeof body.enabled === 'boolean') {
-      params.push(body.enabled);
-      updates.push(`is_enabled = $${params.length}`);
+    const connectorId = Number(c.req.param('id'));
+    if (!Number.isFinite(connectorId) || connectorId <= 0) {
+      return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
     }
 
-    if (updates.length === 0) {
-      return c.json({ updated: true });
-    }
-
-    params.push(new Date().toISOString());
-    const pool = getPool();
-    const result = await pool.query(
-      `UPDATE connector_configs
-       SET ${updates.join(', ')}, updated_at = $${params.length}
-       WHERE tenant_id = $1 AND id = $2
-       RETURNING id`,
-      params,
-    );
-
-    if (result.rowCount === 0) {
+    const existing = await getConnectorForTenant(access.tenantId, connectorId);
+    if (!existing) {
       return sendError(c, 404, 'not_found', 'Connector not found');
     }
 
-    return c.json({ updated: true });
+    const body = await c.req.json().catch(() => ({}));
+    const nextName = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : existing.name;
+    const enabled = typeof body.enabled === 'boolean' ? body.enabled : existing.is_enabled;
+    const nextType = typeof body.type === 'string' ? body.type : existing.type;
+    const incomingSettings = typeof body.settings === 'object' && body.settings ? body.settings : body.config;
+    const mergedSettings = {
+      ...(existing.config_json ?? {}),
+      ...(typeof incomingSettings === 'object' && incomingSettings ? incomingSettings : {}),
+    };
+    let mergedSecrets = {};
+
+    try {
+      mergedSecrets = {
+        ...decryptConnectorSecrets(existing.secret_ciphertext),
+        ...(typeof body.secrets === 'object' && body.secrets ? body.secrets : {}),
+      };
+    } catch {
+      mergedSecrets = typeof body.secrets === 'object' && body.secrets ? body.secrets as Record<string, string> : {};
+    }
+
+    const onlyDisabling = body.enabled === false
+      && typeof body.name !== 'string'
+      && typeof body.type !== 'string'
+      && !incomingSettings
+      && !body.secrets
+      && typeof body.pollIntervalMinutes === 'undefined';
+
+    if (onlyDisabling) {
+      const pool = getPool();
+      await pool.query(
+        `UPDATE connector_configs
+         SET status = 'disabled',
+             is_enabled = false,
+             updated_at = NOW()
+         WHERE tenant_id = $1 AND id = $2`,
+        [access.tenantId, connectorId],
+      );
+
+      await writeTenantAuditLog({
+        tenantId: access.tenantId,
+        userId: access.userId,
+        eventType: 'connector.updated',
+        source: 'connector',
+        message: 'Connector updated',
+        payload: {
+          connectorId,
+          name: existing.name,
+          status: 'disabled',
+          enabled: false,
+        },
+      });
+
+      return c.json({ updated: true, status: 'disabled' });
+    }
+
+    let connectorInput;
+    try {
+      connectorInput = parseConnectorPayload({
+        type: nextType,
+        settings: mergedSettings,
+        secrets: mergedSecrets,
+        pollIntervalMinutes: typeof body.pollIntervalMinutes === 'undefined'
+          ? existing.poll_interval_minutes
+          : body.pollIntervalMinutes,
+      });
+    } catch (error) {
+      return sendError(c, 400, 'invalid_connector', error instanceof Error ? error.message : 'Invalid connector payload');
+    }
+
+    const status = enabled ? 'pending' : 'disabled';
+    const secretCiphertext = encryptConnectorSecrets(connectorInput.secrets);
+    const pool = getPool();
+    await pool.query(
+      `UPDATE connector_configs
+       SET name = $3,
+           type = $4,
+           status = $5,
+           config_json = $6,
+           secret_ciphertext = $7,
+           secret_key_version = 1,
+           poll_interval_minutes = $8,
+           is_enabled = $9,
+           last_error_message = NULL,
+           updated_at = NOW()
+       WHERE tenant_id = $1 AND id = $2`,
+      [
+        access.tenantId,
+        connectorId,
+        nextName,
+        connectorInput.type,
+        status,
+        JSON.stringify(connectorInput.settings),
+        secretCiphertext,
+        connectorInput.pollIntervalMinutes,
+        enabled,
+      ],
+    );
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'connector.updated',
+      source: 'connector',
+      message: 'Connector updated',
+      payload: {
+        connectorId,
+        name: nextName,
+        type: connectorInput.type,
+        status,
+        enabled,
+        rotatedSecrets: Boolean(body.secrets),
+      },
+    });
+
+    return c.json({ updated: true, status });
+  });
+
+  router.delete('/v1/connectors/:id', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can delete connectors.');
+    if (denied) return denied;
+
+    const connectorId = Number(c.req.param('id'));
+    if (!Number.isFinite(connectorId) || connectorId <= 0) {
+      return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
+    }
+
+    const existing = await getConnectorForTenant(access.tenantId, connectorId);
+    if (!existing) {
+      return sendError(c, 404, 'not_found', 'Connector not found');
+    }
+
+    const pool = getPool();
+    await pool.query(
+      `DELETE FROM connector_configs
+       WHERE tenant_id = $1 AND id = $2`,
+      [access.tenantId, connectorId],
+    );
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'connector.deleted',
+      source: 'connector',
+      message: 'Connector deleted',
+      payload: {
+        connectorId,
+        name: existing.name,
+        type: existing.type,
+      },
+    });
+
+    return c.json({ deleted: true });
   });
 
   router.get('/v1/health/pipeline', async (c) => {
@@ -1673,8 +1967,9 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
 
     const details = (await getConnectorsForTenant(access.tenantId)).map(connectorSummary);
     const healthy = details.filter((item) => item.isHealthy).length;
-    const degraded = details.filter((item) => item.status === 'degraded' || item.consecutiveErrors > 0).length;
-    const error = details.filter((item) => item.status === 'error').length;
+    const degraded = details.filter((item) => item.status === 'pending').length;
+    const error = details.filter((item) => item.status === 'failed').length;
+    const disabled = details.filter((item) => item.status === 'disabled').length;
 
     return c.json({
       connectors: {
@@ -1682,6 +1977,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
         healthy,
         degraded,
         error,
+        disabled,
         details,
       },
       queues: {},

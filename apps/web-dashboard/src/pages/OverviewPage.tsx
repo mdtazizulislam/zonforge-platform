@@ -225,12 +225,11 @@ export function OverviewPage() {
                 {/* Health summary */}
                 {posture.data && (
                   <div className="px-5 py-3 border-b border-gray-800/60 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-green-500 rounded-full transition-all"
-                        style={{ width: `${posture.data.connectorHealthScore}%` }}
-                      />
-                    </div>
+                    <progress
+                      className="h-1.5 flex-1 overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-gray-800 [&::-webkit-progress-value]:bg-green-500 [&::-moz-progress-bar]:bg-green-500"
+                      max={100}
+                      value={posture.data.connectorHealthScore}
+                    />
                     <span className="text-xs font-mono text-gray-400">
                       {posture.data.connectorHealthScore}% healthy
                     </span>
@@ -313,11 +312,12 @@ function AlertRow({ alert }: { alert: ReturnType<typeof useAlerts>['data'] exten
 }
 
 function ConnectorRow({ connector }: { connector: import('@/lib/api').ConnectorSummary }) {
-  const statusColor = connector.isHealthy
+  const status = connector.status.toLowerCase()
+  const statusColor = status === 'connected'
     ? 'bg-green-500'
-    : connector.status === 'error'
+    : status === 'failed'
     ? 'bg-red-500'
-    : connector.status === 'degraded'
+    : status === 'pending'
     ? 'bg-amber-500'
     : 'bg-gray-500'
 
