@@ -144,6 +144,10 @@ app.use('*', cors({
 
     try {
       const parsed = new URL(origin);
+      if (parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')) {
+        return parsed.origin;
+      }
+
       if (ALLOWED_WEB_ORIGINS.has(parsed.origin)) {
         return parsed.origin;
       }
@@ -153,7 +157,7 @@ app.use('*', cors({
 
     return 'https://zonforge.com';
   },
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));

@@ -16,9 +16,9 @@ const JWT_SECRET = getJwtSecret();
 const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '15m';
 const REFRESH_TOKEN_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
 const DEFAULT_ONBOARDING_STEPS = [
-  { stepKey: 'workspace_created', isComplete: true, payload: { source: 'signup' } },
+  { stepKey: 'welcome', isComplete: false, payload: null },
   { stepKey: 'connect_environment', isComplete: false, payload: null },
-  { stepKey: 'invite_team', isComplete: false, payload: null },
+  { stepKey: 'first_scan', isComplete: false, payload: null },
 ] as const;
 
 type Queryable = {

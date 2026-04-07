@@ -118,7 +118,7 @@ export default function SignupPage() {
       tokenStorage.setRefresh(result.refreshToken)
       setUser(result.user)
 
-      navigate(result.user.onboardingStatus === 'pending' ? '/onboarding' : '/customer-dashboard', {
+      navigate(result.user.onboardingStatus === 'completed' ? '/dashboard' : '/onboarding', {
         replace: true,
       })
     } catch (error) {

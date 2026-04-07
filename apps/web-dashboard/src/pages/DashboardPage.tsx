@@ -199,6 +199,13 @@ export default function DashboardPage() {
   const connectors = connData?.data ?? []
   const openP1 = alerts.filter(alert => alert.priority === 'P1').length
   const healthyConn = connectors.filter((connector: any) => connector.isHealthy).length
+  const hasDashboardData =
+    alerts.length > 0 ||
+    connectors.length > 0 ||
+    (risk?.data?.postureScore ?? 0) > 0 ||
+    (risk?.data?.openCriticalAlerts ?? 0) > 0 ||
+    (risk?.data?.openHighAlerts ?? 0) > 0
+  const showOnboardingCta = !riskLoading && !alertsLoading && !connLoading && !mttdLoading && !hasDashboardData
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -233,6 +240,29 @@ export default function DashboardPage() {
             })} · Tenant: {user?.tenantId?.slice(0, 8)}…
           </p>
         </div>
+
+        {showOnboardingCta ? (
+          <div className="mb-6 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-cyan-300">Tenant onboarding CTA</p>
+                <h3 className="mt-2 text-lg font-semibold text-white">No live tenant data is flowing yet.</h3>
+                <p className="mt-2 max-w-2xl text-sm text-gray-300">
+                  {user?.onboardingStatus === 'completed'
+                    ? 'Return to onboarding to review the recorded setup steps or connect the first environment placeholder again.'
+                    : 'Finish the onboarding flow first, choose an environment placeholder, and then return here for the dashboard handoff.'}
+                </p>
+              </div>
+
+              <Link
+                to="/onboarding"
+                className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-cyan-300"
+              >
+                {user?.onboardingStatus === 'completed' ? 'Review onboarding' : 'Continue onboarding'}
+              </Link>
+            </div>
+          </div>
+        ) : null}
 
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard

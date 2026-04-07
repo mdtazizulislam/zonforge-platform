@@ -88,6 +88,10 @@ type RawTenant = Partial<TenantContext> & {
   plan?: string
   onboardingStatus?: string
   onboarding_status?: string
+  onboardingStartedAt?: string | null
+  onboarding_started_at?: string | null
+  onboardingCompletedAt?: string | null
+  onboarding_completed_at?: string | null
 }
 
 type RawMembership = Partial<MembershipContext> & {
@@ -129,6 +133,8 @@ type RawLoginResult = {
 type RawOnboardingStep = {
   stepKey?: string
   step_key?: string
+  title?: string
+  description?: string
   isComplete?: boolean
   is_complete?: boolean
   payload?: unknown
@@ -141,6 +147,10 @@ type RawOnboardingStatus = {
   tenant_id?: string | number
   onboardingStatus?: string
   onboarding_status?: string
+  onboardingStartedAt?: string | null
+  onboarding_started_at?: string | null
+  onboardingCompletedAt?: string | null
+  onboarding_completed_at?: string | null
   steps?: RawOnboardingStep[]
 }
 
@@ -165,6 +175,27 @@ function normalizeTenantContext(tenant?: RawTenant, fallbackUser?: RawCurrentUse
     slug: String(tenantSlug ?? ''),
     plan: String(tenant?.plan ?? 'starter'),
     onboardingStatus: String(tenant?.onboardingStatus ?? tenant?.onboarding_status ?? 'pending'),
+    onboardingStartedAt: tenant?.onboardingStartedAt ?? tenant?.onboarding_started_at ?? null,
+    onboardingCompletedAt: tenant?.onboardingCompletedAt ?? tenant?.onboarding_completed_at ?? null,
+  }
+}
+
+function normalizeOnboardingPayload(payload: RawOnboardingStatus): OnboardingStatusResponse {
+  return {
+    tenantId: String(payload.tenantId ?? payload.tenant_id ?? ''),
+    onboardingStatus: String(payload.onboardingStatus ?? payload.onboarding_status ?? 'pending'),
+    onboardingStartedAt: payload.onboardingStartedAt ?? payload.onboarding_started_at ?? null,
+    onboardingCompletedAt: payload.onboardingCompletedAt ?? payload.onboarding_completed_at ?? null,
+    steps: Array.isArray(payload.steps)
+      ? payload.steps.map((step) => ({
+          stepKey: String(step.stepKey ?? step.step_key ?? ''),
+          title: String(step.title ?? String(step.stepKey ?? step.step_key ?? '').replace(/_/g, ' ')),
+          description: String(step.description ?? ''),
+          isComplete: Boolean(step.isComplete ?? step.is_complete ?? false),
+          payload: step.payload ?? null,
+          updatedAt: step.updatedAt ?? step.updated_at ?? null,
+        }))
+      : [],
   }
 }
 
@@ -406,20 +437,25 @@ export const api = {
   },
 
   onboarding: {
+    get: async (): Promise<OnboardingStatusResponse> => {
+      const payload = await apiFetch<RawOnboardingStatus>('/v1/onboarding')
+      return normalizeOnboardingPayload(payload)
+    },
     status: async (): Promise<OnboardingStatusResponse> => {
       const payload = await apiFetch<RawOnboardingStatus>('/v1/onboarding/status')
-      return {
-        tenantId: String(payload.tenantId ?? payload.tenant_id ?? ''),
-        onboardingStatus: String(payload.onboardingStatus ?? payload.onboarding_status ?? 'pending'),
-        steps: Array.isArray(payload.steps)
-          ? payload.steps.map((step) => ({
-              stepKey: String(step.stepKey ?? step.step_key ?? ''),
-              isComplete: Boolean(step.isComplete ?? step.is_complete ?? false),
-              payload: step.payload ?? null,
-              updatedAt: step.updatedAt ?? step.updated_at ?? null,
-            }))
-          : [],
-      }
+      return normalizeOnboardingPayload(payload)
+    },
+    updateStatus: async (input: {
+      status?: 'pending' | 'in_progress' | 'completed'
+      stepKey?: string
+      isComplete?: boolean
+      payload?: unknown
+    }): Promise<OnboardingStatusResponse> => {
+      const payload = await apiFetch<RawOnboardingStatus>('/v1/onboarding/status', {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      })
+      return normalizeOnboardingPayload(payload)
     },
   },
 
@@ -604,6 +640,8 @@ export interface TenantContext {
   slug: string
   plan: string
   onboardingStatus: string
+  onboardingStartedAt: string | null
+  onboardingCompletedAt: string | null
 }
 
 export interface MembershipContext {
@@ -612,6 +650,8 @@ export interface MembershipContext {
 
 export interface OnboardingStep {
   stepKey: string
+  title: string
+  description: string
   isComplete: boolean
   payload: unknown
   updatedAt: string | null
@@ -620,6 +660,8 @@ export interface OnboardingStep {
 export interface OnboardingStatusResponse {
   tenantId: string
   onboardingStatus: string
+  onboardingStartedAt: string | null
+  onboardingCompletedAt: string | null
   steps: OnboardingStep[]
 }
 

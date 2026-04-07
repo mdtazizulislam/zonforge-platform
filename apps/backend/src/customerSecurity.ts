@@ -11,9 +11,42 @@ type TenantAccess = {
   tenantSlug: string;
   tenantPlan: string;
   onboardingStatus: string;
+  onboardingStartedAt: string | Date | null;
+  onboardingCompletedAt: string | Date | null;
   membershipRole: string;
   emailVerified: boolean;
 };
+
+type OnboardingStepDefinition = {
+  stepKey: 'welcome' | 'connect_environment' | 'first_scan';
+  title: string;
+  description: string;
+};
+
+type OnboardingStepRow = {
+  step_key: string;
+  is_complete: boolean;
+  payload_json: unknown;
+  updated_at: string | Date | null;
+};
+
+const DEFAULT_ONBOARDING_STEPS: OnboardingStepDefinition[] = [
+  {
+    stepKey: 'welcome',
+    title: 'Welcome',
+    description: 'Review your workspace setup and begin tenant onboarding.',
+  },
+  {
+    stepKey: 'connect_environment',
+    title: 'Connect your environment',
+    description: 'Choose the first cloud or identity source to connect. Placeholder flow for AWS, M365, or GCP.',
+  },
+  {
+    stepKey: 'first_scan',
+    title: 'First scan CTA',
+    description: 'Trigger the first guided scan action and land in the dashboard.',
+  },
+];
 
 type AlertRow = {
   alert_id: string;
@@ -85,6 +118,21 @@ type InvestigationRow = {
 function toIso(value: string | Date | null | undefined): string | null {
   if (!value) return null;
   return new Date(value).toISOString();
+}
+
+function normalizeOnboardingStatus(status: string | null | undefined): 'pending' | 'in_progress' | 'completed' {
+  switch ((status ?? '').toLowerCase()) {
+    case 'in_progress':
+      return 'in_progress';
+    case 'completed':
+      return 'completed';
+    default:
+      return 'pending';
+  }
+}
+
+function isOnboardingStepKey(value: string): value is OnboardingStepDefinition['stepKey'] {
+  return DEFAULT_ONBOARDING_STEPS.some((step) => step.stepKey === value);
 }
 
 function severityToPriority(severity: string): string {
@@ -330,8 +378,106 @@ async function getTenantAccess(c: any, requireAuthUserId: (c: any) => number | n
     tenantSlug: context.tenant.slug ?? '',
     tenantPlan: context.tenant.plan ?? 'starter',
     onboardingStatus: context.tenant.onboardingStatus ?? 'pending',
+    onboardingStartedAt: context.tenant.onboardingStartedAt ?? null,
+    onboardingCompletedAt: context.tenant.onboardingCompletedAt ?? null,
     membershipRole: context.membership?.role ?? 'owner',
     emailVerified: context.user.emailVerified,
+  };
+}
+
+async function writeTenantAuditLog(input: {
+  tenantId: number;
+  userId: number;
+  eventType: string;
+  message: string;
+  payload?: Record<string, unknown> | null;
+}) {
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO billing_audit_logs (
+      tenant_id,
+      user_id,
+      event_type,
+      source,
+      message,
+      payload_json
+    ) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [
+      input.tenantId,
+      input.userId,
+      input.eventType,
+      'onboarding',
+      input.message,
+      input.payload ? JSON.stringify(input.payload) : null,
+    ],
+  );
+}
+
+async function ensureDefaultOnboardingSteps(tenantId: number) {
+  const pool = getPool();
+  for (const step of DEFAULT_ONBOARDING_STEPS) {
+    await pool.query(
+      `INSERT INTO onboarding_progress (
+        tenant_id,
+        step_key,
+        is_complete,
+        payload_json
+      ) VALUES ($1,$2,$3,$4)
+      ON CONFLICT (tenant_id, step_key) DO NOTHING`,
+      [tenantId, step.stepKey, false, null],
+    );
+  }
+}
+
+async function loadOnboardingState(access: TenantAccess) {
+  await ensureDefaultOnboardingSteps(access.tenantId);
+
+  const pool = getPool();
+  const tenantResult = await pool.query(
+    `SELECT onboarding_status, onboarding_started_at, onboarding_completed_at
+     FROM tenants
+     WHERE id = $1`,
+    [access.tenantId],
+  );
+
+  const stepsResult = await pool.query(
+    `SELECT step_key, is_complete, payload_json, updated_at
+     FROM onboarding_progress
+     WHERE tenant_id = $1
+     ORDER BY CASE step_key
+       WHEN 'welcome' THEN 1
+       WHEN 'connect_environment' THEN 2
+       WHEN 'first_scan' THEN 3
+       ELSE 99
+     END, created_at ASC, id ASC`,
+    [access.tenantId],
+  );
+
+  const tenantRow = tenantResult.rows[0] as {
+    onboarding_status?: string | null;
+    onboarding_started_at?: string | Date | null;
+    onboarding_completed_at?: string | Date | null;
+  } | undefined;
+
+  const rows = stepsResult.rows as OnboardingStepRow[];
+  const rowMap = new Map(rows.map((row) => [row.step_key, row]));
+
+  return {
+    tenantId: String(access.tenantId),
+    onboardingStatus: normalizeOnboardingStatus(tenantRow?.onboarding_status ?? access.onboardingStatus),
+    onboardingStartedAt: toIso(tenantRow?.onboarding_started_at ?? access.onboardingStartedAt),
+    onboardingCompletedAt: toIso(tenantRow?.onboarding_completed_at ?? access.onboardingCompletedAt),
+    steps: DEFAULT_ONBOARDING_STEPS.map((definition) => {
+      const row = rowMap.get(definition.stepKey);
+      return {
+        stepKey: definition.stepKey,
+        title: definition.title,
+        description: definition.description,
+        isComplete: Boolean(row?.is_complete ?? false),
+        payload: row?.payload_json ?? null,
+        updatedAt: toIso(row?.updated_at ?? null),
+      };
+    }),
   };
 }
 
@@ -506,6 +652,8 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
         slug: access.tenantSlug,
         plan: access.tenantPlan,
         onboardingStatus: access.onboardingStatus,
+        onboardingStartedAt: toIso(access.onboardingStartedAt),
+        onboardingCompletedAt: toIso(access.onboardingCompletedAt),
       },
       membership: {
         role: access.membershipRole,
@@ -523,27 +671,124 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => numb
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    return c.json(await loadOnboardingState(access));
+  });
+
+  router.get('/v1/onboarding', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    return c.json(await loadOnboardingState(access));
+  });
+
+  router.patch('/v1/onboarding/status', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const body = await c.req.json().catch(() => ({}));
+    const requestedStatus = body.status != null ? normalizeOnboardingStatus(String(body.status)) : null;
+    const rawStepKey = typeof body.stepKey === 'string'
+      ? body.stepKey
+      : typeof body.step_key === 'string'
+        ? body.step_key
+        : null;
+    const isComplete = typeof body.isComplete === 'boolean'
+      ? body.isComplete
+      : typeof body.is_complete === 'boolean'
+        ? body.is_complete
+        : null;
+    const payload = body.payload ?? null;
+
+    if (rawStepKey && !isOnboardingStepKey(rawStepKey)) {
+      return sendError(c, 400, 'invalid_step_key', 'Invalid onboarding step key');
+    }
+
+    if (!requestedStatus && !rawStepKey) {
+      return sendError(c, 400, 'invalid_onboarding_update', 'status or stepKey is required');
+    }
+
+    await ensureDefaultOnboardingSteps(access.tenantId);
     const pool = getPool();
-    const stepsResult = await pool.query(
-      `SELECT step_key, is_complete, payload_json, updated_at
-       FROM onboarding_progress
-       WHERE tenant_id = $1
-       ORDER BY created_at ASC, id ASC`,
-      [access.tenantId],
+
+    if (rawStepKey) {
+      await pool.query(
+        `INSERT INTO onboarding_progress (
+          tenant_id,
+          step_key,
+          is_complete,
+          payload_json,
+          updated_at
+        ) VALUES ($1,$2,$3,$4,NOW())
+        ON CONFLICT (tenant_id, step_key)
+        DO UPDATE SET
+          is_complete = EXCLUDED.is_complete,
+          payload_json = EXCLUDED.payload_json,
+          updated_at = NOW()`,
+        [access.tenantId, rawStepKey, Boolean(isComplete), payload],
+      );
+    }
+
+    const currentState = await loadOnboardingState(access);
+    const completedCount = currentState.steps.filter((step) => step.isComplete).length;
+    const allStepsComplete = currentState.steps.every((step) => step.isComplete);
+
+    let nextStatus: 'pending' | 'in_progress' | 'completed';
+    if (requestedStatus === 'completed' || allStepsComplete) {
+      nextStatus = 'completed';
+    } else if (requestedStatus === 'in_progress' || completedCount > 0 || access.onboardingStatus === 'in_progress') {
+      nextStatus = 'in_progress';
+    } else {
+      nextStatus = 'pending';
+    }
+
+    await pool.query(
+      `UPDATE tenants
+       SET onboarding_status = $2::text,
+           onboarding_started_at = CASE
+             WHEN $2::text IN ('in_progress', 'completed') THEN COALESCE(onboarding_started_at, NOW())
+             ELSE NULL
+           END,
+           onboarding_completed_at = CASE
+             WHEN $2::text = 'completed' THEN COALESCE(onboarding_completed_at, NOW())
+             ELSE NULL
+           END,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [access.tenantId, nextStatus],
     );
 
-    const steps = stepsResult.rows.map((row: any) => ({
-      stepKey: String(row.step_key),
-      isComplete: Boolean(row.is_complete),
-      payload: row.payload_json ?? null,
-      updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
-    }));
+    const eventType = nextStatus === 'completed'
+      ? 'onboarding.completed'
+      : nextStatus === 'in_progress' && access.onboardingStatus === 'pending'
+        ? 'onboarding.started'
+        : 'onboarding.updated';
 
-    return c.json({
-      tenantId: String(access.tenantId),
-      onboardingStatus: access.onboardingStatus,
-      steps,
+    const message = nextStatus === 'completed'
+      ? 'Tenant onboarding completed'
+      : nextStatus === 'in_progress' && access.onboardingStatus === 'pending'
+        ? 'Tenant onboarding started'
+        : 'Tenant onboarding updated';
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType,
+      message,
+      payload: {
+        requestedStatus,
+        resolvedStatus: nextStatus,
+        stepKey: rawStepKey,
+        isComplete,
+        payload,
+      },
     });
+
+    const refreshedAccess = {
+      ...access,
+      onboardingStatus: nextStatus,
+    };
+
+    return c.json(await loadOnboardingState(refreshedAccess));
   });
 
   router.get('/v1/alerts', async (c) => {

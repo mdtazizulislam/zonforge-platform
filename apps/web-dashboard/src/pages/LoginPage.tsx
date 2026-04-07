@@ -33,7 +33,7 @@ export default function LoginPage() {
       tokenStorage.setRefresh(result.refreshToken)
       setUser(result.user)
 
-      navigate(result.user.onboardingStatus === 'pending' ? '/onboarding' : '/customer-dashboard', { replace: true })
+      navigate(result.user.onboardingStatus === 'completed' ? '/dashboard' : '/onboarding', { replace: true })
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in.')
     } finally {

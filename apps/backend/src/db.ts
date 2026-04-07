@@ -18,6 +18,8 @@ export type UserWorkspaceContext = {
     slug: string | null;
     plan: string | null;
     onboardingStatus: string | null;
+    onboardingStartedAt: string | Date | null;
+    onboardingCompletedAt: string | Date | null;
   };
   membership: {
     id: number;
@@ -114,6 +116,16 @@ export async function initDatabase() {
     await client.query(`
       ALTER TABLE tenants
       ADD COLUMN IF NOT EXISTS onboarding_status VARCHAR(32) NOT NULL DEFAULT 'pending'
+    `);
+
+    await client.query(`
+      ALTER TABLE tenants
+      ADD COLUMN IF NOT EXISTS onboarding_started_at TIMESTAMPTZ
+    `);
+
+    await client.query(`
+      ALTER TABLE tenants
+      ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ
     `);
 
     await client.query(`
@@ -757,6 +769,8 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
        t.slug AS tenant_slug,
        t.plan AS tenant_plan,
        t.onboarding_status,
+       t.onboarding_started_at,
+       t.onboarding_completed_at,
        tm.id AS membership_id,
        tm.role AS membership_role
      FROM users u
@@ -779,6 +793,8 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
     tenant_slug?: string | null;
     tenant_plan?: string | null;
     onboarding_status?: string | null;
+    onboarding_started_at?: string | Date | null;
+    onboarding_completed_at?: string | Date | null;
     membership_id?: number;
     membership_role?: string | null;
   } | undefined;
@@ -798,6 +814,8 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
         slug: membershipRow.tenant_slug ?? null,
         plan: membershipRow.tenant_plan ?? null,
         onboardingStatus: membershipRow.onboarding_status ?? null,
+        onboardingStartedAt: membershipRow.onboarding_started_at ?? null,
+        onboardingCompletedAt: membershipRow.onboarding_completed_at ?? null,
       },
       membership: membershipRow.membership_id
         ? {
@@ -819,7 +837,9 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
        t.name AS tenant_name,
        t.slug AS tenant_slug,
        t.plan AS tenant_plan,
-       t.onboarding_status
+       t.onboarding_status,
+       t.onboarding_started_at,
+       t.onboarding_completed_at
      FROM users u
      LEFT JOIN tenants t ON t.user_id = u.id
      WHERE u.id = $1
@@ -838,6 +858,8 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
     tenant_slug?: string | null;
     tenant_plan?: string | null;
     onboarding_status?: string | null;
+    onboarding_started_at?: string | Date | null;
+    onboarding_completed_at?: string | Date | null;
   } | undefined;
 
   if (!legacyRow?.tenant_id || !legacyRow.email || !legacyRow.tenant_name) {
@@ -858,6 +880,8 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
       slug: legacyRow.tenant_slug ?? null,
       plan: legacyRow.tenant_plan ?? null,
       onboardingStatus: legacyRow.onboarding_status ?? null,
+      onboardingStartedAt: legacyRow.onboarding_started_at ?? null,
+      onboardingCompletedAt: legacyRow.onboarding_completed_at ?? null,
     },
     membership: null,
   };

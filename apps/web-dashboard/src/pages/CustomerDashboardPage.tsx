@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQueries } from '@tanstack/react-query'
 import ConnectorHealthPanel from '@/components/customer/ConnectorHealthPanel'
 import { CustomerLayout } from '@/components/customer/CustomerLayout'
@@ -673,7 +674,23 @@ export default function CustomerDashboardPage() {
               )}
 
               {isEmptyState ? (
-                <div className="zf-customer-empty">The dashboard is live, but the current APIs did not return customer dashboard data yet.</div>
+                <div className="zf-customer-empty">
+                  <div>The dashboard is live, but the current APIs did not return customer dashboard data yet.</div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      to="/onboarding"
+                      className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-cyan-300"
+                    >
+                      {user?.onboardingStatus === 'completed' ? 'Review onboarding' : 'Continue onboarding'}
+                    </Link>
+                    <Link
+                      to="/connectors"
+                      className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
+                    >
+                      Open connectors
+                    </Link>
+                  </div>
+                </div>
               ) : null}
               </section>
             </div>
