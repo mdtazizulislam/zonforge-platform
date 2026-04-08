@@ -1,0 +1,70 @@
+Production schema hotfix date: 2026-04-08
+
+Scope:
+- Fix Railway production backend crash caused by schema drift during startup.
+- Crash source from Railway logs: Postgres 42703 on missing auth_refresh_tokens.session_id while creating ix_auth_refresh_tokens_session.
+
+Local versus production schema comparison:
+- Local backend initDatabase expected auth_refresh_tokens.session_id and created ix_auth_refresh_tokens_session.
+- Production already contained detections, detection_events, and risk_scores columns used by computeRiskStats.
+- Production was missing auth_refresh_tokens.session_id.
+
+Production schema evidence before fix:
+
+select table_name from information_schema.tables where table_schema='public' and table_name in ('detections','detection_events','auth_refresh_tokens','user_sessions','risk_scores') order by table_name;
+
+Result:
+- auth_refresh_tokens
+- detection_events
+- detections
+- risk_scores
+- user_sessions
+
+select column_name,data_type from information_schema.columns where table_schema='public' and table_name='auth_refresh_tokens' order by ordinal_position;
+
+Relevant pre-fix result:
+- id bigint
+- user_id integer
+- token_hash character varying
+- token_family uuid
+- expires_at timestamptz
+- rotated_from_id bigint
+- revoked_at timestamptz
+- revoked_reason character varying
+- last_used_at timestamptz
+- created_ip character varying
+- user_agent text
+- created_at timestamptz
+
+Missing column:
+- session_id uuid
+
+SQL executed in production:
+- [packages/db-client/src/postgres/migrations/20260408_prod_schema_hotfix_auth_refresh_tokens_detection.sql](packages/db-client/src/postgres/migrations/20260408_prod_schema_hotfix_auth_refresh_tokens_detection.sql)
+
+psql output:
+- ALTER TABLE
+- CREATE INDEX
+- detections already exists, skipping
+- detection_events already exists, skipping
+- risk_scores columns already exist, skipping
+
+Direct verification after migration:
+
+select column_name,data_type from information_schema.columns where table_schema='public' and table_name='auth_refresh_tokens' and column_name='session_id';
+
+Result:
+- session_id | uuid
+
+Backend logs after fix and redeploy:
+- Starting Container
+- Connected to database.
+- Database tables created.
+- Default plans seeded.
+- [ingestion] Redis not configured; ingestion queue disabled.
+- ZonForge SaaS Backend starting on port 8080
+
+API health check after fix:
+- GET https://api.zonforge.com/health
+- StatusCode: 200
+- Body: {"status":"healthy"}

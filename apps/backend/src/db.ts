@@ -439,6 +439,7 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS step_up_verified_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS step_up_method VARCHAR(32)`);
     await client.query(`ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS step_up_expires_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE auth_refresh_tokens ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES user_sessions(session_id) ON DELETE SET NULL`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (
