@@ -17,9 +17,8 @@ import {
   revokeRefreshToken,
   revokeUserSession,
   rotateRefreshToken,
-  type JWTPayload,
-  verifyActiveAccessToken,
 } from './auth.js';
+import { getBearerToken, requireAuth, requireAuthUserId, requireTenantContext, verifyStepUpPassword } from './authz.js';
 import {
   createCheckoutSessionForTenant,
   getTenantBillingStatus,
@@ -66,9 +65,9 @@ import { createEventPipelineRouter, createEventPipelineRuntime } from './eventIn
 
 const app = new Hono();
 const API_PREFIX = '/v1';
-const customerSecurityRouter = createCustomerSecurityRouter(requireAuthUserId);
+const customerSecurityRouter = createCustomerSecurityRouter();
 const eventPipelineRuntime = createEventPipelineRuntime({ writeAuditLog });
-const eventPipelineRouter = createEventPipelineRouter(requireAuthUserId, eventPipelineRuntime);
+const eventPipelineRouter = createEventPipelineRouter(eventPipelineRuntime);
 const ALLOWED_WEB_ORIGINS = new Set([
   'https://zonforge.com',
   'https://www.zonforge.com',
@@ -189,29 +188,6 @@ app.get('/', (c) => {
 app.get('/health', (c) => {
   return c.json({ status: 'healthy' });
 });
-
-function getBearerToken(c: any): string | null {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader) {
-    return null;
-  }
-
-  return authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-}
-
-async function requireAuthPayload(c: any): Promise<JWTPayload | null> {
-  const token = getBearerToken(c);
-  if (!token) {
-    return null;
-  }
-
-  return verifyActiveAccessToken(token);
-}
-
-async function requireAuthUserId(c: any): Promise<number | null> {
-  const payload = await requireAuthPayload(c);
-  return payload?.userId ?? null;
-}
 
 function resolveFrontendOrigin(c: any): string {
   const candidates = [
@@ -699,6 +675,35 @@ app.post(`${API_PREFIX}/auth/refresh`, async (c) => {
   }
 });
 
+app.post(`${API_PREFIX}/auth/step-up/verify`, async (c) => {
+  const access = await requireTenantContext(c);
+  if (access instanceof Response) {
+    return access;
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const password = typeof body.password === 'string' ? body.password : '';
+
+  try {
+    const result = await verifyStepUpPassword(c, access, password);
+    return c.json({
+      success: true,
+      stepUp: {
+        method: result.method,
+        verifiedAt: result.verifiedAt,
+        expiresAt: result.expiresAt,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
+    }
+
+    const normalized = normalizeAppError(error);
+    return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
+  }
+});
+
 app.post(`${API_PREFIX}/auth/logout`, async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
@@ -727,20 +732,13 @@ app.post(`${API_PREFIX}/auth/logout`, async (c) => {
 });
 
 app.post(`${API_PREFIX}/auth/logout-all`, async (c) => {
-  const payload = await requireAuthPayload(c);
-  if (!payload) {
-    return sendError(c, 401, 'unauthorized', 'Unauthorized');
-  }
-
-  const tenantId = await getTenantIdForUser(payload.userId);
-  if (!tenantId) {
-    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
-  }
+  const access = await requireTenantContext(c);
+  if (access instanceof Response) return access;
 
   try {
     const result = await revokeAllUserSessions({
-      userId: payload.userId,
-      tenantId,
+      userId: access.userId,
+      tenantId: access.tenantId,
       metadata: {
         ip: getClientIp(c),
         userAgent: c.req.header('user-agent') ?? null,
@@ -750,8 +748,8 @@ app.post(`${API_PREFIX}/auth/logout-all`, async (c) => {
     await writeAuditLog({
       eventType: 'auth.logout_all',
       message: 'All sessions revoked',
-      tenantId,
-      userId: payload.userId,
+      tenantId: access.tenantId,
+      userId: access.userId,
       source: 'auth',
       payload: {
         revokedCount: result.revokedCount,
@@ -770,30 +768,16 @@ app.post(`${API_PREFIX}/auth/logout-all`, async (c) => {
 });
 
 app.get(`${API_PREFIX}/auth/sessions`, async (c) => {
-  const payload = await requireAuthPayload(c);
-  if (!payload) {
-    return sendError(c, 401, 'unauthorized', 'Unauthorized');
-  }
+  const access = await requireTenantContext(c);
+  if (access instanceof Response) return access;
 
-  const tenantId = await getTenantIdForUser(payload.userId);
-  if (!tenantId) {
-    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
-  }
-
-  const items = await listUserSessions(payload.userId, tenantId, payload.sessionId);
+  const items = await listUserSessions(access.userId, access.tenantId, access.sessionId);
   return c.json({ success: true, items });
 });
 
 app.delete(`${API_PREFIX}/auth/sessions/:id`, async (c) => {
-  const payload = await requireAuthPayload(c);
-  if (!payload) {
-    return sendError(c, 401, 'unauthorized', 'Unauthorized');
-  }
-
-  const tenantId = await getTenantIdForUser(payload.userId);
-  if (!tenantId) {
-    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
-  }
+  const access = await requireTenantContext(c);
+  if (access instanceof Response) return access;
 
   const sessionId = c.req.param('id')?.trim() ?? '';
   if (!/^[0-9a-fA-F-]{36}$/.test(sessionId)) {
@@ -802,8 +786,8 @@ app.delete(`${API_PREFIX}/auth/sessions/:id`, async (c) => {
 
   try {
     const revoked = await revokeUserSession({
-      actorUserId: payload.userId,
-      tenantId,
+      actorUserId: access.userId,
+      tenantId: access.tenantId,
       sessionId,
       metadata: {
         ip: getClientIp(c),
@@ -814,8 +798,8 @@ app.delete(`${API_PREFIX}/auth/sessions/:id`, async (c) => {
     await writeAuditLog({
       eventType: 'auth.session_revoked',
       message: 'Session revoked',
-      tenantId,
-      userId: payload.userId,
+      tenantId: access.tenantId,
+      userId: access.userId,
       source: 'auth',
       payload: {
         revokedSessionId: sessionId,
@@ -1059,14 +1043,13 @@ app.get(`${API_PREFIX}/growth/proof`, async (c) => {
 
 // Protected route example
 app.get(`${API_PREFIX}/users`, async (c) => {
-  const payload = await requireAuthPayload(c);
-
-  if (!payload) {
-    return sendError(c, 401, 'unauthorized', 'Unauthorized');
+  const access = await requireAuth(c);
+  if (access instanceof Response) {
+    return access;
   }
 
   const pool = getPool();
-  const result = await pool.query('SELECT id, email FROM users WHERE id = $1', [payload.userId]);
+  const result = await pool.query('SELECT id, email FROM users WHERE id = $1', [access.userId]);
   const user = result.rows[0];
 
   return c.json({ user });

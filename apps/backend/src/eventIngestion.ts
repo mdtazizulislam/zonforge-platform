@@ -2,8 +2,14 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import { Queue, QueueEvents, Worker, type JobsOptions } from 'bullmq';
 import Redis from 'ioredis';
-import { getPool, getUserWorkspaceContext } from './db.js';
-import { normalizeTenantRole, type TenantMembershipRole } from './auth.js';
+import { getPool } from './db.js';
+import { type TenantMembershipRole } from './auth.js';
+import {
+  requireRole as sharedRequireRole,
+  requireStepUpAuth,
+  requireTenantContext,
+  type TenantAccess,
+} from './authz.js';
 import { getClientIp, getRequestId, sendError } from './security.js';
 
 const INGESTION_QUEUE_NAME = 'zf-ingestion-events';
@@ -37,13 +43,6 @@ type IngestionTokenRecord = {
   token_prefix: string;
   token_status: string;
   token_expires_at: string | Date | null;
-};
-
-type TenantAccess = {
-  userId: number;
-  tenantId: number;
-  membershipRole: TenantMembershipRole;
-  email: string;
 };
 
 type IngestionEventInput = {
@@ -176,8 +175,8 @@ function toIso(value: string | Date | null | undefined): string | null {
   return new Date(value).toISOString();
 }
 
-function requireRole(access: TenantAccess, allowed: TenantMembershipRole[]): boolean {
-  return allowed.includes(normalizeTenantRole(access.membershipRole));
+async function requireRole(c: any, access: TenantAccess, allowed: TenantMembershipRole[], message: string, action?: string): Promise<Response | null> {
+  return sharedRequireRole(c, access, allowed, message, action ? { action } : undefined);
 }
 
 function normalizeTimestamp(value: unknown): string | null {
@@ -339,23 +338,8 @@ function parseIngestionBody(rawBody: string): ParsedIngestionRequest {
   };
 }
 
-async function getTenantAccess(c: any, requireAuthUserId: (c: any) => Promise<number | null>): Promise<TenantAccess | Response> {
-  const userId = await requireAuthUserId(c);
-  if (!userId) {
-    return sendError(c, 401, 'unauthorized', 'Unauthorized');
-  }
-
-  const context = await getUserWorkspaceContext(userId);
-  if (!context) {
-    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
-  }
-
-  return {
-    userId,
-    tenantId: context.tenant.id,
-    membershipRole: normalizeTenantRole(context.membership?.role),
-    email: context.user.email,
-  };
+async function getTenantAccess(c: any, _requireAuthUserId?: (c: any) => Promise<number | null>): Promise<TenantAccess | Response> {
+  return requireTenantContext(c);
 }
 
 async function getConnectorForTenant(tenantId: number, connectorId: number) {
@@ -1114,10 +1098,7 @@ export function createEventPipelineRuntime(options: EventPipelineOptions) {
   return new EventPipelineRuntime(options);
 }
 
-export function createEventPipelineRouter(
-  requireAuthUserId: (c: any) => Promise<number | null>,
-  runtime: EventPipelineRuntime,
-) {
+export function createEventPipelineRouter(runtime: EventPipelineRuntime) {
   const router = new Hono();
 
   router.post('/v1/events/ingest', async (c) => {
@@ -1212,11 +1193,11 @@ export function createEventPipelineRouter(
   });
 
   router.get('/v1/events', async (c) => {
-    const access = await getTenantAccess(c, requireAuthUserId);
+    const access = await getTenantAccess(c);
     if (access instanceof Response) return access;
-    if (!requireRole(access, EVENT_READ_ROLES)) {
-      return sendError(c, 403, 'forbidden', 'You do not have permission to view events.');
-    }
+
+    const denied = await requireRole(c, access, EVENT_READ_ROLES, 'You do not have permission to view events.', 'event.list');
+    if (denied) return denied;
 
     const limit = parsePositiveInt(c.req.query('limit'), 25, MAX_EVENT_QUERY_LIMIT);
     const page = parsePositiveInt(c.req.query('page'), 1, 1_000);
@@ -1275,11 +1256,11 @@ export function createEventPipelineRouter(
   });
 
   router.get('/v1/events/:id', async (c) => {
-    const access = await getTenantAccess(c, requireAuthUserId);
+    const access = await getTenantAccess(c);
     if (access instanceof Response) return access;
-    if (!requireRole(access, EVENT_READ_ROLES)) {
-      return sendError(c, 403, 'forbidden', 'You do not have permission to view events.');
-    }
+
+    const denied = await requireRole(c, access, EVENT_READ_ROLES, 'You do not have permission to view events.', 'event.detail');
+    if (denied) return denied;
 
     const eventId = Number(c.req.param('id'));
     if (!Number.isFinite(eventId) || eventId <= 0) {
@@ -1318,11 +1299,11 @@ export function createEventPipelineRouter(
   });
 
   router.get('/v1/connectors/:id/ingestion-token', async (c) => {
-    const access = await getTenantAccess(c, requireAuthUserId);
+    const access = await getTenantAccess(c);
     if (access instanceof Response) return access;
-    if (!requireRole(access, TOKEN_MANAGER_ROLES)) {
-      return sendError(c, 403, 'forbidden', 'Only owners and admins can manage ingestion credentials.');
-    }
+
+    const denied = await requireRole(c, access, TOKEN_MANAGER_ROLES, 'Only owners and admins can manage ingestion credentials.', 'connector.ingestion_token.status');
+    if (denied) return denied;
 
     const connectorId = Number(c.req.param('id'));
     if (!Number.isFinite(connectorId) || connectorId <= 0) {
@@ -1337,11 +1318,16 @@ export function createEventPipelineRouter(
   });
 
   router.post('/v1/connectors/:id/ingestion-token', async (c) => {
-    const access = await getTenantAccess(c, requireAuthUserId);
+    const access = await getTenantAccess(c);
     if (access instanceof Response) return access;
-    if (!requireRole(access, TOKEN_MANAGER_ROLES)) {
-      return sendError(c, 403, 'forbidden', 'Only owners and admins can manage ingestion credentials.');
-    }
+
+    const denied = await requireRole(c, access, TOKEN_MANAGER_ROLES, 'Only owners and admins can manage ingestion credentials.', 'connector.ingestion_token.rotate');
+    if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to rotate ingestion credentials.', {
+      action: 'connector.ingestion_token.rotate',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const connectorId = Number(c.req.param('id'));
     if (!Number.isFinite(connectorId) || connectorId <= 0) {
@@ -1358,11 +1344,16 @@ export function createEventPipelineRouter(
   });
 
   router.delete('/v1/connectors/:id/ingestion-token', async (c) => {
-    const access = await getTenantAccess(c, requireAuthUserId);
+    const access = await getTenantAccess(c);
     if (access instanceof Response) return access;
-    if (!requireRole(access, TOKEN_MANAGER_ROLES)) {
-      return sendError(c, 403, 'forbidden', 'Only owners and admins can manage ingestion credentials.');
-    }
+
+    const denied = await requireRole(c, access, TOKEN_MANAGER_ROLES, 'Only owners and admins can manage ingestion credentials.', 'connector.ingestion_token.revoke');
+    if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to revoke ingestion credentials.', {
+      action: 'connector.ingestion_token.revoke',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const connectorId = Number(c.req.param('id'));
     if (!Number.isFinite(connectorId) || connectorId <= 0) {
@@ -1377,11 +1368,11 @@ export function createEventPipelineRouter(
   });
 
   router.get('/internal/ingestion/queue-health', async (c) => {
-    const access = await getTenantAccess(c, requireAuthUserId);
+    const access = await getTenantAccess(c);
     if (access instanceof Response) return access;
-    if (!requireRole(access, TOKEN_MANAGER_ROLES)) {
-      return sendError(c, 403, 'forbidden', 'Only owners and admins can view ingestion queue health.');
-    }
+
+    const denied = await requireRole(c, access, TOKEN_MANAGER_ROLES, 'Only owners and admins can view ingestion queue health.', 'ingestion.queue_health');
+    if (denied) return denied;
 
     const queue = await runtime.getQueueHealth();
     const pool = getPool();

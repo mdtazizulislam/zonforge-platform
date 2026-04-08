@@ -375,6 +375,9 @@ export async function initDatabase() {
         operating_system VARCHAR(64) NOT NULL DEFAULT 'Unknown',
         mfa_required BOOLEAN NOT NULL DEFAULT false,
         mfa_verified_at TIMESTAMPTZ,
+        step_up_verified_at TIMESTAMPTZ,
+        step_up_method VARCHAR(32),
+        step_up_expires_at TIMESTAMPTZ,
         last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         revoked_at TIMESTAMPTZ,
         revoked_reason VARCHAR(64),
@@ -432,6 +435,10 @@ export async function initDatabase() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+
+    await client.query(`ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS step_up_verified_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS step_up_method VARCHAR(32)`);
+    await client.query(`ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS step_up_expires_at TIMESTAMPTZ`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS email_verification_tokens (

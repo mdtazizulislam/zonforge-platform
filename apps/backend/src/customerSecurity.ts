@@ -13,21 +13,13 @@ import { getPool, getUserWorkspaceContext } from './db.js';
 import { assertValidEmail, sendError } from './security.js';
 import { sendProductEmail } from './email.js';
 import { assertTenantInviteRole, normalizeTenantRole, type TenantInviteRole, type TenantMembershipRole } from './auth.js';
-
-type TenantAccess = {
-  userId: number;
-  tenantId: number;
-  email: string;
-  fullName: string;
-  tenantName: string;
-  tenantSlug: string;
-  tenantPlan: string;
-  onboardingStatus: string;
-  onboardingStartedAt: string | Date | null;
-  onboardingCompletedAt: string | Date | null;
-  membershipRole: string;
-  emailVerified: boolean;
-};
+import {
+  requireOwnership,
+  requireRole as sharedRequireRole,
+  requireStepUpAuth,
+  requireTenantContext,
+  type TenantAccess,
+} from './authz.js';
 
 type OnboardingStepDefinition = {
   stepKey: 'welcome' | 'connect_environment' | 'first_scan';
@@ -258,13 +250,8 @@ function canManageMembership(actorRole: TenantMembershipRole, targetRole: Tenant
   return false;
 }
 
-function requireRole(c: any, access: TenantAccess, roles: TenantMembershipRole[], message: string): Response | null {
-  const role = normalizeTenantRole(access.membershipRole);
-  if (roles.includes(role)) {
-    return null;
-  }
-
-  return sendError(c, 403, 'forbidden', message);
+async function requireRole(c: any, access: TenantAccess, roles: TenantMembershipRole[], message: string, action?: string): Promise<Response | null> {
+  return sharedRequireRole(c, access, roles, message, action ? { action } : undefined);
 }
 
 function serializeTeamMember(row: TeamMemberRow, currentUserId: number) {
@@ -538,31 +525,8 @@ function percentile(values: number[], fraction: number): number | null {
   return values[index] ?? null;
 }
 
-async function getTenantAccess(c: any, requireAuthUserId: (c: any) => Promise<number | null>): Promise<TenantAccess | Response> {
-  const userId = await requireAuthUserId(c);
-  if (!userId) {
-    return sendError(c, 401, 'unauthorized', 'Unauthorized');
-  }
-
-  const context = await getUserWorkspaceContext(userId);
-  if (!context) {
-    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
-  }
-
-  return {
-    userId,
-    tenantId: context.tenant.id,
-    email: context.user.email,
-    fullName: context.user.fullName?.trim() || context.user.email.split('@')[0] || 'User',
-    tenantName: context.tenant.name,
-    tenantSlug: context.tenant.slug ?? '',
-    tenantPlan: context.tenant.plan ?? 'starter',
-    onboardingStatus: context.tenant.onboardingStatus ?? 'pending',
-    onboardingStartedAt: context.tenant.onboardingStartedAt ?? null,
-    onboardingCompletedAt: context.tenant.onboardingCompletedAt ?? null,
-    membershipRole: normalizeTenantRole(context.membership?.role),
-    emailVerified: context.user.emailVerified,
-  };
+async function getTenantAccess(c: any, _requireAuthUserId?: (c: any) => Promise<number | null>): Promise<TenantAccess | Response> {
+  return requireTenantContext(c);
 }
 
 async function writeTenantAuditLog(input: {
@@ -920,7 +884,7 @@ async function buildAssistantReply(tenantId: number, message: string) {
   };
 }
 
-export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Promise<number | null>) {
+export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Promise<number | null>) {
   const router = new Hono();
 
   router.get('/v1/auth/me', async (c) => {
@@ -1003,7 +967,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can view team invitations.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can view team invitations.', 'team.invite.list');
     if (denied) return denied;
 
     const pool = getPool();
@@ -1036,8 +1000,13 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can invite team members.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can invite team members.', 'team.invite.create');
     if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to invite team members.', {
+      action: 'team.invite.create',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const body = await c.req.json().catch(() => ({}));
     const email = assertValidEmail(body.email);
@@ -1146,8 +1115,13 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update team roles.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update team roles.', 'team.member.role_update');
     if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to update team roles.', {
+      action: 'team.member.role_update',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const membershipId = Number(c.req.param('membershipId'));
     if (!Number.isFinite(membershipId)) {
@@ -1184,19 +1158,36 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
       [access.tenantId, membershipId],
     );
 
-    const membership = result.rows[0] as TeamMemberRow | undefined;
-    if (!membership) {
-      return sendError(c, 404, 'not_found', 'Team member not found');
-    }
+    const membership = await requireOwnership(c, {
+      access,
+      resource: result.rows[0] as TeamMemberRow | undefined,
+      canAccess: () => true,
+      forbiddenMessage: 'Your role cannot manage this member.',
+      notFoundCode: 'not_found',
+      notFoundMessage: 'Team member not found',
+      action: 'team.member.role_update',
+      metadata: { membershipId },
+    });
+    if (membership instanceof Response) return membership;
 
     const currentRole = normalizeTenantRole(membership.role);
     if (membership.user_id === access.userId) {
       return sendError(c, 409, 'self_role_change_forbidden', 'You cannot change your own workspace role.');
     }
 
-    if (!canManageMembership(actorRole, currentRole)) {
-      return sendError(c, 403, 'forbidden', 'Your role cannot manage this member.');
-    }
+    const managedMembership = await requireOwnership(c, {
+      access,
+      resource: membership,
+      canAccess: (resource) => canManageMembership(actorRole, normalizeTenantRole(resource.role)),
+      forbiddenMessage: 'Your role cannot manage this member.',
+      action: 'team.member.role_update',
+      metadata: {
+        membershipId,
+        targetUserId: membership.user_id,
+        targetRole: currentRole,
+      },
+    });
+    if (managedMembership instanceof Response) return managedMembership;
 
     await pool.query(
       `UPDATE tenant_memberships
@@ -1214,8 +1205,8 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
       message: 'Team member role updated',
       payload: {
         membershipId,
-        targetUserId: membership.user_id,
-        email: membership.email,
+        targetUserId: managedMembership.user_id,
+        email: managedMembership.email,
         previousRole: currentRole,
         nextRole,
       },
@@ -1228,8 +1219,13 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can remove team members.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can remove team members.', 'team.member.remove');
     if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to remove team members.', {
+      action: 'team.member.remove',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const membershipId = Number(c.req.param('membershipId'));
     if (!Number.isFinite(membershipId)) {
@@ -1258,10 +1254,17 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
       [access.tenantId, membershipId],
     );
 
-    const membership = result.rows[0] as TeamMemberRow | undefined;
-    if (!membership) {
-      return sendError(c, 404, 'not_found', 'Team member not found');
-    }
+    const membership = await requireOwnership(c, {
+      access,
+      resource: result.rows[0] as TeamMemberRow | undefined,
+      canAccess: () => true,
+      forbiddenMessage: 'Your role cannot remove this member.',
+      notFoundCode: 'not_found',
+      notFoundMessage: 'Team member not found',
+      action: 'team.member.remove',
+      metadata: { membershipId },
+    });
+    if (membership instanceof Response) return membership;
 
     const actorRole = normalizeTenantRole(access.membershipRole);
     const targetRole = normalizeTenantRole(membership.role);
@@ -1269,9 +1272,19 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
       return sendError(c, 409, 'self_removal_forbidden', 'You cannot remove yourself from the workspace.');
     }
 
-    if (!canManageMembership(actorRole, targetRole)) {
-      return sendError(c, 403, 'forbidden', 'Your role cannot remove this member.');
-    }
+    const managedMembership = await requireOwnership(c, {
+      access,
+      resource: membership,
+      canAccess: (resource) => canManageMembership(actorRole, normalizeTenantRole(resource.role)),
+      forbiddenMessage: 'Your role cannot remove this member.',
+      action: 'team.member.remove',
+      metadata: {
+        membershipId,
+        targetUserId: membership.user_id,
+        targetRole,
+      },
+    });
+    if (managedMembership instanceof Response) return managedMembership;
 
     await pool.query(
       `DELETE FROM tenant_memberships
@@ -1287,8 +1300,8 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
       message: 'Team member removed',
       payload: {
         membershipId,
-        targetUserId: membership.user_id,
-        email: membership.email,
+        targetUserId: managedMembership.user_id,
+        email: managedMembership.email,
         role: targetRole,
       },
     });
@@ -1300,8 +1313,13 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can revoke team invitations.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can revoke team invitations.', 'team.invite.revoke');
     if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to revoke team invitations.', {
+      action: 'team.invite.revoke',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const inviteId = Number(c.req.param('inviteId'));
     if (!Number.isFinite(inviteId)) {
@@ -1330,10 +1348,17 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
       [access.tenantId, inviteId],
     );
 
-    const invite = result.rows[0] as TeamInviteRow | undefined;
-    if (!invite) {
-      return sendError(c, 404, 'not_found', 'Invitation not found');
-    }
+    const invite = await requireOwnership(c, {
+      access,
+      resource: result.rows[0] as TeamInviteRow | undefined,
+      canAccess: () => true,
+      forbiddenMessage: 'Your role cannot revoke this invitation.',
+      notFoundCode: 'not_found',
+      notFoundMessage: 'Invitation not found',
+      action: 'team.invite.revoke',
+      metadata: { inviteId },
+    });
+    if (invite instanceof Response) return invite;
 
     if (invite.accepted_at) {
       return sendError(c, 409, 'invite_already_accepted', 'Accepted invitations cannot be revoked.');
@@ -1382,7 +1407,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update onboarding state.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update onboarding state.', 'onboarding.update');
     if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));
@@ -1555,7 +1580,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can update alerts.');
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can update alerts.', 'alert.status.update');
     if (denied) return denied;
 
     const alertId = c.req.param('id');
@@ -1584,7 +1609,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can record alert feedback.');
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can record alert feedback.', 'alert.feedback');
     if (denied) return denied;
 
     const alert = await getAlertForTenant(access.tenantId, c.req.param('id'));
@@ -1599,7 +1624,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can assign alerts.');
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can assign alerts.', 'alert.assign');
     if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));
@@ -1684,8 +1709,13 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can create connectors.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can create connectors.', 'connector.create');
     if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to create connectors.', {
+      action: 'connector.create',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const body = await c.req.json().catch(() => ({}));
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -1751,7 +1781,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can test connector connections.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can test connector connections.', 'connector.validate');
     if (denied) return denied;
 
     const connectorId = Number(c.req.param('id'));
@@ -1771,7 +1801,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can test connector connections.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can test connector connections.', 'connector.test');
     if (denied) return denied;
 
     const connectorId = Number(c.req.param('id'));
@@ -1791,18 +1821,30 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update connectors.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can update connectors.', 'connector.update');
     if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to update connectors.', {
+      action: 'connector.update',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const connectorId = Number(c.req.param('id'));
     if (!Number.isFinite(connectorId) || connectorId <= 0) {
       return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
     }
 
-    const existing = await getConnectorForTenant(access.tenantId, connectorId);
-    if (!existing) {
-      return sendError(c, 404, 'not_found', 'Connector not found');
-    }
+    const existing = await requireOwnership(c, {
+      access,
+      resource: await getConnectorForTenant(access.tenantId, connectorId),
+      canAccess: () => true,
+      forbiddenMessage: 'You do not have permission to update this connector.',
+      notFoundCode: 'not_found',
+      notFoundMessage: 'Connector not found',
+      action: 'connector.update',
+      metadata: { connectorId },
+    });
+    if (existing instanceof Response) return existing;
 
     const body = await c.req.json().catch(() => ({}));
     const nextName = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : existing.name;
@@ -1925,18 +1967,30 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can delete connectors.');
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can delete connectors.', 'connector.delete');
     if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to delete connectors.', {
+      action: 'connector.delete',
+    });
+    if (stepUpRequired) return stepUpRequired;
 
     const connectorId = Number(c.req.param('id'));
     if (!Number.isFinite(connectorId) || connectorId <= 0) {
       return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
     }
 
-    const existing = await getConnectorForTenant(access.tenantId, connectorId);
-    if (!existing) {
-      return sendError(c, 404, 'not_found', 'Connector not found');
-    }
+    const existing = await requireOwnership(c, {
+      access,
+      resource: await getConnectorForTenant(access.tenantId, connectorId),
+      canAccess: () => true,
+      forbiddenMessage: 'You do not have permission to delete this connector.',
+      notFoundCode: 'not_found',
+      notFoundMessage: 'Connector not found',
+      action: 'connector.delete',
+      metadata: { connectorId },
+    });
+    if (existing instanceof Response) return existing;
 
     const pool = getPool();
     await pool.query(
@@ -2103,7 +2157,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can create investigations.');
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can create investigations.', 'investigation.create');
     if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));
@@ -2170,7 +2224,7 @@ export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Prom
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can review investigations.');
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can review investigations.', 'investigation.review');
     if (denied) return denied;
 
     const body = await c.req.json().catch(() => ({}));

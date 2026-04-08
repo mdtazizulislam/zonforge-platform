@@ -1,0 +1,78 @@
+{
+  "users": {
+    "owner": "serial.s2.owner+1775617317645@example.com",
+    "viewer": "serial.s2.viewer+1775617317645@example.com",
+    "analyst": "serial.s2.analyst+1775617317645@example.com",
+    "owner2": "serial.s2.owner2+1775617317645@example.com"
+  },
+  "api": {
+    "owner_signup": {
+      "status": 200,
+      "userId": 1
+    },
+    "denied_without_step_up": {
+      "status": 403,
+      "code": "STEP_UP_REQUIRED"
+    },
+    "step_up_failure": {
+      "status": 401,
+      "code": "invalid_credentials"
+    },
+    "step_up_success": {
+      "status": 200,
+      "expiresAt": "2026-04-08T03:11:58.282Z"
+    },
+    "invite_viewer": {
+      "status": 201,
+      "inviteId": "1"
+    },
+    "invite_analyst": {
+      "status": 201,
+      "inviteId": "2"
+    },
+    "viewer_forbidden": {
+      "status": 403,
+      "code": "forbidden"
+    },
+    "analyst_forbidden": {
+      "status": 403,
+      "code": "forbidden"
+    },
+    "role_update_with_step_up": {
+      "status": 200,
+      "updated": true
+    },
+    "connector_create_with_step_up": {
+      "status": 201,
+      "connectorId": "1"
+    },
+    "token_rotate_with_step_up": {
+      "status": 201,
+      "tokenPrefix": "zfi_a502b9e32799cb"
+    },
+    "expired_step_up_denied": {
+      "status": 403,
+      "code": "STEP_UP_REQUIRED"
+    },
+    "step_up_renewed": {
+      "status": 200,
+      "expiresAt": "2026-04-08T03:11:59.228Z"
+    },
+    "token_revoke_with_step_up": {
+      "status": 200,
+      "revoked": true
+    },
+    "member_removal_with_step_up": {
+      "status": 200,
+      "removed": true
+    },
+    "cross_tenant_denied": {
+      "status": 404,
+      "code": "not_found"
+    },
+    "connector_delete_with_step_up": {
+      "status": 200,
+      "deleted": true
+    }
+  }
+}

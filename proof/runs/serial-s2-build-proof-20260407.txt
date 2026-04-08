@@ -1,0 +1,37 @@
+Backend build command:
+
+`npm --prefix c:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform-main-release --workspace @zonforge/backend run build`
+
+Output:
+
+> @zonforge/backend@1.0.0 build
+> tsc
+
+Runtime log proof:
+
+✓ Connected to database.
+✓ Database tables created.
+✓ Default plans seeded.
+[ingestion] Redis not configured; ingestion queue disabled.
+
+✓ ZonForge SaaS Backend starting on port 3106
+
+POST /v1/auth/signup -> 200 (346ms)
+POST /v1/team/invites -> 403 (20ms)
+POST /v1/auth/step-up/verify -> 401 (139ms)
+POST /v1/auth/step-up/verify -> 200 (115ms)
+POST /v1/team/invites -> 201 (26ms)
+POST /v1/team/invites -> 201 (27ms)
+POST /v1/auth/invite/accept -> 200 (152ms)
+POST /v1/auth/invite/accept -> 200 (130ms)
+POST /v1/team/invites -> 403 (9ms)
+POST /v1/connectors -> 403 (8ms)
+PATCH /v1/team/members/2 -> 200 (25ms)
+POST /v1/connectors -> 201 (29ms)
+POST /v1/connectors/1/ingestion-token -> 201 (34ms)
+DELETE /v1/connectors/1/ingestion-token -> 403 (8ms)
+POST /v1/auth/step-up/verify -> 200 (134ms)
+DELETE /v1/connectors/1/ingestion-token -> 200 (14ms)
+DELETE /v1/team/members/3 -> 200 (18ms)
+DELETE /v1/team/members/4 -> 404 (27ms)
+DELETE /v1/connectors/1 -> 200 (49ms)
