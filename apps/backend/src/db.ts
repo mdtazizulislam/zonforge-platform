@@ -711,6 +711,64 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS alerts (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        rule_key VARCHAR(64) NOT NULL,
+        grouping_key VARCHAR(128) NOT NULL,
+        principal_type VARCHAR(32) NOT NULL,
+        principal_key VARCHAR(255) NOT NULL,
+        title TEXT,
+        description TEXT,
+        severity VARCHAR(32) NOT NULL,
+        priority VARCHAR(8),
+        status VARCHAR(32) NOT NULL DEFAULT 'open',
+        affected_user_id VARCHAR(255),
+        affected_ip VARCHAR(255),
+        evidence_json JSONB,
+        mitre_tactics_json JSONB,
+        mitre_techniques_json JSONB,
+        detection_gap_minutes INTEGER,
+        mttd_sla_breached BOOLEAN NOT NULL DEFAULT false,
+        assigned_to VARCHAR(255),
+        assigned_at TIMESTAMPTZ,
+        recommended_actions_json JSONB,
+        first_signal_time TIMESTAMPTZ,
+        first_seen_at TIMESTAMPTZ NOT NULL,
+        last_seen_at TIMESTAMPTZ NOT NULL,
+        finding_count INTEGER NOT NULL DEFAULT 1,
+        llm_narrative_json JSONB,
+        llm_narrative_generated_at TIMESTAMPTZ,
+        resolved_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS alert_findings (
+        id BIGSERIAL PRIMARY KEY,
+        alert_id BIGINT NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
+        finding_id BIGINT NOT NULL REFERENCES detection_findings(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS alert_events (
+        id BIGSERIAL PRIMARY KEY,
+        alert_id BIGINT NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        event_type VARCHAR(64) NOT NULL,
+        actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        previous_status VARCHAR(32),
+        new_status VARCHAR(32),
+        payload_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS failed_ingestion_events (
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -966,6 +1024,15 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_created ON detection_findings(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_rule ON detection_findings(tenant_id, rule_key, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_severity ON detection_findings(tenant_id, severity, created_at DESC)`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_alerts_grouping_key ON alerts(tenant_id, grouping_key, created_at)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_alerts_tenant_created ON alerts(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_alerts_tenant_status ON alerts(tenant_id, status, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_alerts_tenant_grouping_window ON alerts(tenant_id, rule_key, principal_key, last_seen_at DESC)`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_alert_findings_finding ON alert_findings(finding_id)`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_alert_findings_pair ON alert_findings(alert_id, finding_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_alert_findings_alert ON alert_findings(alert_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_alert_events_alert ON alert_events(alert_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_alert_events_tenant_type ON alert_events(tenant_id, event_type, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_tenant ON failed_ingestion_events(tenant_id, failed_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_source_type ON failed_ingestion_events(source_type, failed_at DESC)`);
 

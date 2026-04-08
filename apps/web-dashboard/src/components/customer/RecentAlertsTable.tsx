@@ -9,7 +9,7 @@ function severityClass(severity: string) {
 function statusClass(status?: string) {
   const normalized = (status ?? '').toLowerCase()
   if (normalized.includes('resolved') || normalized.includes('healthy')) return 'zf-status-pill is-success'
-  if (normalized.includes('investigating') || normalized.includes('warning')) return 'zf-status-pill is-warning'
+  if (normalized.includes('in_progress') || normalized.includes('warning')) return 'zf-status-pill is-warning'
   if (normalized.includes('failed') || normalized.includes('error')) return 'zf-status-pill is-danger'
   return 'zf-status-pill'
 }

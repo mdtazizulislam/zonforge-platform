@@ -335,11 +335,9 @@ export default function AlertDetailPage() {
                   <span className={clsx(
                     'px-2.5 py-1 rounded-full text-xs font-medium capitalize',
                     {
-                      open:          'bg-red-500/10 text-red-400',
-                      investigating: 'bg-yellow-500/10 text-yellow-400',
-                      resolved:      'bg-green-500/10 text-green-400',
-                      suppressed:    'bg-slate-500/10 text-slate-400',
-                      false_positive:'bg-violet-500/10 text-violet-400',
+                      open:        'bg-red-500/10 text-red-400',
+                      in_progress: 'bg-yellow-500/10 text-yellow-400',
+                      resolved:    'bg-green-500/10 text-green-400',
                     }[alert.status] ?? 'bg-gray-700 text-gray-400',
                   )}>
                     {alert.status.replace('_', ' ')}
@@ -348,27 +346,21 @@ export default function AlertDetailPage() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <StatusButton
-                    status="investigating" current={alert.status}
+                    status="open" current={alert.status}
+                    label="Reopen" colorClass="bg-red-500/10 text-red-400"
+                    onClick={() => updateStatus({ alertId: alert.id, status: 'open' })}
+                    loading={statusPending}
+                  />
+                  <StatusButton
+                    status="in_progress" current={alert.status}
                     label="Investigate" colorClass="bg-yellow-500/10 text-yellow-400"
-                    onClick={() => updateStatus({ alertId: alert.id, status: 'investigating' })}
+                    onClick={() => updateStatus({ alertId: alert.id, status: 'in_progress' })}
                     loading={statusPending}
                   />
                   <StatusButton
                     status="resolved" current={alert.status}
                     label="Resolve" colorClass="bg-green-500/10 text-green-400"
                     onClick={() => updateStatus({ alertId: alert.id, status: 'resolved' })}
-                    loading={statusPending}
-                  />
-                  <StatusButton
-                    status="suppressed" current={alert.status}
-                    label="Suppress" colorClass="bg-gray-700 text-gray-400"
-                    onClick={() => updateStatus({ alertId: alert.id, status: 'suppressed' })}
-                    loading={statusPending}
-                  />
-                  <StatusButton
-                    status="false_positive" current={alert.status}
-                    label="False Pos." colorClass="bg-gray-700 text-gray-500"
-                    onClick={() => updateStatus({ alertId: alert.id, status: 'false_positive' })}
                     loading={statusPending}
                   />
                 </div>

@@ -66,11 +66,9 @@ export function PriorityBadge({ priority }: { priority: string }) {
 // ─────────────────────────────────────────────
 
 const STATUS_CLASSES: Record<string, string> = {
-  open:           'badge bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
-  investigating:  'badge bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30',
-  resolved:       'badge bg-green-500/15 text-green-400 ring-1 ring-green-500/30',
-  suppressed:     'badge bg-gray-500/15 text-gray-400 ring-1 ring-gray-500/30',
-  false_positive: 'badge bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30',
+  open:        'badge bg-red-500/15 text-red-400 ring-1 ring-red-500/30',
+  in_progress: 'badge bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30',
+  resolved:    'badge bg-green-500/15 text-green-400 ring-1 ring-green-500/30',
 }
 
 export function StatusBadge({ status }: { status: string }) {

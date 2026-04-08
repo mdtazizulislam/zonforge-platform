@@ -186,10 +186,9 @@ export function AlertWorkflowPanel({ alertId }: { alertId: string }) {
             Actions:
           </span>
           {[
-            { status: 'investigating', label: 'Investigate',     color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+            { status: 'open',          label: 'Reopen',           color: 'bg-red-500/10 text-red-400 border-red-500/20' },
+            { status: 'in_progress',   label: 'Investigate',      color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
             { status: 'resolved',      label: 'Resolve',          color: 'bg-green-500/10 text-green-400 border-green-500/20' },
-            { status: 'suppressed',    label: 'Suppress',         color: 'bg-gray-700 text-gray-400 border-gray-600' },
-            { status: 'false_positive',label: 'False Positive',   color: 'bg-gray-700 text-gray-500 border-gray-700' },
           ].map(({ status, label, color }) => (
             <button
               key={status}
@@ -482,7 +481,7 @@ export function AlertWorkflowPanel({ alertId }: { alertId: string }) {
                 />
               )}
 
-              {alert.status === 'investigating' && (
+              {alert.status === 'in_progress' && (
                 <TimelineStep
                   icon={Activity}
                   title="Investigation started"

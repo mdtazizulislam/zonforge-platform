@@ -105,7 +105,7 @@ export function AlertContextPanel({ alert }: AlertContextPanelProps) {
 
   // Fetch related alerts (same user or IP in last 30 days)
   const { data: relatedData } = useAlerts({
-    status: ['open', 'investigating', 'resolved'],
+    status: ['open', 'in_progress', 'resolved'],
     limit:  20,
   })
   const relatedAlerts = (relatedData?.data ?? [])

@@ -18,7 +18,7 @@ import {
 
 export function OverviewPage() {
   const posture    = useRiskSummary()
-  const openAlerts = useAlerts({ status: 'open,investigating', limit: 8 })
+  const openAlerts = useAlerts({ status: ['open', 'in_progress'], limit: 8 })
   const riskUsers  = useRiskUsers()
   const connectors = useConnectors()
   const mttd       = useMttd()

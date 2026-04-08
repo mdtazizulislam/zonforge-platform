@@ -21,6 +21,11 @@ import {
   requireTenantContext,
   type TenantAccess,
 } from './authz.js';
+import {
+  assignAlertForTenant,
+  normalizeAlertLifecycleStatus,
+  updateAlertStatusForTenant,
+} from './alertSystem.js';
 
 type OnboardingStepDefinition = {
   stepKey: 'welcome' | 'connect_environment' | 'first_scan';
@@ -99,6 +104,9 @@ const ROLE_PRIORITY: Record<TenantMembershipRole, number> = {
 type AlertRow = {
   alert_id: string;
   tenant_id: number;
+  rule_key?: string | null;
+  principal_type?: string | null;
+  principal_key?: string | null;
   title: string | null;
   description: string | null;
   severity: string;
@@ -112,8 +120,12 @@ type AlertRow = {
   detection_gap_minutes: number | null;
   mttd_sla_breached: boolean | null;
   assigned_to: string | null;
+  assigned_at?: string | Date | null;
   recommended_actions_json: string[] | null;
   first_signal_time: string | Date | null;
+  first_seen_at?: string | Date | null;
+  last_seen_at?: string | Date | null;
+  finding_count?: number | null;
   llm_narrative_json: Record<string, unknown> | null;
   llm_narrative_generated_at: string | Date | null;
   created_at: string | Date;
@@ -351,11 +363,17 @@ function severityScore(severity: string): number {
 }
 
 function normalizeAlertStatus(status: string): string {
-  const normalized = (status ?? '').toLowerCase();
-  if (['open', 'investigating', 'resolved', 'suppressed', 'false_positive'].includes(normalized)) {
-    return normalized;
-  }
-  return 'open';
+  return normalizeAlertLifecycleStatus(status);
+}
+
+function parseListFilter(c: any, key: string): string[] {
+  const url = new URL(c.req.url);
+  const values = url.searchParams.getAll(key)
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(values));
 }
 
 function connectorSummary(row: ConnectorRow) {
@@ -416,6 +434,12 @@ function alertSummary(row: AlertRow) {
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
     resolvedAt: toIso(row.resolved_at) ?? undefined,
+    findingCount: Number(row.finding_count ?? 1),
+    firstSeenAt: toIso(row.first_seen_at) ?? toIso(row.first_signal_time) ?? undefined,
+    lastSeenAt: toIso(row.last_seen_at) ?? undefined,
+    ruleKey: row.rule_key ?? undefined,
+    principalType: row.principal_type ?? undefined,
+    principalKey: row.principal_key ?? undefined,
   };
 }
 
@@ -427,6 +451,7 @@ function alertDetail(row: AlertRow) {
     llmNarrative: row.llm_narrative_json ?? undefined,
     llmNarrativeGeneratedAt: toIso(row.llm_narrative_generated_at) ?? undefined,
     firstSignalTime: toIso(row.first_signal_time) ?? undefined,
+    assignedAt: toIso(row.assigned_at) ?? undefined,
     recommendedActions: row.recommended_actions_json ?? [],
   };
 }
@@ -691,11 +716,44 @@ async function loadOnboardingState(access: TenantAccess) {
 }
 
 async function getAlertForTenant(tenantId: number, alertId: string): Promise<AlertRow | null> {
+  if (!/^\d+$/.test(alertId)) {
+    return null;
+  }
+
   const pool = getPool();
   const result = await pool.query(
-    `SELECT *
-     FROM security_alerts
-     WHERE tenant_id = $1 AND alert_id = $2
+    `SELECT
+       id::text AS alert_id,
+       tenant_id,
+       rule_key,
+       principal_type,
+       principal_key,
+       title,
+       description,
+       severity,
+       priority,
+       status,
+       affected_user_id,
+       affected_ip,
+       evidence_json,
+       mitre_tactics_json,
+       mitre_techniques_json,
+       detection_gap_minutes,
+       mttd_sla_breached,
+       assigned_to,
+       assigned_at,
+       recommended_actions_json,
+       first_signal_time,
+       first_seen_at,
+       last_seen_at,
+       finding_count,
+       llm_narrative_json,
+       llm_narrative_generated_at,
+       created_at,
+       updated_at,
+       resolved_at
+     FROM alerts
+     WHERE tenant_id = $1 AND id = $2::bigint
      LIMIT 1`,
     [tenantId, alertId],
   );
@@ -896,8 +954,8 @@ async function buildRiskSummary(tenantId: number) {
   const [alertCounts, riskyUsers, connectors] = await Promise.all([
     pool.query(
       `SELECT severity, COUNT(*)::int AS count
-       FROM security_alerts
-       WHERE tenant_id = $1 AND status IN ('open', 'investigating')
+       FROM alerts
+       WHERE tenant_id = $1 AND status IN ('open', 'in_progress')
        GROUP BY severity`,
       [tenantId],
     ),
@@ -909,10 +967,10 @@ async function buildRiskSummary(tenantId: number) {
                     WHEN 'medium' THEN 48
                     WHEN 'low' THEN 22
                     ELSE 10 END)::numeric(10,2) AS avg_score
-       FROM security_alerts
+       FROM alerts
        WHERE tenant_id = $1
          AND affected_user_id IS NOT NULL
-         AND status IN ('open', 'investigating')
+         AND status IN ('open', 'in_progress')
        GROUP BY affected_user_id
        ORDER BY avg_score DESC
        LIMIT 5`,
@@ -951,10 +1009,39 @@ async function buildAssistantReply(tenantId: number, message: string) {
   const pool = getPool();
   const [latestAlertRow, riskSummary, investigationRows, connectors] = await Promise.all([
     pool.query(
-      `SELECT *
-       FROM security_alerts
+      `SELECT
+         id::text AS alert_id,
+         tenant_id,
+         rule_key,
+         principal_type,
+         principal_key,
+         title,
+         description,
+         severity,
+         priority,
+         status,
+         affected_user_id,
+         affected_ip,
+         evidence_json,
+         mitre_tactics_json,
+         mitre_techniques_json,
+         detection_gap_minutes,
+         mttd_sla_breached,
+         assigned_to,
+         assigned_at,
+         recommended_actions_json,
+         first_signal_time,
+         first_seen_at,
+         last_seen_at,
+         finding_count,
+         llm_narrative_json,
+         llm_narrative_generated_at,
+         created_at,
+         updated_at,
+         resolved_at
+       FROM alerts
        WHERE tenant_id = $1
-       ORDER BY created_at DESC
+       ORDER BY last_seen_at DESC, created_at DESC
        LIMIT 1`,
       [tenantId],
     ),
@@ -1652,35 +1739,64 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const severity = c.req.query('severity');
-    const status = c.req.query('status');
-    const priority = c.req.query('priority');
+    const severity = parseListFilter(c, 'severity');
+    const status = parseListFilter(c, 'status').map(normalizeAlertStatus);
+    const priority = parseListFilter(c, 'priority').map((value) => value.toUpperCase());
     const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20), 1), 100);
 
     const conditions = ['tenant_id = $1'];
     const params: unknown[] = [access.tenantId];
 
-    if (severity) {
-      params.push(String(severity).toLowerCase());
-      conditions.push(`severity = $${params.length}`);
+    if (severity.length > 0) {
+      params.push(severity.map((value) => value.toLowerCase()));
+      conditions.push(`LOWER(severity) = ANY($${params.length}::text[])`);
     }
-    if (status) {
-      params.push(String(status).toLowerCase());
-      conditions.push(`status = $${params.length}`);
+    if (status.length > 0) {
+      params.push(status);
+      conditions.push(`status = ANY($${params.length}::text[])`);
     }
-    if (priority) {
-      params.push(String(priority).toUpperCase());
-      conditions.push(`priority = $${params.length}`);
+    if (priority.length > 0) {
+      params.push(priority);
+      conditions.push(`UPPER(priority) = ANY($${params.length}::text[])`);
     }
 
     params.push(limit + 1);
 
     const pool = getPool();
     const result = await pool.query(
-      `SELECT *
-       FROM security_alerts
+      `SELECT
+         id::text AS alert_id,
+         tenant_id,
+         rule_key,
+         principal_type,
+         principal_key,
+         title,
+         description,
+         severity,
+         priority,
+         status,
+         affected_user_id,
+         affected_ip,
+         evidence_json,
+         mitre_tactics_json,
+         mitre_techniques_json,
+         detection_gap_minutes,
+         mttd_sla_breached,
+         assigned_to,
+         assigned_at,
+         recommended_actions_json,
+         first_signal_time,
+         first_seen_at,
+         last_seen_at,
+         finding_count,
+         llm_narrative_json,
+         llm_narrative_generated_at,
+         created_at,
+         updated_at,
+         resolved_at
+       FROM alerts
        WHERE ${conditions.join(' AND ')}
-       ORDER BY created_at DESC
+       ORDER BY last_seen_at DESC, created_at DESC
        LIMIT $${params.length}`,
       params,
     );
@@ -1784,18 +1900,15 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const body = await c.req.json().catch(() => ({}));
     const status = normalizeAlertStatus(String(body.status ?? 'open'));
 
-    const pool = getPool();
-    const result = await pool.query(
-      `UPDATE security_alerts
-       SET status = $3,
-           resolved_at = CASE WHEN $3 = 'resolved' THEN NOW() ELSE NULL END,
-           updated_at = NOW()
-       WHERE tenant_id = $1 AND alert_id = $2
-       RETURNING alert_id`,
-      [access.tenantId, alertId, status],
-    );
+    const updated = await updateAlertStatusForTenant({
+      tenantId: access.tenantId,
+      alertId,
+      status,
+      actorUserId: access.userId,
+      notes: typeof body.notes === 'string' ? body.notes.trim() : undefined,
+    });
 
-    if (result.rowCount === 0) {
+    if (!updated) {
       return sendError(c, 404, 'not_found', 'Alert not found');
     }
 
@@ -1827,17 +1940,13 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const body = await c.req.json().catch(() => ({}));
     const analystId = typeof body.analystId === 'string' ? body.analystId.trim() : '';
 
-    const pool = getPool();
-    const result = await pool.query(
-      `UPDATE security_alerts
-       SET assigned_to = $3,
-           updated_at = NOW()
-       WHERE tenant_id = $1 AND alert_id = $2
-       RETURNING alert_id`,
-      [access.tenantId, c.req.param('id'), analystId || access.email],
-    );
+    const assigned = await assignAlertForTenant({
+      tenantId: access.tenantId,
+      alertId: c.req.param('id'),
+      analystId: analystId || access.email,
+    });
 
-    if (result.rowCount === 0) {
+    if (!assigned) {
       return sendError(c, 404, 'not_found', 'Alert not found');
     }
 
@@ -1858,7 +1967,7 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const pool = getPool();
     const result = await pool.query(
       `SELECT priority, detection_gap_minutes
-       FROM security_alerts
+       FROM alerts
        WHERE tenant_id = $1
          AND detection_gap_minutes IS NOT NULL
        ORDER BY created_at DESC

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 
 const SEVERITY_OPTIONS  = ['critical', 'high', 'medium', 'low']
-const STATUS_OPTIONS    = ['open', 'investigating', 'resolved', 'false_positive', 'suppressed']
+const STATUS_OPTIONS    = ['open', 'in_progress', 'resolved']
 const PRIORITY_OPTIONS  = ['P1', 'P2', 'P3', 'P4']
 
 function Badge({ children, color }: { children: React.ReactNode; color: string }) {
@@ -33,11 +33,9 @@ function severityColor(sev: string) {
 
 function statusColor(status: string) {
   return {
-    open:          'bg-red-500/10 text-red-400',
-    investigating: 'bg-yellow-500/10 text-yellow-400',
-    resolved:      'bg-green-500/10 text-green-400',
-    false_positive:'bg-gray-700 text-gray-500',
-    suppressed:    'bg-gray-700 text-gray-500',
+    open:        'bg-red-500/10 text-red-400',
+    in_progress: 'bg-yellow-500/10 text-yellow-400',
+    resolved:    'bg-green-500/10 text-green-400',
   }[status] ?? 'bg-gray-700 text-gray-400'
 }
 
@@ -86,7 +84,7 @@ export default function AlertsPage() {
     (effectiveFilters.status.length > 0 &&
      !(effectiveFilters.status.length === 2 &&
        effectiveFilters.status.includes('open') &&
-       effectiveFilters.status.includes('investigating'))
+       effectiveFilters.status.includes('in_progress'))
       ? effectiveFilters.status.length : 0)
 
   return (

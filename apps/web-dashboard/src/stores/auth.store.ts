@@ -117,11 +117,11 @@ export const useUiStore = create<UiState>()(
       toggleSidebar:     () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       selectedTenantId:  null,
       setSelectedTenant: (id) => set({ selectedTenantId: id }),
-      alertFilters: { severity: [], status: ['open', 'investigating'], priority: [] },
+      alertFilters: { severity: [], status: ['open', 'in_progress'], priority: [] },
       setAlertFilter: (key, values) =>
         set(s => ({ alertFilters: { ...s.alertFilters, [key]: values } })),
       clearAlertFilters: () =>
-        set({ alertFilters: { severity: [], status: ['open', 'investigating'], priority: [] } }),
+        set({ alertFilters: { severity: [], status: ['open', 'in_progress'], priority: [] } }),
     }),
     {
       name:       'zf-ui',

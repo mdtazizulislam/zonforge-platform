@@ -182,7 +182,7 @@ function AlertRow({ alert }: { alert: {
           {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
         <p className={clsx('mt-0.5 text-xs font-medium', {
-          'text-yellow-400': alert.status === 'investigating',
+          'text-yellow-400': alert.status === 'in_progress',
           'text-gray-400': alert.status === 'open',
           'text-green-400': alert.status === 'resolved',
         })}>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
   const user = useAuthStore(s => s.user)
 
   const { data: risk, isLoading: riskLoading } = useRiskSummary()
-  const { data: alertsData, isLoading: alertsLoading } = useAlerts({ status: ['open', 'investigating'], limit: 8 })
+  const { data: alertsData, isLoading: alertsLoading } = useAlerts({ status: ['open', 'in_progress'], limit: 8 })
   const { data: mttd, isLoading: mttdLoading } = useMttdMetrics()
   const { data: connData, isLoading: connLoading } = useConnectors()
   const { data: pipeline } = usePipelineHealth()

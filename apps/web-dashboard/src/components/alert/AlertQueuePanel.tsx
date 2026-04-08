@@ -48,8 +48,8 @@ export function AlertQueuePanel({ onSelectAlert }: AlertQueuePanelProps) {
 
   const { data, isLoading, isFetching, dataUpdatedAt } = useAlerts({
     status:  showResolved
-      ? ['open', 'investigating', 'resolved']
-      : ['open', 'investigating'],
+      ? ['open', 'in_progress', 'resolved']
+      : ['open', 'in_progress'],
     limit:   200,
   })
 
@@ -179,7 +179,7 @@ export function AlertQueuePanel({ onSelectAlert }: AlertQueuePanelProps) {
                       <div className={clsx(
                         'mt-1 flex-shrink-0 h-1.5 w-1.5 rounded-full',
                         alert.status === 'open'          ? 'bg-red-400'
-                        : alert.status === 'investigating' ? 'bg-yellow-400 animate-pulse'
+                        : alert.status === 'in_progress' ? 'bg-yellow-400 animate-pulse'
                         : 'bg-green-400',
                       )} />
                       <p className={clsx(
@@ -241,7 +241,7 @@ export function AlertQueuePanel({ onSelectAlert }: AlertQueuePanelProps) {
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
             { label: 'Open',  count: alerts.filter(a => a.status === 'open').length,          color: 'text-red-400' },
-            { label: 'Active', count: alerts.filter(a => a.status === 'investigating').length, color: 'text-yellow-400' },
+            { label: 'Active', count: alerts.filter(a => a.status === 'in_progress').length, color: 'text-yellow-400' },
             { label: 'SLA',   count: alerts.filter(a => a.mttdSlaBreached).length,            color: 'text-orange-400' },
           ].map(({ label, count, color }) => (
             <div key={label}>

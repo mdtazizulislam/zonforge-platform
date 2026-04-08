@@ -988,7 +988,7 @@ export interface PaginatedResult<T> {
 }
 
 export type AlertSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info'
-export type AlertStatus    = 'open' | 'investigating' | 'resolved' | 'suppressed' | 'false_positive'
+export type AlertStatus    = 'open' | 'in_progress' | 'resolved'
 export type AlertPriority  = 'P1' | 'P2' | 'P3' | 'P4' | 'P5'
 
 export interface AlertSummary {
@@ -1008,6 +1008,12 @@ export interface AlertSummary {
   createdAt:       string
   updatedAt:       string
   resolvedAt?:     string
+  findingCount?:   number
+  firstSeenAt?:    string
+  lastSeenAt?:     string
+  ruleKey?:        string
+  principalType?:  string
+  principalKey?:   string
 }
 
 export interface AlertDetail extends AlertSummary {

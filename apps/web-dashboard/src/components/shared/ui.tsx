@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react'
 
 export type BadgeVariant =
   | 'critical' | 'high' | 'medium' | 'low' | 'info'
-  | 'open' | 'investigating' | 'resolved' | 'suppressed' | 'false_positive'
+  | 'open' | 'in_progress' | 'resolved'
   | 'P1' | 'P2' | 'P3' | 'P4' | 'P5'
   | 'success' | 'warning' | 'error' | 'neutral'
 
@@ -21,10 +21,8 @@ const BADGE_STYLES: Record<BadgeVariant, string> = {
   info:          'bg-gray-700 text-gray-400',
   // Status
   open:          'bg-red-500/10 text-red-400',
-  investigating: 'bg-yellow-500/10 text-yellow-400',
+  in_progress:   'bg-yellow-500/10 text-yellow-400',
   resolved:      'bg-green-500/10 text-green-400',
-  suppressed:    'bg-gray-700 text-gray-500',
-  false_positive:'bg-gray-700 text-gray-500',
   // Priority
   P1: 'bg-red-500/20 text-red-300 ring-1 ring-red-500/40',
   P2: 'bg-orange-500/20 text-orange-300',
@@ -60,10 +58,10 @@ export function Badge({
         <span className={clsx('h-1.5 w-1.5 rounded-full', {
           'bg-red-400':    ['critical', 'P1'].includes(variant),
           'bg-orange-400': ['high',     'P2'].includes(variant),
-          'bg-yellow-400': ['medium', 'investigating', 'P3'].includes(variant),
+          'bg-yellow-400': ['medium', 'in_progress', 'P3'].includes(variant),
           'bg-blue-400':   ['low',    'P4'].includes(variant),
           'bg-green-400':  ['resolved', 'success'].includes(variant),
-          'bg-gray-400':   ['info', 'neutral', 'suppressed', 'false_positive'].includes(variant),
+          'bg-gray-400':   ['info', 'neutral'].includes(variant),
         })} />
       )}
       {children}

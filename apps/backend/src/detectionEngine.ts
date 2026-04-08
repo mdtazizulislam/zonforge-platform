@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getPool } from './db.js';
+import { materializeAlertForFinding } from './alertSystem.js';
 
 type DetectionRuleKey = 'suspicious_login' | 'brute_force' | 'privilege_escalation';
 
@@ -155,6 +156,17 @@ async function insertFinding(input: DetectionFindingInput) {
       sourceType: input.sourceType,
       eventCount: input.eventCount,
     });
+
+    try {
+      await materializeAlertForFinding(Number(createdId));
+    } catch (error) {
+      console.error('alert_materialization_failed', {
+        findingId: String(createdId),
+        tenantId: input.tenantId,
+        ruleKey: input.ruleKey,
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+    }
   }
 }
 
