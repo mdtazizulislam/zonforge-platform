@@ -1,0 +1,60 @@
+{
+  "users": {
+    "owner": "serial.s4.owner+1775619729419@example.com"
+  },
+  "api": {
+    "owner_signup": {
+      "status": 200,
+      "userId": 1
+    },
+    "step_up": {
+      "status": 200
+    },
+    "connector_create": {
+      "status": 201,
+      "connectorId": "1"
+    },
+    "token_create": {
+      "status": 201,
+      "tokenPrefix": "zfi_4a51270543b267"
+    },
+    "valid_ingestion_success": {
+      "status": 202,
+      "acceptedCount": 1,
+      "batchId": "fcc9b2a7-c4cb-4ec7-a23d-314a45e68fd1"
+    },
+    "replay_event_rejected": {
+      "status": 409,
+      "code": "replay_detected"
+    },
+    "malformed_payload_rejected": {
+      "status": 400,
+      "code": "invalid_ingestion_payload"
+    },
+    "oversized_payload_rejected": {
+      "status": 413,
+      "code": "payload_too_large"
+    },
+    "second_valid_ingestion": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "third_valid_ingestion": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "rate_limit_triggered": {
+      "status": 429,
+      "code": "ingestion_rate_limited"
+    },
+    "queue_health": {
+      "status": 200,
+      "queueAvailable": true,
+      "recentEvents24h": 3,
+      "failedEvents24h": 0,
+      "rateLimited24h": 1,
+      "replayDetected24h": 1,
+      "anomalyDetected24h": 1
+    }
+  }
+}

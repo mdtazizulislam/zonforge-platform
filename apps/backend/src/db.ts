@@ -615,6 +615,23 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS ingestion_security_events (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+        connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL,
+        token_id BIGINT REFERENCES connector_ingestion_tokens(id) ON DELETE SET NULL,
+        request_id VARCHAR(128),
+        source_type VARCHAR(64),
+        event_type VARCHAR(64) NOT NULL,
+        client_ip VARCHAR(128),
+        token_prefix VARCHAR(24),
+        reason_code VARCHAR(64),
+        metadata_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS raw_ingestion_events (
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -769,6 +786,17 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE ingestion_request_logs ADD COLUMN IF NOT EXISTS error_message TEXT`);
     await client.query(`ALTER TABLE ingestion_request_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`ALTER TABLE ingestion_request_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS token_id BIGINT REFERENCES connector_ingestion_tokens(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS request_id VARCHAR(128)`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS source_type VARCHAR(64)`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(64)`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS client_ip VARCHAR(128)`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS token_prefix VARCHAR(24)`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS reason_code VARCHAR(64)`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS metadata_json JSONB`);
+    await client.query(`ALTER TABLE ingestion_security_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`ALTER TABLE raw_ingestion_events ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE raw_ingestion_events ADD COLUMN IF NOT EXISTS connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL`);
     await client.query(`ALTER TABLE raw_ingestion_events ADD COLUMN IF NOT EXISTS request_id VARCHAR(128)`);
@@ -853,6 +881,9 @@ export async function initDatabase() {
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ingestion_request_logs_batch ON ingestion_request_logs(batch_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_ingestion_request_logs_tenant ON ingestion_request_logs(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_ingestion_request_logs_status ON ingestion_request_logs(status, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_ingestion_security_events_created ON ingestion_security_events(created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_ingestion_security_events_tenant_type ON ingestion_security_events(tenant_id, event_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_ingestion_security_events_connector ON ingestion_security_events(connector_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_raw_ingestion_events_tenant ON raw_ingestion_events(tenant_id, received_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_raw_ingestion_events_connector ON raw_ingestion_events(connector_id, received_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_raw_ingestion_events_status ON raw_ingestion_events(status, received_at DESC)`);
