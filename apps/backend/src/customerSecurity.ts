@@ -228,6 +228,77 @@ type InvestigationRow = {
   updated_at: string | Date;
 };
 
+type InvestigationWorkflowStatus = 'open' | 'in_progress' | 'closed';
+
+type WorkflowInvestigationRow = {
+  id: number;
+  tenant_id: number;
+  ai_investigation_id: number | null;
+  linked_alert_id: number | null;
+  source: string;
+  title: string;
+  summary: string | null;
+  status: InvestigationWorkflowStatus;
+  priority: string | null;
+  primary_entity_type: string | null;
+  primary_entity_key: string | null;
+  risk_context_json: Record<string, unknown> | null;
+  created_by_user_id: number | null;
+  closed_at: string | Date | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+type InvestigationEvidenceRow = {
+  id: number;
+  investigation_id: number;
+  tenant_id: number;
+  source_type: string;
+  source_ref: string | null;
+  title: string;
+  description: string | null;
+  evidence_json: Record<string, unknown> | null;
+  created_by_user_id: number | null;
+  created_at: string | Date;
+  author_email?: string | null;
+  author_full_name?: string | null;
+};
+
+type InvestigationEventRow = {
+  id: number;
+  investigation_id: number;
+  tenant_id: number;
+  event_type: string;
+  message: string;
+  actor_user_id: number | null;
+  payload_json: Record<string, unknown> | null;
+  created_at: string | Date;
+  actor_email?: string | null;
+  actor_full_name?: string | null;
+};
+
+type InvestigationNoteRow = {
+  id: number;
+  investigation_id: number;
+  tenant_id: number;
+  note: string;
+  created_by_user_id: number | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+  author_email?: string | null;
+  author_full_name?: string | null;
+};
+
+type InvestigationListRow = InvestigationRow & {
+  workflow_source: string | null;
+  workflow_title: string | null;
+  workflow_status: InvestigationWorkflowStatus | null;
+  workflow_priority: string | null;
+  workflow_closed_at: string | Date | null;
+  evidence_count: number;
+  note_count: number;
+};
+
 function toIso(value: string | Date | null | undefined): string | null {
   if (!value) return null;
   return new Date(value).toISOString();
@@ -628,6 +699,487 @@ function buildInvestigationDraft(alert: ReturnType<typeof alertDetail> | null) {
     totalTokens: 0,
     durationMs: 50,
     agentModel: 'zonforge-backend-deterministic-v1',
+  };
+}
+
+function normalizeInvestigationWorkflowStatus(value: string | null | undefined): InvestigationWorkflowStatus {
+  switch ((value ?? '').toLowerCase()) {
+    case 'in_progress':
+      return 'in_progress';
+    case 'closed':
+      return 'closed';
+    default:
+      return 'open';
+  }
+}
+
+function workflowStatusFromLegacyStatus(value: string | null | undefined): InvestigationWorkflowStatus {
+  switch ((value ?? '').toLowerCase()) {
+    case 'investigating':
+      return 'in_progress';
+    case 'completed':
+    case 'failed':
+      return 'closed';
+    default:
+      return 'open';
+  }
+}
+
+function legacyStatusFromWorkflowStatus(status: InvestigationWorkflowStatus, confidence: number): string {
+  if (status === 'closed') {
+    return 'completed';
+  }
+
+  if (status === 'in_progress') {
+    return 'investigating';
+  }
+
+  return confidence < 85 ? 'awaiting_approval' : 'queued';
+}
+
+function serializeInvestigationRiskScore(score: RiskScoreRow | null | undefined) {
+  if (!score) return null;
+
+  return {
+    entityType: score.entity_type,
+    entityKey: score.entity_key,
+    entityLabel: score.entity_label,
+    score: Number(score.score ?? 0),
+    scoreBand: score.score_band,
+    signalCount: Number(score.signal_count ?? 0),
+    topFactors: score.top_factors_json ?? [],
+    lastEventAt: toIso(score.last_event_at),
+    lastCalculatedAt: toIso(score.last_calculated_at),
+  };
+}
+
+function extractInvestigationAssetKey(alert: ReturnType<typeof alertDetail> | null): string | null {
+  if (!alert) return null;
+
+  if (alert.principalType?.toLowerCase() === 'asset' && alert.principalKey) {
+    return normalizeRiskEntityKey('asset', alert.principalKey);
+  }
+
+  const evidence = Array.isArray(alert.evidence) ? alert.evidence : [];
+  for (const item of evidence) {
+    if (!item || typeof item !== 'object') continue;
+    const candidate = (item as Record<string, unknown>).targetResource;
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return normalizeRiskEntityKey('asset', candidate);
+    }
+  }
+
+  return null;
+}
+
+function deriveInvestigationPrimaryEntity(alert: ReturnType<typeof alertDetail> | null) {
+  if (!alert) {
+    return { entityType: null, entityKey: null };
+  }
+
+  const userKey = alert.affectedUserId
+    ? normalizeRiskEntityKey('user', alert.affectedUserId)
+    : alert.principalType?.toLowerCase() === 'user' && alert.principalKey
+      ? normalizeRiskEntityKey('user', alert.principalKey)
+      : null;
+
+  if (userKey) {
+    return { entityType: 'user', entityKey: userKey };
+  }
+
+  const assetKey = extractInvestigationAssetKey(alert);
+  if (assetKey) {
+    return { entityType: 'asset', entityKey: assetKey };
+  }
+
+  return { entityType: 'org', entityKey: 'org' };
+}
+
+async function buildInvestigationRiskContext(tenantId: number, alert: ReturnType<typeof alertDetail> | null) {
+  const orgScore = await getRiskScoreForTenant(tenantId, 'org', 'org');
+  const primary = deriveInvestigationPrimaryEntity(alert);
+  const userKey = primary.entityType === 'user' && primary.entityKey
+    ? primary.entityKey
+    : alert?.affectedUserId
+      ? normalizeRiskEntityKey('user', alert.affectedUserId)
+      : null;
+  const assetKey = primary.entityType === 'asset' && primary.entityKey
+    ? primary.entityKey
+    : extractInvestigationAssetKey(alert);
+
+  const userScore = userKey ? await getRiskScoreForTenant(tenantId, 'user', userKey) : null;
+  const assetScore = assetKey ? await getRiskScoreForTenant(tenantId, 'asset', assetKey) : null;
+
+  return {
+    org: serializeInvestigationRiskScore(orgScore),
+    user: serializeInvestigationRiskScore(userScore),
+    asset: serializeInvestigationRiskScore(assetScore),
+  };
+}
+
+async function getAiInvestigationForTenant(tenantId: number, investigationId: string): Promise<InvestigationRow | null> {
+  if (!/^\d+$/.test(investigationId)) {
+    return null;
+  }
+
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT *
+     FROM ai_investigations
+     WHERE tenant_id = $1 AND id = $2::bigint
+     LIMIT 1`,
+    [tenantId, investigationId],
+  );
+
+  return (result.rows[0] as InvestigationRow | undefined) ?? null;
+}
+
+async function getWorkflowInvestigationForAiId(tenantId: number, aiInvestigationId: string | number): Promise<WorkflowInvestigationRow | null> {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT *
+     FROM investigations
+     WHERE tenant_id = $1 AND ai_investigation_id = $2::bigint
+     LIMIT 1`,
+    [tenantId, String(aiInvestigationId)],
+  );
+
+  return (result.rows[0] as WorkflowInvestigationRow | undefined) ?? null;
+}
+
+async function listDetectionFindingsForAlert(tenantId: number, alertId: string): Promise<DetectionFindingRow[]> {
+  if (!/^\d+$/.test(alertId)) {
+    return [];
+  }
+
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT df.*
+     FROM alert_findings af
+     INNER JOIN detection_findings df
+       ON df.id = af.finding_id
+     WHERE af.alert_id = $1::bigint
+       AND df.tenant_id = $2
+     ORDER BY df.created_at DESC, df.id DESC`,
+    [alertId, tenantId],
+  );
+
+  return result.rows as DetectionFindingRow[];
+}
+
+async function listRelatedAlertsForInvestigation(tenantId: number, alert: AlertRow | null): Promise<ReturnType<typeof alertSummary>[]> {
+  if (!alert?.principal_key) {
+    return [];
+  }
+
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT
+       id::text AS alert_id,
+       tenant_id,
+       rule_key,
+       principal_type,
+       principal_key,
+       title,
+       description,
+       severity,
+       priority,
+       status,
+       affected_user_id,
+       affected_ip,
+       evidence_json,
+       mitre_tactics_json,
+       mitre_techniques_json,
+       detection_gap_minutes,
+       mttd_sla_breached,
+       assigned_to,
+       assigned_at,
+       recommended_actions_json,
+       first_signal_time,
+       first_seen_at,
+       last_seen_at,
+       finding_count,
+       llm_narrative_json,
+       llm_narrative_generated_at,
+       created_at,
+       updated_at,
+       resolved_at
+     FROM alerts
+     WHERE tenant_id = $1
+       AND principal_key = $2
+       AND id <> $3::bigint
+     ORDER BY created_at DESC
+     LIMIT 5`,
+    [tenantId, alert.principal_key, alert.alert_id],
+  );
+
+  return (result.rows as AlertRow[]).map(alertSummary);
+}
+
+function serializeInvestigationEvent(row: InvestigationEventRow) {
+  return {
+    id: String(row.id),
+    eventType: row.event_type,
+    message: row.message,
+    actor: row.actor_user_id
+      ? {
+          userId: String(row.actor_user_id),
+          email: row.actor_email ?? null,
+          fullName: displayPersonName(row.actor_full_name ?? null, row.actor_email ?? null),
+        }
+      : null,
+    payload: row.payload_json ?? {},
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function serializeInvestigationNote(row: InvestigationNoteRow) {
+  return {
+    id: String(row.id),
+    note: row.note,
+    author: row.created_by_user_id
+      ? {
+          userId: String(row.created_by_user_id),
+          email: row.author_email ?? null,
+          fullName: displayPersonName(row.author_full_name ?? null, row.author_email ?? null),
+        }
+      : null,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+function serializeInvestigationEvidence(row: InvestigationEvidenceRow) {
+  return {
+    id: String(row.id),
+    sourceType: row.source_type,
+    sourceRef: row.source_ref,
+    title: row.title,
+    description: row.description,
+    evidence: row.evidence_json ?? {},
+    addedBy: row.created_by_user_id
+      ? {
+          userId: String(row.created_by_user_id),
+          email: row.author_email ?? null,
+          fullName: displayPersonName(row.author_full_name ?? null, row.author_email ?? null),
+        }
+      : null,
+    createdAt: toIso(row.created_at),
+  };
+}
+
+async function insertInvestigationEvent(client: any, investigationId: number, tenantId: number, eventType: string, message: string, actorUserId: number | null, payload?: Record<string, unknown>) {
+  await client.query(
+    `INSERT INTO investigation_events (
+       investigation_id,
+       tenant_id,
+       event_type,
+       message,
+       actor_user_id,
+       payload_json
+     ) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [investigationId, tenantId, eventType, message, actorUserId, payload ? JSON.stringify(payload) : null],
+  );
+}
+
+async function insertInvestigationEvidence(client: any, input: {
+  investigationId: number;
+  tenantId: number;
+  sourceType: string;
+  sourceRef?: string | null;
+  title: string;
+  description?: string | null;
+  evidence?: Record<string, unknown>;
+  createdByUserId?: number | null;
+}) {
+  const result = await client.query(
+    `INSERT INTO investigation_evidence (
+       investigation_id,
+       tenant_id,
+       source_type,
+       source_ref,
+       title,
+       description,
+       evidence_json,
+       created_by_user_id
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     RETURNING *`,
+    [
+      input.investigationId,
+      input.tenantId,
+      input.sourceType,
+      input.sourceRef ?? null,
+      input.title,
+      input.description ?? null,
+      JSON.stringify(input.evidence ?? {}),
+      input.createdByUserId ?? null,
+    ],
+  );
+
+  return result.rows[0] as InvestigationEvidenceRow;
+}
+
+async function ensureWorkflowInvestigation(access: TenantAccess, aiInvestigation: InvestigationRow, alert: AlertRow | null, clientOverride?: any): Promise<WorkflowInvestigationRow> {
+  const existing = await getWorkflowInvestigationForAiId(access.tenantId, aiInvestigation.id);
+  if (existing) {
+    return existing;
+  }
+
+  const pool = getPool();
+  const client = clientOverride ?? await pool.connect();
+  const shouldRelease = !clientOverride;
+  try {
+    if (!clientOverride) {
+      await client.query('BEGIN');
+    }
+
+    const alertView = alert ? alertDetail(alert) : null;
+    const primary = deriveInvestigationPrimaryEntity(alertView);
+    const riskContext = await buildInvestigationRiskContext(access.tenantId, alertView);
+    const result = await client.query(
+      `INSERT INTO investigations (
+         tenant_id,
+         ai_investigation_id,
+         linked_alert_id,
+         source,
+         title,
+         summary,
+         status,
+         priority,
+         primary_entity_type,
+         primary_entity_key,
+         risk_context_json,
+         created_by_user_id
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT (ai_investigation_id) DO UPDATE
+       SET updated_at = NOW()
+       RETURNING *`,
+      [
+        access.tenantId,
+        aiInvestigation.id,
+        alert?.alert_id ? Number(alert.alert_id) : null,
+        alert ? 'alert' : 'manual',
+        alert?.title ?? aiInvestigation.alert_title ?? `Investigation ${aiInvestigation.id}`,
+        aiInvestigation.summary,
+        workflowStatusFromLegacyStatus(aiInvestigation.status),
+        severityToPriority(alert?.severity ?? aiInvestigation.alert_severity ?? 'medium'),
+        primary.entityType,
+        primary.entityKey,
+        JSON.stringify(riskContext),
+        access.userId,
+      ],
+    );
+
+    const workflow = result.rows[0] as WorkflowInvestigationRow;
+    await insertInvestigationEvent(
+      client,
+      workflow.id,
+      access.tenantId,
+      'workflow_bootstrapped',
+      'Workflow record materialized for investigation.',
+      access.userId,
+      { aiInvestigationId: String(aiInvestigation.id) },
+    );
+
+    if (!clientOverride) {
+      await client.query('COMMIT');
+    }
+
+    return workflow;
+  } catch (error) {
+    if (!clientOverride) {
+      await client.query('ROLLBACK');
+    }
+    throw error;
+  } finally {
+    if (shouldRelease) {
+      client.release();
+    }
+  }
+}
+
+async function listInvestigationNotes(tenantId: number, investigationId: number) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT n.*, u.email AS author_email, u.full_name AS author_full_name
+     FROM investigation_notes n
+     LEFT JOIN users u
+       ON u.id = n.created_by_user_id
+     WHERE n.tenant_id = $1 AND n.investigation_id = $2
+     ORDER BY n.created_at ASC, n.id ASC`,
+    [tenantId, investigationId],
+  );
+
+  return (result.rows as InvestigationNoteRow[]).map(serializeInvestigationNote);
+}
+
+async function listInvestigationTimeline(tenantId: number, investigationId: number) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT e.*, u.email AS actor_email, u.full_name AS actor_full_name
+     FROM investigation_events e
+     LEFT JOIN users u
+       ON u.id = e.actor_user_id
+     WHERE e.tenant_id = $1 AND e.investigation_id = $2
+     ORDER BY e.created_at ASC, e.id ASC`,
+    [tenantId, investigationId],
+  );
+
+  return (result.rows as InvestigationEventRow[]).map(serializeInvestigationEvent);
+}
+
+async function listInvestigationEvidenceLinks(tenantId: number, investigationId: number) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT e.*, u.email AS author_email, u.full_name AS author_full_name
+     FROM investigation_evidence e
+     LEFT JOIN users u
+       ON u.id = e.created_by_user_id
+     WHERE e.tenant_id = $1 AND e.investigation_id = $2
+     ORDER BY e.created_at ASC, e.id ASC`,
+    [tenantId, investigationId],
+  );
+
+  return (result.rows as InvestigationEvidenceRow[]).map(serializeInvestigationEvidence);
+}
+
+function investigationListView(row: InvestigationListRow) {
+  return {
+    ...investigationView(row),
+    workflowStatus: row.workflow_status ?? workflowStatusFromLegacyStatus(row.status),
+    source: row.workflow_source ?? (row.alert_id ? 'alert' : 'manual'),
+    title: row.workflow_title ?? row.alert_title ?? `Investigation ${row.id}`,
+    priority: row.workflow_priority ?? severityToPriority(row.alert_severity ?? 'medium'),
+    evidenceCount: Number(row.evidence_count ?? 0),
+    noteCount: Number(row.note_count ?? 0),
+    closedAt: toIso(row.workflow_closed_at),
+  };
+}
+
+async function buildInvestigationDetailResponse(access: TenantAccess, investigation: InvestigationRow, workflow: WorkflowInvestigationRow | null) {
+  const alert = investigation.alert_id ? await getAlertForTenant(access.tenantId, investigation.alert_id) : null;
+  const findings = alert ? await listDetectionFindingsForAlert(access.tenantId, alert.alert_id) : [];
+  const notes = workflow ? await listInvestigationNotes(access.tenantId, workflow.id) : [];
+  const timeline = workflow ? await listInvestigationTimeline(access.tenantId, workflow.id) : [];
+  const linkedEvidence = workflow ? await listInvestigationEvidenceLinks(access.tenantId, workflow.id) : [];
+  const riskContext = workflow?.risk_context_json ?? await buildInvestigationRiskContext(access.tenantId, alert ? alertDetail(alert) : null);
+
+  return {
+    ...investigationView(investigation),
+    workflowStatus: workflow?.status ?? workflowStatusFromLegacyStatus(investigation.status),
+    source: workflow?.source ?? (investigation.alert_id ? 'alert' : 'manual'),
+    title: workflow?.title ?? investigation.alert_title ?? `Investigation ${investigation.id}`,
+    priority: workflow?.priority ?? severityToPriority(investigation.alert_severity ?? alert?.severity ?? 'medium'),
+    closedAt: workflow ? toIso(workflow.closed_at) : null,
+    linkedAlert: alert ? alertDetail(alert) : null,
+    relatedAlerts: await listRelatedAlertsForInvestigation(access.tenantId, alert),
+    relatedFindings: findings.map(detectionDetail),
+    linkedEvidence,
+    evidenceCount: linkedEvidence.length,
+    notes,
+    noteCount: notes.length,
+    timeline,
+    riskContext,
   };
 }
 
@@ -2867,15 +3419,25 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20), 1), 100);
     const pool = getPool();
     const result = await pool.query(
-      `SELECT *
-       FROM ai_investigations
-       WHERE tenant_id = $1
-       ORDER BY created_at DESC
+      `SELECT
+         ai.*,
+         inv.source AS workflow_source,
+         inv.title AS workflow_title,
+         inv.status AS workflow_status,
+         inv.priority AS workflow_priority,
+         inv.closed_at AS workflow_closed_at,
+         COALESCE((SELECT COUNT(*)::int FROM investigation_evidence ie WHERE ie.investigation_id = inv.id), 0) AS evidence_count,
+         COALESCE((SELECT COUNT(*)::int FROM investigation_notes inn WHERE inn.investigation_id = inv.id), 0) AS note_count
+       FROM ai_investigations ai
+       LEFT JOIN investigations inv
+         ON inv.ai_investigation_id = ai.id
+       WHERE ai.tenant_id = $1
+       ORDER BY ai.created_at DESC
        LIMIT $2`,
       [access.tenantId, limit],
     );
 
-    return c.json((result.rows as InvestigationRow[]).map(investigationView));
+    return c.json((result.rows as InvestigationListRow[]).map(investigationListView));
   });
 
   router.get('/v1/investigations/stats', async (c) => {
@@ -2915,21 +3477,13 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const pool = getPool();
-    const result = await pool.query(
-      `SELECT *
-       FROM ai_investigations
-       WHERE tenant_id = $1 AND id = $2
-       LIMIT 1`,
-      [access.tenantId, Number(c.req.param('id'))],
-    );
-
-    const investigation = result.rows[0] as InvestigationRow | undefined;
+    const investigation = await getAiInvestigationForTenant(access.tenantId, c.req.param('id'));
     if (!investigation) {
       return sendError(c, 404, 'not_found', 'Investigation not found');
     }
 
-    return c.json(investigationView(investigation));
+    const workflow = await getWorkflowInvestigationForAiId(access.tenantId, investigation.id);
+    return c.json(await buildInvestigationDetailResponse(access, investigation, workflow));
   });
 
   router.post('/v1/investigations', async (c) => {
@@ -2941,62 +3495,619 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
 
     const body = await c.req.json().catch(() => ({}));
     const alertId = typeof body.alertId === 'string' ? body.alertId.trim() : '';
-    if (!alertId) {
-      return sendError(c, 400, 'invalid_request', 'alertId is required');
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    const context = typeof body.context === 'string' ? body.context.trim() : '';
+
+    if (!alertId && !title) {
+      return sendError(c, 400, 'invalid_request', 'alertId or title is required');
     }
 
-    const alert = await getAlertForTenant(access.tenantId, alertId);
-    const draft = buildInvestigationDraft(alert ? alertDetail(alert) : null);
-    const pool = getPool();
-    const result = await pool.query(
-      `INSERT INTO ai_investigations (
-         tenant_id,
-         alert_id,
-         alert_title,
-         alert_severity,
-         status,
-         confidence,
-         summary,
-         executive_summary,
-         detailed_report,
-         recommendations_json,
-         ioc_list_json,
-         thoughts_json,
-         evidence_json,
-         total_steps,
-         total_tokens,
-         duration_ms,
-         agent_model
-       ) VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
-       )
-       RETURNING id, status`,
-      [
-        access.tenantId,
-        alertId,
-        alert?.title ?? null,
-        alert?.severity ?? null,
-        draft.status,
-        draft.confidence,
-        draft.summary,
-        draft.executiveSummary,
-        draft.detailedReport,
-        JSON.stringify(draft.recommendations),
-        JSON.stringify(draft.iocList),
-        JSON.stringify(draft.thoughts),
-        JSON.stringify(draft.evidence),
-        draft.totalSteps,
-        draft.totalTokens,
-        draft.durationMs,
-        draft.agentModel,
-      ],
-    );
+    const alert = alertId ? await getAlertForTenant(access.tenantId, alertId) : null;
+    if (alertId && !alert) {
+      return sendError(c, 404, 'not_found', 'Alert not found');
+    }
 
-    return c.json({
-      investigationId: String(result.rows[0].id),
-      status: result.rows[0].status,
-      message: draft.summary,
-    }, 201);
+    try {
+      const alertView = alert ? alertDetail(alert) : null;
+      const draft = buildInvestigationDraft(alertView);
+      const persistedAlertId = alertId || `manual-${Date.now()}`;
+      if (context) {
+        draft.summary = `${draft.summary} Analyst context captured.`;
+        draft.detailedReport = `${draft.detailedReport}\n\nAnalyst context:\n${context}`;
+        draft.thoughts = [
+          ...(draft.thoughts ?? []),
+          { type: 'observation', content: `Analyst context: ${context}` },
+        ];
+        draft.totalSteps = (draft.thoughts ?? []).length;
+      }
+
+      const primary = deriveInvestigationPrimaryEntity(alertView);
+      const riskContext = await buildInvestigationRiskContext(access.tenantId, alertView);
+      const workflowStatus: InvestigationWorkflowStatus = draft.status === 'completed' ? 'closed' : 'open';
+      const pool = getPool();
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+        const aiResult = await client.query(
+          `INSERT INTO ai_investigations (
+             tenant_id,
+             alert_id,
+             alert_title,
+             alert_severity,
+             status,
+             confidence,
+             summary,
+             executive_summary,
+             detailed_report,
+             recommendations_json,
+             ioc_list_json,
+             thoughts_json,
+             evidence_json,
+             total_steps,
+             total_tokens,
+             duration_ms,
+             agent_model
+           ) VALUES (
+             $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+           )
+           RETURNING *`,
+          [
+            access.tenantId,
+            persistedAlertId,
+            alert?.title ?? (title || null),
+            alert?.severity ?? null,
+            draft.status,
+            draft.confidence,
+            draft.summary,
+            draft.executiveSummary,
+            draft.detailedReport,
+            JSON.stringify(draft.recommendations),
+            JSON.stringify(draft.iocList),
+            JSON.stringify(draft.thoughts),
+            JSON.stringify(draft.evidence),
+            draft.totalSteps,
+            draft.totalTokens,
+            draft.durationMs,
+            draft.agentModel,
+          ],
+        );
+
+        const aiInvestigation = aiResult.rows[0] as InvestigationRow;
+        const workflowResult = await client.query(
+          `INSERT INTO investigations (
+             tenant_id,
+             ai_investigation_id,
+             linked_alert_id,
+             source,
+             title,
+             summary,
+             status,
+             priority,
+             primary_entity_type,
+             primary_entity_key,
+             risk_context_json,
+             created_by_user_id
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           RETURNING *`,
+          [
+            access.tenantId,
+            aiInvestigation.id,
+            alert?.alert_id ? Number(alert.alert_id) : null,
+            alert ? 'alert' : 'manual',
+            title || alert?.title || `Investigation ${aiInvestigation.id}`,
+            draft.summary,
+            workflowStatus,
+            severityToPriority(alert?.severity ?? 'medium'),
+            primary.entityType,
+            primary.entityKey,
+            JSON.stringify(riskContext),
+            access.userId,
+          ],
+        );
+
+        const workflow = workflowResult.rows[0] as WorkflowInvestigationRow;
+        await insertInvestigationEvent(
+          client,
+          workflow.id,
+          access.tenantId,
+          'investigation_created',
+          alert
+            ? `Investigation created from alert ${alert.alert_id}.`
+            : 'Manual investigation created.',
+          access.userId,
+          {
+            alertId: alert?.alert_id ?? null,
+            workflowStatus,
+            source: alert ? 'alert' : 'manual',
+          },
+        );
+
+        if (alert) {
+          await insertInvestigationEvidence(client, {
+            investigationId: workflow.id,
+            tenantId: access.tenantId,
+            sourceType: 'alert',
+            sourceRef: alert.alert_id,
+            title: alert.title ?? `Alert ${alert.alert_id}`,
+            description: alert.description ?? 'Linked alert evidence.',
+            evidence: {
+              severity: alert.severity,
+              status: alert.status,
+              affectedUserId: alert.affected_user_id,
+              affectedIp: alert.affected_ip,
+            },
+            createdByUserId: access.userId,
+          });
+
+          const findings = await listDetectionFindingsForAlert(access.tenantId, alert.alert_id);
+          for (const finding of findings) {
+            await insertInvestigationEvidence(client, {
+              investigationId: workflow.id,
+              tenantId: access.tenantId,
+              sourceType: 'finding',
+              sourceRef: String(finding.id),
+              title: finding.title,
+              description: finding.explanation,
+              evidence: {
+                severity: finding.severity,
+                ruleKey: finding.rule_key,
+                eventCount: finding.event_count,
+              },
+              createdByUserId: access.userId,
+            });
+          }
+        }
+
+        for (const [entityName, score] of Object.entries(riskContext)) {
+          if (!score || typeof score !== 'object') continue;
+          const typedScore = score as Record<string, unknown>;
+          await insertInvestigationEvidence(client, {
+            investigationId: workflow.id,
+            tenantId: access.tenantId,
+            sourceType: 'risk',
+            sourceRef: `${typedScore.entityType ?? entityName}:${typedScore.entityKey ?? entityName}`,
+            title: `${String(entityName).toUpperCase()} risk context`,
+            description: `${typedScore.entityLabel ?? entityName} currently scores ${typedScore.score ?? 0} (${typedScore.scoreBand ?? 'info'}).`,
+            evidence: typedScore,
+            createdByUserId: access.userId,
+          });
+        }
+
+        if (context) {
+          await client.query(
+            `INSERT INTO investigation_notes (
+               investigation_id,
+               tenant_id,
+               note,
+               created_by_user_id
+             ) VALUES ($1,$2,$3,$4)`,
+            [workflow.id, access.tenantId, context, access.userId],
+          );
+          await insertInvestigationEvent(
+            client,
+            workflow.id,
+            access.tenantId,
+            'investigation_note_added',
+            'Initial analyst context attached to investigation.',
+            access.userId,
+          );
+        }
+
+        await client.query('COMMIT');
+
+        await writeTenantAuditLog({
+          tenantId: access.tenantId,
+          userId: access.userId,
+          eventType: 'investigation.create',
+          source: 'customer_security',
+          message: alert
+            ? `Created investigation ${aiInvestigation.id} from alert ${alert.alert_id}.`
+            : `Created manual investigation ${aiInvestigation.id}.`,
+          payload: {
+            investigationId: String(aiInvestigation.id),
+            alertId: alert?.alert_id ?? null,
+            workflowStatus,
+          },
+        });
+
+        console.info({
+          event: 'investigation_created',
+          tenantId: access.tenantId,
+          investigationId: String(aiInvestigation.id),
+          workflowStatus,
+          alertId: alert?.alert_id ?? null,
+        });
+
+        return c.json({
+          investigationId: String(aiInvestigation.id),
+          status: aiInvestigation.status,
+          message: draft.summary,
+        }, 201);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error({
+        event: 'investigation_failed',
+        action: 'create',
+        tenantId: access.tenantId,
+        alertId: alertId || null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return sendError(c, 500, 'investigation_failed', 'Failed to create investigation');
+    }
+  });
+
+  router.patch('/v1/investigations/:id/status', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can update investigations.', 'investigation.status');
+    if (denied) return denied;
+
+    const body = await c.req.json().catch(() => ({}));
+    const rawStatus = typeof body.status === 'string' ? body.status.trim().toLowerCase() : '';
+    if (!['open', 'in_progress', 'closed'].includes(rawStatus)) {
+      return sendError(c, 400, 'invalid_request', 'status must be open, in_progress, or closed');
+    }
+
+    const nextStatus = normalizeInvestigationWorkflowStatus(rawStatus);
+    const note = typeof body.note === 'string' ? body.note.trim() : '';
+    const verdict = typeof body.verdict === 'string' ? body.verdict.trim() : null;
+    const investigation = await getAiInvestigationForTenant(access.tenantId, c.req.param('id'));
+    if (!investigation) {
+      return sendError(c, 404, 'not_found', 'Investigation not found');
+    }
+
+    try {
+      const alert = investigation.alert_id ? await getAlertForTenant(access.tenantId, investigation.alert_id) : null;
+      const pool = getPool();
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+        const workflow = await ensureWorkflowInvestigation(access, investigation, alert, client);
+        const previousStatus = workflow.status;
+        const legacyStatus = legacyStatusFromWorkflowStatus(nextStatus, Number(investigation.confidence ?? 0));
+
+        await client.query(
+          `UPDATE investigations
+           SET status = $3,
+               closed_at = CASE WHEN $3 = 'closed' THEN NOW() ELSE NULL END,
+               updated_at = NOW()
+           WHERE tenant_id = $1 AND id = $2`,
+          [access.tenantId, workflow.id, nextStatus],
+        );
+
+        await client.query(
+          `UPDATE ai_investigations
+           SET status = $3,
+               verdict = COALESCE($4, verdict),
+               updated_at = NOW()
+           WHERE tenant_id = $1 AND id = $2`,
+          [access.tenantId, investigation.id, legacyStatus, verdict],
+        );
+
+        await insertInvestigationEvent(
+          client,
+          workflow.id,
+          access.tenantId,
+          'investigation_status_changed',
+          `Investigation status changed from ${previousStatus} to ${nextStatus}.`,
+          access.userId,
+          { previousStatus, nextStatus, verdict },
+        );
+
+        if (note) {
+          await client.query(
+            `INSERT INTO investigation_notes (
+               investigation_id,
+               tenant_id,
+               note,
+               created_by_user_id
+             ) VALUES ($1,$2,$3,$4)`,
+            [workflow.id, access.tenantId, note, access.userId],
+          );
+        }
+
+        await client.query('COMMIT');
+
+        await writeTenantAuditLog({
+          tenantId: access.tenantId,
+          userId: access.userId,
+          eventType: 'investigation.status',
+          source: 'customer_security',
+          message: `Updated investigation ${investigation.id} status to ${nextStatus}.`,
+          payload: { investigationId: String(investigation.id), previousStatus, nextStatus },
+        });
+
+        console.info({
+          event: 'investigation_status_changed',
+          tenantId: access.tenantId,
+          investigationId: String(investigation.id),
+          previousStatus,
+          nextStatus,
+        });
+
+        return c.json({ updated: true, status: nextStatus, legacyStatus });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error({
+        event: 'investigation_failed',
+        action: 'status',
+        tenantId: access.tenantId,
+        investigationId: c.req.param('id'),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return sendError(c, 500, 'investigation_failed', 'Failed to update investigation status');
+    }
+  });
+
+  router.post('/v1/investigations/:id/evidence', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can add investigation evidence.', 'investigation.evidence');
+    if (denied) return denied;
+
+    const body = await c.req.json().catch(() => ({}));
+    const investigation = await getAiInvestigationForTenant(access.tenantId, c.req.param('id'));
+    if (!investigation) {
+      return sendError(c, 404, 'not_found', 'Investigation not found');
+    }
+
+    try {
+      const linkedAlert = investigation.alert_id ? await getAlertForTenant(access.tenantId, investigation.alert_id) : null;
+      let evidenceInput: {
+        sourceType: string;
+        sourceRef?: string | null;
+        title: string;
+        description?: string | null;
+        evidence?: Record<string, unknown>;
+      } | null = null;
+      const bodyAlertId = typeof body.alertId === 'string' ? body.alertId.trim() : '';
+      const bodyFindingId = typeof body.findingId === 'string' || typeof body.findingId === 'number' ? String(body.findingId).trim() : '';
+      const bodyTitle = typeof body.title === 'string' ? body.title.trim() : '';
+      const bodyDescription = typeof body.description === 'string' ? body.description.trim() : '';
+
+      if (bodyAlertId) {
+        const alert = await getAlertForTenant(access.tenantId, bodyAlertId);
+        if (!alert) {
+          return sendError(c, 404, 'not_found', 'Alert not found');
+        }
+
+        evidenceInput = {
+          sourceType: 'alert',
+          sourceRef: alert.alert_id,
+          title: alert.title ?? `Alert ${alert.alert_id}`,
+          description: alert.description ?? 'Linked alert evidence.',
+          evidence: {
+            severity: alert.severity,
+            status: alert.status,
+            priority: alert.priority,
+          },
+        };
+      } else if (bodyFindingId) {
+        const finding = await getDetectionFindingForTenant(access.tenantId, Number(bodyFindingId));
+        if (!finding) {
+          return sendError(c, 404, 'not_found', 'Finding not found');
+        }
+
+        evidenceInput = {
+          sourceType: 'finding',
+          sourceRef: String(finding.id),
+          title: finding.title,
+          description: finding.explanation,
+          evidence: {
+            severity: finding.severity,
+            ruleKey: finding.rule_key,
+            eventCount: finding.event_count,
+          },
+        };
+      } else {
+        const entityType = normalizeRiskEntityType(typeof body.entityType === 'string' ? body.entityType : null);
+        const entityKey = typeof body.entityKey === 'string' ? body.entityKey.trim() : '';
+        if (entityType && entityKey) {
+          const normalizedKey = normalizeRiskEntityKey(entityType, entityKey);
+          const score = await getRiskScoreForTenant(access.tenantId, entityType, normalizedKey);
+          if (!score) {
+            return sendError(c, 404, 'not_found', 'Risk context not found');
+          }
+
+          evidenceInput = {
+            sourceType: 'risk',
+            sourceRef: `${entityType}:${normalizedKey}`,
+            title: `${entityType.toUpperCase()} risk context`,
+            description: `${score.entity_label} currently scores ${score.score} (${score.score_band}).`,
+            evidence: serializeInvestigationRiskScore(score) ?? {},
+          };
+        } else if (bodyTitle) {
+          evidenceInput = {
+            sourceType: typeof body.sourceType === 'string' ? body.sourceType.trim().toLowerCase() || 'manual' : 'manual',
+            sourceRef: typeof body.sourceRef === 'string' ? body.sourceRef.trim() : null,
+            title: bodyTitle,
+            description: bodyDescription || null,
+            evidence: body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {},
+          };
+        }
+      }
+
+      if (!evidenceInput) {
+        return sendError(c, 400, 'invalid_request', 'Provide alertId, findingId, entityType/entityKey, or manual evidence details');
+      }
+
+      const pool = getPool();
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+        const workflow = await ensureWorkflowInvestigation(access, investigation, linkedAlert, client);
+
+        const evidence = await insertInvestigationEvidence(client, {
+          investigationId: workflow.id,
+          tenantId: access.tenantId,
+          sourceType: evidenceInput.sourceType,
+          sourceRef: evidenceInput.sourceRef ?? null,
+          title: evidenceInput.title,
+          description: evidenceInput.description ?? null,
+          evidence: evidenceInput.evidence,
+          createdByUserId: access.userId,
+        });
+
+        await insertInvestigationEvent(
+          client,
+          workflow.id,
+          access.tenantId,
+          'investigation_evidence_added',
+          `Evidence added from ${evidenceInput.sourceType}.`,
+          access.userId,
+          {
+            sourceType: evidenceInput.sourceType,
+            sourceRef: evidenceInput.sourceRef ?? null,
+            title: evidenceInput.title,
+          },
+        );
+
+        await client.query('COMMIT');
+
+        await writeTenantAuditLog({
+          tenantId: access.tenantId,
+          userId: access.userId,
+          eventType: 'investigation.evidence',
+          source: 'customer_security',
+          message: `Added ${evidenceInput.sourceType} evidence to investigation ${investigation.id}.`,
+          payload: { investigationId: String(investigation.id), sourceType: evidenceInput.sourceType, sourceRef: evidenceInput.sourceRef ?? null },
+        });
+
+        console.info({
+          event: 'investigation_evidence_added',
+          tenantId: access.tenantId,
+          investigationId: String(investigation.id),
+          sourceType: evidenceInput.sourceType,
+        });
+
+        return c.json({ added: true, evidence: serializeInvestigationEvidence(evidence) }, 201);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error({
+        event: 'investigation_failed',
+        action: 'evidence',
+        tenantId: access.tenantId,
+        investigationId: c.req.param('id'),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return sendError(c, 500, 'investigation_failed', 'Failed to add investigation evidence');
+    }
+  });
+
+  router.post('/v1/investigations/:id/notes', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can add investigation notes.', 'investigation.notes');
+    if (denied) return denied;
+
+    const body = await c.req.json().catch(() => ({}));
+    const note = typeof body.note === 'string' ? body.note.trim() : '';
+    if (!note) {
+      return sendError(c, 400, 'invalid_request', 'note is required');
+    }
+
+    const investigation = await getAiInvestigationForTenant(access.tenantId, c.req.param('id'));
+    if (!investigation) {
+      return sendError(c, 404, 'not_found', 'Investigation not found');
+    }
+
+    try {
+      const alert = investigation.alert_id ? await getAlertForTenant(access.tenantId, investigation.alert_id) : null;
+      const pool = getPool();
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+        const workflow = await ensureWorkflowInvestigation(access, investigation, alert, client);
+        const noteResult = await client.query(
+          `INSERT INTO investigation_notes (
+             investigation_id,
+             tenant_id,
+             note,
+             created_by_user_id
+           ) VALUES ($1,$2,$3,$4)
+           RETURNING *`,
+          [workflow.id, access.tenantId, note, access.userId],
+        );
+
+        await insertInvestigationEvent(
+          client,
+          workflow.id,
+          access.tenantId,
+          'investigation_note_added',
+          'Investigation note added.',
+          access.userId,
+        );
+
+        await client.query('COMMIT');
+
+        await writeTenantAuditLog({
+          tenantId: access.tenantId,
+          userId: access.userId,
+          eventType: 'investigation.note',
+          source: 'customer_security',
+          message: `Added note to investigation ${investigation.id}.`,
+          payload: { investigationId: String(investigation.id) },
+        });
+
+        console.info({
+          event: 'investigation_note_added',
+          tenantId: access.tenantId,
+          investigationId: String(investigation.id),
+        });
+
+        const createdNote = noteResult.rows[0] as InvestigationNoteRow;
+        return c.json({
+          added: true,
+          note: {
+            id: String(createdNote.id),
+            note: createdNote.note,
+            author: {
+              userId: String(access.userId),
+              email: access.email,
+              fullName: access.fullName,
+            },
+            createdAt: toIso(createdNote.created_at),
+            updatedAt: toIso(createdNote.updated_at),
+          },
+        }, 201);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error({
+        event: 'investigation_failed',
+        action: 'note',
+        tenantId: access.tenantId,
+        investigationId: c.req.param('id'),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return sendError(c, 500, 'investigation_failed', 'Failed to add investigation note');
+    }
   });
 
   router.post('/v1/investigations/:id/review', async (c) => {
@@ -3013,23 +4124,86 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     }
 
     const notes = typeof body.notes === 'string' ? body.notes.trim() : null;
-    const pool = getPool();
-    const result = await pool.query(
-      `UPDATE ai_investigations
-       SET verdict = $3,
-           status = 'completed',
-           review_notes = $4,
-           updated_at = NOW()
-       WHERE tenant_id = $1 AND id = $2
-       RETURNING id`,
-      [access.tenantId, Number(c.req.param('id')), verdict, notes],
-    );
-
-    if (result.rowCount === 0) {
+    const investigation = await getAiInvestigationForTenant(access.tenantId, c.req.param('id'));
+    if (!investigation) {
       return sendError(c, 404, 'not_found', 'Investigation not found');
     }
 
-    return c.json({ reviewed: true });
+    try {
+      const alert = investigation.alert_id ? await getAlertForTenant(access.tenantId, investigation.alert_id) : null;
+      const pool = getPool();
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+        const workflow = await ensureWorkflowInvestigation(access, investigation, alert, client);
+        await client.query(
+          `UPDATE ai_investigations
+           SET verdict = $3,
+               status = 'completed',
+               review_notes = $4,
+               updated_at = NOW()
+           WHERE tenant_id = $1 AND id = $2`,
+          [access.tenantId, investigation.id, verdict, notes],
+        );
+        await client.query(
+          `UPDATE investigations
+           SET status = 'closed',
+               closed_at = NOW(),
+               updated_at = NOW()
+           WHERE tenant_id = $1 AND id = $2`,
+          [access.tenantId, workflow.id],
+        );
+        await insertInvestigationEvent(
+          client,
+          workflow.id,
+          access.tenantId,
+          'investigation_reviewed',
+          `Investigation reviewed with verdict ${verdict}.`,
+          access.userId,
+          { verdict },
+        );
+
+        if (notes) {
+          await client.query(
+            `INSERT INTO investigation_notes (
+               investigation_id,
+               tenant_id,
+               note,
+               created_by_user_id
+             ) VALUES ($1,$2,$3,$4)`,
+            [workflow.id, access.tenantId, notes, access.userId],
+          );
+        }
+
+        await client.query('COMMIT');
+
+        await writeTenantAuditLog({
+          tenantId: access.tenantId,
+          userId: access.userId,
+          eventType: 'investigation.review',
+          source: 'customer_security',
+          message: `Reviewed investigation ${investigation.id} with verdict ${verdict}.`,
+          payload: { investigationId: String(investigation.id), verdict },
+        });
+
+        return c.json({ reviewed: true, status: 'closed', verdict });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error({
+        event: 'investigation_failed',
+        action: 'review',
+        tenantId: access.tenantId,
+        investigationId: c.req.param('id'),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return sendError(c, 500, 'investigation_failed', 'Failed to review investigation');
+    }
   });
 
   return router;

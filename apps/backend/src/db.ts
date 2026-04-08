@@ -830,6 +830,67 @@ export async function initDatabase() {
       )
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS investigations (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        ai_investigation_id BIGINT UNIQUE REFERENCES ai_investigations(id) ON DELETE SET NULL,
+        linked_alert_id BIGINT REFERENCES alerts(id) ON DELETE SET NULL,
+        source VARCHAR(32) NOT NULL DEFAULT 'manual',
+        title TEXT NOT NULL,
+        summary TEXT,
+        status VARCHAR(32) NOT NULL DEFAULT 'open',
+        priority VARCHAR(8),
+        primary_entity_type VARCHAR(32),
+        primary_entity_key VARCHAR(255),
+        risk_context_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        closed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS investigation_evidence (
+        id BIGSERIAL PRIMARY KEY,
+        investigation_id BIGINT NOT NULL REFERENCES investigations(id) ON DELETE CASCADE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        source_type VARCHAR(32) NOT NULL,
+        source_ref VARCHAR(255),
+        title TEXT NOT NULL,
+        description TEXT,
+        evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS investigation_events (
+        id BIGSERIAL PRIMARY KEY,
+        investigation_id BIGINT NOT NULL REFERENCES investigations(id) ON DELETE CASCADE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        event_type VARCHAR(64) NOT NULL,
+        message TEXT NOT NULL,
+        actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        payload_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS investigation_notes (
+        id BIGSERIAL PRIMARY KEY,
+        investigation_id BIGINT NOT NULL REFERENCES investigations(id) ON DELETE CASCADE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        note TEXT NOT NULL,
+        created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS title TEXT`);
     await client.query(`ALTER TABLE security_alerts ADD COLUMN IF NOT EXISTS description TEXT`);
@@ -1009,12 +1070,61 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS review_notes TEXT`);
     await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`ALTER TABLE ai_investigations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS ai_investigation_id BIGINT REFERENCES ai_investigations(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS linked_alert_id BIGINT REFERENCES alerts(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS source VARCHAR(32) NOT NULL DEFAULT 'manual'`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS title TEXT`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS summary TEXT`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'open'`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS priority VARCHAR(8)`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS primary_entity_type VARCHAR(32)`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS primary_entity_key VARCHAR(255)`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS risk_context_json JSONB NOT NULL DEFAULT '{}'::jsonb`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE investigations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`UPDATE investigations SET title = COALESCE(NULLIF(title, ''), 'Investigation') WHERE title IS NULL OR title = ''`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS investigation_id BIGINT REFERENCES investigations(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS source_type VARCHAR(32) NOT NULL DEFAULT 'manual'`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS source_ref VARCHAR(255)`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS title TEXT`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS description TEXT`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`UPDATE investigation_evidence SET title = COALESCE(NULLIF(title, ''), 'Evidence') WHERE title IS NULL OR title = ''`);
+    await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS investigation_id BIGINT REFERENCES investigations(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(64) NOT NULL DEFAULT 'event'`);
+    await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS message TEXT`);
+    await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS payload_json JSONB`);
+    await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`UPDATE investigation_events SET message = COALESCE(NULLIF(message, ''), 'Investigation event') WHERE message IS NULL OR message = ''`);
+    await client.query(`ALTER TABLE investigation_notes ADD COLUMN IF NOT EXISTS investigation_id BIGINT REFERENCES investigations(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_notes ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_notes ADD COLUMN IF NOT EXISTS note TEXT`);
+    await client.query(`ALTER TABLE investigation_notes ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE investigation_notes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE investigation_notes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`UPDATE investigation_notes SET note = COALESCE(NULLIF(note, ''), 'Investigation note') WHERE note IS NULL OR note = ''`);
 
     await client.query(`CREATE INDEX IF NOT EXISTS ix_security_alerts_tenant ON security_alerts(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_security_alerts_status ON security_alerts(tenant_id, status, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_connector_configs_tenant ON connector_configs(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_connector_configs_type_status ON connector_configs(tenant_id, type, status, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_ai_investigations_tenant ON ai_investigations(tenant_id, created_at DESC)`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_investigations_ai ON investigations(ai_investigation_id) WHERE ai_investigation_id IS NOT NULL`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigations_tenant_status ON investigations(tenant_id, status, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigations_alert ON investigations(linked_alert_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_evidence_investigation ON investigation_evidence(investigation_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_evidence_tenant_type ON investigation_evidence(tenant_id, source_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_events_investigation ON investigation_events(investigation_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_events_tenant_type ON investigation_events(tenant_id, event_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_notes_investigation ON investigation_notes(investigation_id, created_at DESC)`);
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_connector_ingestion_tokens_hash ON connector_ingestion_tokens(token_hash)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_connector_ingestion_tokens_connector ON connector_ingestion_tokens(connector_id, status, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_connector_ingestion_tokens_tenant ON connector_ingestion_tokens(tenant_id, status, created_at DESC)`);
