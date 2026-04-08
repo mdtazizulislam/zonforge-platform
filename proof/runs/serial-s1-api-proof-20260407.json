@@ -1,0 +1,137 @@
+{
+  "users": {
+    "user1": "serial.s1.owner1+1775615442782@example.com",
+    "user2": "serial.s1.owner2+1775615442782@example.com"
+  },
+  "api": {
+    "login_success": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "userId": 4,
+        "tenantId": "4",
+        "membershipRole": "owner",
+        "expires_in": 900
+      }
+    },
+    "session_list_success": {
+      "status": 200,
+      "sessionCount": 3,
+      "currentSessions": [
+        {
+          "id": "e8ff85a8-e740-409d-9807-f5823d252360",
+          "current": true,
+          "deviceLabel": "Browser on Windows",
+          "revokedAt": null,
+          "revokedReason": null
+        },
+        {
+          "id": "58d3f61b-f0cd-45e0-a3fe-2aa633a3f5cb",
+          "current": false,
+          "deviceLabel": "Browser on Windows",
+          "revokedAt": null,
+          "revokedReason": null
+        },
+        {
+          "id": "7a37f797-cc83-4989-aed0-00b97f3da549",
+          "current": false,
+          "deviceLabel": "Browser on Windows",
+          "revokedAt": null,
+          "revokedReason": null
+        }
+      ]
+    },
+    "refresh_success": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "expires_in": 900,
+        "sessionId": "e8ff85a8-e740-409d-9807-f5823d252360"
+      }
+    },
+    "invalid_refresh_rejected": {
+      "status": 401,
+      "body": {
+        "error": {
+          "code": "refresh_token_reuse_detected",
+          "message": "Refresh token reuse detected. Session revoked."
+        }
+      }
+    },
+    "bogus_refresh_rejected": {
+      "status": 401,
+      "body": {
+        "error": {
+          "code": "invalid_refresh_token",
+          "message": "Refresh token is invalid or expired."
+        }
+      }
+    },
+    "logout_success": {
+      "status": 200,
+      "body": {
+        "success": true
+      }
+    },
+    "logout_all_success": {
+      "status": 200,
+      "body": {
+        "success": true,
+        "revokedCount": 6
+      }
+    },
+    "final_user1_sessions": {
+      "status": 200,
+      "items": [
+        {
+          "id": "e795c57d-c125-4e9c-ad2b-d970e5ca6a29",
+          "current": true,
+          "deviceLabel": "Browser on Windows",
+          "revokedAt": null,
+          "revokedReason": null
+        },
+        {
+          "id": "c8f1856a-e20a-480b-9d9c-3a999e0f2e51",
+          "current": false,
+          "deviceLabel": "Browser on Windows",
+          "revokedAt": "2026-04-08T02:30:44.361Z",
+          "revokedReason": "logout_all"
+        },
+        {
+          "id": "34b0bb52-8729-49eb-b5fd-c3d5291a7b25",
+          "current": false,
+          "deviceLabel": "Browser on Windows",
+          "revokedAt": "2026-04-08T02:30:44.361Z",
+          "revokedReason": "logout_all"
+        },
+        {
+          "id": "1dffda1c-93cd-4fc0-baa9-f93a7170eacc",
+          "current": false,
+          "deviceLabel": "Browser on Windows",
+          "revokedAt": "2026-04-08T02:30:44.055Z",
+          "revokedReason": "logout"
+        }
+      ]
+    }
+  },
+  "security": {
+    "refresh_reuse_detected": {
+      "status": 401,
+      "code": "refresh_token_reuse_detected",
+      "message": "Refresh token reuse detected. Session revoked."
+    },
+    "cross_user_session_revoke_blocked": {
+      "status": 404,
+      "code": "session_not_found",
+      "message": "Session not found."
+    },
+    "tenant_isolation_preserved": {
+      "user1SessionId": "e795c57d-c125-4e9c-ad2b-d970e5ca6a29",
+      "user2SessionIds": [
+        "b20d447d-2c16-4d93-96d3-a4ea70ecc34c",
+        "0824d8f0-11ba-449e-bacb-2c9b33afd6f1"
+      ],
+      "containsUser1Session": false
+    }
+  }
+}

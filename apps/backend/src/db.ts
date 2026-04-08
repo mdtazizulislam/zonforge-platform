@@ -361,9 +361,65 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id BIGSERIAL PRIMARY KEY,
+        session_id UUID NOT NULL UNIQUE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_family UUID NOT NULL UNIQUE,
+        created_ip VARCHAR(128),
+        last_ip VARCHAR(128),
+        user_agent TEXT,
+        device_type VARCHAR(32) NOT NULL DEFAULT 'desktop',
+        browser VARCHAR(64) NOT NULL DEFAULT 'Unknown',
+        operating_system VARCHAR(64) NOT NULL DEFAULT 'Unknown',
+        mfa_required BOOLEAN NOT NULL DEFAULT false,
+        mfa_verified_at TIMESTAMPTZ,
+        last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        revoked_at TIMESTAMPTZ,
+        revoked_reason VARCHAR(64),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS auth_events (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        session_id UUID REFERENCES user_sessions(session_id) ON DELETE SET NULL,
+        event_type VARCHAR(64) NOT NULL,
+        ip_address VARCHAR(128),
+        user_agent TEXT,
+        error_code VARCHAR(64),
+        metadata_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mfa_enrollments (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        method VARCHAR(32) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+        secret_ciphertext TEXT,
+        recovery_codes_ciphertext TEXT,
+        enrolled_at TIMESTAMPTZ,
+        verified_at TIMESTAMPTZ,
+        last_used_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
         id BIGSERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        session_id UUID REFERENCES user_sessions(session_id) ON DELETE SET NULL,
         token_hash VARCHAR(128) NOT NULL UNIQUE,
         token_family UUID NOT NULL,
         expires_at TIMESTAMPTZ NOT NULL,
@@ -896,8 +952,17 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_webhook_events_type ON billing_webhook_events(event_type)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_tenant ON billing_audit_logs(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_event_type ON billing_audit_logs(event_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_user_sessions_user ON user_sessions(user_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_user_sessions_tenant ON user_sessions(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_user_sessions_active ON user_sessions(user_id, tenant_id, revoked_at)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_events_tenant ON auth_events(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_events_user ON auth_events(user_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_events_type ON auth_events(event_type, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_user ON auth_refresh_tokens(user_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_family ON auth_refresh_tokens(token_family, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_auth_refresh_tokens_session ON auth_refresh_tokens(session_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_mfa_enrollments_user ON mfa_enrollments(user_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_mfa_enrollments_tenant ON mfa_enrollments(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_email_events_type ON email_events(email_type, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_conversion_events_name ON conversion_events(event_name, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_analytics_events_name ON analytics_events(event_name, created_at DESC)`);

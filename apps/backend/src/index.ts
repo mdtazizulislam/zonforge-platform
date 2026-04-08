@@ -3,7 +3,23 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { initDatabase, getPool } from './db.js';
-import { AuthFlowError, acceptTeamInvite, createWorkspaceSignup, getTeamInvitePreview, loginUser, verifyJWT, getTenantIdForUser, rotateRefreshToken, revokeRefreshToken } from './auth.js';
+import {
+  AuthFlowError,
+  acceptTeamInvite,
+  createWorkspaceSignup,
+  getTeamInvitePreview,
+  getTenantIdForUser,
+  listUserSessions,
+  loginUser,
+  recordAuthEvent,
+  revokeAllUserSessions,
+  revokeCurrentSessionByAccessToken,
+  revokeRefreshToken,
+  revokeUserSession,
+  rotateRefreshToken,
+  type JWTPayload,
+  verifyActiveAccessToken,
+} from './auth.js';
 import {
   createCheckoutSessionForTenant,
   getTenantBillingStatus,
@@ -174,19 +190,27 @@ app.get('/health', (c) => {
   return c.json({ status: 'healthy' });
 });
 
-function requireAuthUserId(c: any): number | null {
+function getBearerToken(c: any): string | null {
   const authHeader = c.req.header('Authorization');
   if (!authHeader) {
     return null;
   }
 
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-  const payload = verifyJWT(token);
-  if (!payload) {
+  return authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+}
+
+async function requireAuthPayload(c: any): Promise<JWTPayload | null> {
+  const token = getBearerToken(c);
+  if (!token) {
     return null;
   }
 
-  return payload.userId;
+  return verifyActiveAccessToken(token);
+}
+
+async function requireAuthUserId(c: any): Promise<number | null> {
+  const payload = await requireAuthPayload(c);
+  return payload?.userId ?? null;
 }
 
 function resolveFrontendOrigin(c: any): string {
@@ -355,7 +379,7 @@ function normalizeCheckoutRequest(body: Record<string, unknown>) {
 }
 
 async function handleCheckoutRequest(c: any) {
-  const userId = requireAuthUserId(c);
+  const userId = await requireAuthUserId(c);
   if (!userId) {
     return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
@@ -469,6 +493,16 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
       metadata: { emailDomain: email.split('@')[1] ?? null },
     });
 
+    await recordAuthEvent(getPool(), {
+      tenantId,
+      userId,
+      sessionId: tokens.sessionId,
+      eventType: 'login_success',
+      ip: clientIp,
+      userAgent,
+      metadata: { email },
+    });
+
     return c.json({
       success: true,
       userId,
@@ -484,7 +518,7 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
       refresh_expires_at: tokens.refreshExpiresAt,
     });
   } catch (error) {
-    if ((error as Error).message === 'Invalid credentials') {
+    if (error instanceof AuthFlowError && error.code === 'invalid_credentials') {
       await writeAuditLog({
         eventType: 'auth.login_failed',
         message: 'Failed login attempt',
@@ -499,7 +533,18 @@ app.post(`${API_PREFIX}/auth/login`, async (c) => {
         ip: getClientIp(c),
       });
 
+      await recordAuthEvent(getPool(), {
+        eventType: 'login_failed',
+        ip: getClientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+        errorCode: 'invalid_credentials',
+      });
+
       return sendError(c, 401, 'invalid_credentials', 'Invalid email or password.');
+    }
+
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
     }
 
     const normalized = normalizeAppError(error);
@@ -539,7 +584,7 @@ app.post(`${API_PREFIX}/auth/invite/accept`, async (c) => {
           ? body.full_name
           : null,
       password: typeof body.password === 'string' ? body.password : null,
-      authUserId: requireAuthUserId(c),
+      authUserId: await requireAuthUserId(c),
       metadata: {
         ip: clientIp,
         userAgent,
@@ -614,9 +659,18 @@ app.post(`${API_PREFIX}/auth/refresh`, async (c) => {
       eventType: 'auth.refresh',
       message: 'Access token refreshed',
       userId: rotated.userId,
-      tenantId: await getTenantIdForUser(rotated.userId),
+      tenantId: rotated.tenantId,
       source: 'auth',
       payload: { ip: getClientIp(c) },
+    });
+
+    await recordAuthEvent(getPool(), {
+      tenantId: rotated.tenantId,
+      userId: rotated.userId,
+      sessionId: rotated.sessionId,
+      eventType: 'refresh_success',
+      ip: getClientIp(c),
+      userAgent: c.req.header('user-agent') ?? null,
     });
 
     return c.json({
@@ -628,7 +682,20 @@ app.post(`${API_PREFIX}/auth/refresh`, async (c) => {
       refresh_expires_at: rotated.tokens.refreshExpiresAt,
     });
   } catch (error) {
-    return sendError(c, 401, 'invalid_refresh_token', 'Refresh token is invalid or expired.');
+    const authError = error instanceof AuthFlowError
+      ? error
+      : new AuthFlowError(401, 'invalid_refresh_token', 'Refresh token is invalid or expired.');
+
+    if (authError.code !== 'refresh_token_reuse_detected') {
+      await recordAuthEvent(getPool(), {
+        eventType: 'refresh_failed',
+        ip: getClientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+        errorCode: authError.code,
+      });
+    }
+
+    return sendError(c, authError.status, authError.code, authError.message);
   }
 });
 
@@ -636,13 +703,133 @@ app.post(`${API_PREFIX}/auth/logout`, async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const refreshToken = typeof body.refresh_token === 'string' ? body.refresh_token.trim() : '';
+    const accessToken = getBearerToken(c);
     if (refreshToken) {
-      await revokeRefreshToken(refreshToken);
+      await revokeRefreshToken(refreshToken, {
+        ip: getClientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+      });
+    } else if (accessToken) {
+      await revokeCurrentSessionByAccessToken(accessToken, {
+        ip: getClientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+      });
     }
 
     return c.json({ success: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
+    }
+
     return sendError(c, 400, 'logout_failed', 'Could not complete logout.');
+  }
+});
+
+app.post(`${API_PREFIX}/auth/logout-all`, async (c) => {
+  const payload = await requireAuthPayload(c);
+  if (!payload) {
+    return sendError(c, 401, 'unauthorized', 'Unauthorized');
+  }
+
+  const tenantId = await getTenantIdForUser(payload.userId);
+  if (!tenantId) {
+    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
+  }
+
+  try {
+    const result = await revokeAllUserSessions({
+      userId: payload.userId,
+      tenantId,
+      metadata: {
+        ip: getClientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+      },
+    });
+
+    await writeAuditLog({
+      eventType: 'auth.logout_all',
+      message: 'All sessions revoked',
+      tenantId,
+      userId: payload.userId,
+      source: 'auth',
+      payload: {
+        revokedCount: result.revokedCount,
+        ip: getClientIp(c),
+      },
+    });
+
+    return c.json({ success: true, revokedCount: result.revokedCount });
+  } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
+    }
+
+    return sendError(c, 400, 'logout_all_failed', 'Could not revoke all sessions.');
+  }
+});
+
+app.get(`${API_PREFIX}/auth/sessions`, async (c) => {
+  const payload = await requireAuthPayload(c);
+  if (!payload) {
+    return sendError(c, 401, 'unauthorized', 'Unauthorized');
+  }
+
+  const tenantId = await getTenantIdForUser(payload.userId);
+  if (!tenantId) {
+    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
+  }
+
+  const items = await listUserSessions(payload.userId, tenantId, payload.sessionId);
+  return c.json({ success: true, items });
+});
+
+app.delete(`${API_PREFIX}/auth/sessions/:id`, async (c) => {
+  const payload = await requireAuthPayload(c);
+  if (!payload) {
+    return sendError(c, 401, 'unauthorized', 'Unauthorized');
+  }
+
+  const tenantId = await getTenantIdForUser(payload.userId);
+  if (!tenantId) {
+    return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
+  }
+
+  const sessionId = c.req.param('id')?.trim() ?? '';
+  if (!/^[0-9a-fA-F-]{36}$/.test(sessionId)) {
+    return sendError(c, 400, 'invalid_session_id', 'Session id is invalid.');
+  }
+
+  try {
+    const revoked = await revokeUserSession({
+      actorUserId: payload.userId,
+      tenantId,
+      sessionId,
+      metadata: {
+        ip: getClientIp(c),
+        userAgent: c.req.header('user-agent') ?? null,
+      },
+    });
+
+    await writeAuditLog({
+      eventType: 'auth.session_revoked',
+      message: 'Session revoked',
+      tenantId,
+      userId: payload.userId,
+      source: 'auth',
+      payload: {
+        revokedSessionId: sessionId,
+        ip: getClientIp(c),
+      },
+    });
+
+    return c.json({ success: true, revoked: revoked.revoked, session: revoked.session });
+  } catch (error) {
+    if (error instanceof AuthFlowError) {
+      return sendError(c, error.status, error.code, error.message);
+    }
+
+    return sendError(c, 400, 'session_revoke_failed', 'Could not revoke the session.');
   }
 });
 
@@ -677,7 +864,7 @@ app.post(`${API_PREFIX}/support/contact`, async (c) => {
       return sendError(c, 400, 'invalid_support_request', 'name and message are required.');
     }
 
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     const tenantId = userId ? await getTenantIdForUser(userId) : null;
 
     const supportRecord = await storeSupportRequest({
@@ -726,7 +913,7 @@ app.post(`${API_PREFIX}/support/error-report`, async (c) => {
       return sendError(c, 400, 'invalid_error_report', 'message is required.');
     }
 
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     const tenantId = userId ? await getTenantIdForUser(userId) : null;
 
     await storeErrorReport({
@@ -753,7 +940,7 @@ app.post(`${API_PREFIX}/analytics/track`, async (c) => {
       return sendError(c, 400, 'event_required', 'event is required.');
     }
 
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     const tenantId = userId ? await getTenantIdForUser(userId) : null;
 
     await trackAnalyticsEvent({
@@ -800,7 +987,7 @@ app.get(`${API_PREFIX}/analytics/funnel`, async (c) => {
 });
 
 app.get(`${API_PREFIX}/onboarding/get-started`, async (c) => {
-  const userId = requireAuthUserId(c);
+  const userId = await requireAuthUserId(c);
   if (!userId) {
     return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
@@ -872,17 +1059,10 @@ app.get(`${API_PREFIX}/growth/proof`, async (c) => {
 
 // Protected route example
 app.get(`${API_PREFIX}/users`, async (c) => {
-  const authHeader = c.req.header('Authorization');
-
-  if (!authHeader) {
-    return sendError(c, 401, 'unauthorized', 'Unauthorized');
-  }
-
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-  const payload = verifyJWT(token);
+  const payload = await requireAuthPayload(c);
 
   if (!payload) {
-    return sendError(c, 401, 'invalid_token', 'Invalid token');
+    return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
 
   const pool = getPool();
@@ -955,7 +1135,7 @@ app.post(`${API_PREFIX}/billing/checkout-session`, async (c) => {
 
 app.get(`${API_PREFIX}/billing/status`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) {
       return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
@@ -983,7 +1163,7 @@ app.get(`${API_PREFIX}/billing/status`, async (c) => {
 // GET /billing/subscription — detailed subscription object (09.6)
 app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) return sendError(c, 401, 'unauthorized', 'Unauthorized');
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
@@ -1035,7 +1215,7 @@ app.get(`${API_PREFIX}/billing/plans`, async (c) => {
 
 app.get(`${API_PREFIX}/billing/usage`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) {
       return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
@@ -1060,7 +1240,7 @@ app.get(`${API_PREFIX}/billing/usage`, async (c) => {
 
 app.post(`${API_PREFIX}/billing/portal`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) {
       return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
@@ -1080,7 +1260,7 @@ app.post(`${API_PREFIX}/billing/portal`, async (c) => {
 
 app.post(`${API_PREFIX}/billing/change-plan`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) {
       return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
@@ -1111,7 +1291,7 @@ app.post(`${API_PREFIX}/billing/change-plan`, async (c) => {
 
 app.post(`${API_PREFIX}/billing/cancel`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) {
       return sendError(c, 401, 'unauthorized', 'Unauthorized');
     }
@@ -1137,7 +1317,7 @@ app.post(`${API_PREFIX}/billing/cancel`, async (c) => {
 });
 
 app.get(`${API_PREFIX}/billing/access-check`, isActiveUser, async (c) => {
-  return c.json({ allowed: true, userId: requireAuthUserId(c) });
+  return c.json({ allowed: true, userId: await requireAuthUserId(c) });
 });
 
 // Internal centralized enforcement endpoints (used by other services).
@@ -1192,7 +1372,7 @@ app.post(`${API_PREFIX}/billing/internal/increment-usage`, async (c) => {
 
 app.post(`${API_PREFIX}/ai/analyze`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) return c.json({ error: 'User has no associated tenant' }, 400);
@@ -1208,7 +1388,7 @@ app.post(`${API_PREFIX}/ai/analyze`, async (c) => {
 
 app.post(`${API_PREFIX}/reports/export`, async (c) => {
   try {
-    const userId = requireAuthUserId(c);
+    const userId = await requireAuthUserId(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) return c.json({ error: 'User has no associated tenant' }, 400);

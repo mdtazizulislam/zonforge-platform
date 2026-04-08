@@ -339,8 +339,8 @@ function parseIngestionBody(rawBody: string): ParsedIngestionRequest {
   };
 }
 
-async function getTenantAccess(c: any, requireAuthUserId: (c: any) => number | null): Promise<TenantAccess | Response> {
-  const userId = requireAuthUserId(c);
+async function getTenantAccess(c: any, requireAuthUserId: (c: any) => Promise<number | null>): Promise<TenantAccess | Response> {
+  const userId = await requireAuthUserId(c);
   if (!userId) {
     return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
@@ -1115,7 +1115,7 @@ export function createEventPipelineRuntime(options: EventPipelineOptions) {
 }
 
 export function createEventPipelineRouter(
-  requireAuthUserId: (c: any) => number | null,
+  requireAuthUserId: (c: any) => Promise<number | null>,
   runtime: EventPipelineRuntime,
 ) {
   const router = new Hono();

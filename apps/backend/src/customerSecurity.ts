@@ -538,8 +538,8 @@ function percentile(values: number[], fraction: number): number | null {
   return values[index] ?? null;
 }
 
-async function getTenantAccess(c: any, requireAuthUserId: (c: any) => number | null): Promise<TenantAccess | Response> {
-  const userId = requireAuthUserId(c);
+async function getTenantAccess(c: any, requireAuthUserId: (c: any) => Promise<number | null>): Promise<TenantAccess | Response> {
+  const userId = await requireAuthUserId(c);
   if (!userId) {
     return sendError(c, 401, 'unauthorized', 'Unauthorized');
   }
@@ -920,7 +920,7 @@ async function buildAssistantReply(tenantId: number, message: string) {
   };
 }
 
-export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => number | null) {
+export function createCustomerSecurityRouter(requireAuthUserId: (c: any) => Promise<number | null>) {
   const router = new Hono();
 
   router.get('/v1/auth/me', async (c) => {
