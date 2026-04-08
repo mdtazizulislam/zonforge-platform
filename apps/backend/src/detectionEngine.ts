@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { getPool } from './db.js';
 import { materializeAlertForFinding } from './alertSystem.js';
 
-type DetectionRuleKey = 'suspicious_login' | 'brute_force' | 'privilege_escalation';
+type DetectionRuleKey = 'suspicious_login' | 'brute_force' | 'privilege_escalation' | 'ingestion_anomaly';
 
 type DetectionEvent = {
   id: number;
@@ -18,8 +18,34 @@ type DetectionEvent = {
   normalizedPayload: Record<string, unknown>;
 };
 
-type DetectionFindingInput = {
-  findingKey: string;
+type IngestionSecurityDetectionEvent = {
+  id: number;
+  tenantId: number;
+  connectorId: number | null;
+  sourceType: string | null;
+  eventType: 'rate_limited' | 'replay_detected' | 'anomaly_detected';
+  requestId: string | null;
+  clientIp: string | null;
+  tokenPrefix: string | null;
+  reasonCode: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+type DetectionRecordEvent = {
+  normalizedEventId?: number | null;
+  ingestionSecurityEventId?: number | null;
+  eventKind: string;
+  eventTime: string;
+  sourceEventId?: string | null;
+  actorEmail?: string | null;
+  actorIp?: string | null;
+  targetResource?: string | null;
+  evidence: Record<string, unknown>;
+};
+
+type DetectionRecordInput = {
+  detectionKey: string;
   ruleKey: DetectionRuleKey;
   tenantId: number;
   connectorId: number | null;
@@ -33,6 +59,7 @@ type DetectionFindingInput = {
   lastEventAt: string;
   eventCount: number;
   evidence: Record<string, unknown>;
+  eventRows: DetectionRecordEvent[];
 };
 
 type HistoricalEventRow = {
@@ -54,13 +81,20 @@ type AggregateRow = {
 const BRUTE_FORCE_THRESHOLD = Math.max(2, Number(process.env.ZONFORGE_DETECTION_BRUTE_FORCE_THRESHOLD ?? 5));
 const BRUTE_FORCE_WINDOW_MINUTES = Math.max(1, Number(process.env.ZONFORGE_DETECTION_BRUTE_FORCE_WINDOW_MINUTES ?? 10));
 const SUSPICIOUS_LOGIN_LOOKBACK_HOURS = Math.max(1, Number(process.env.ZONFORGE_DETECTION_SUSPICIOUS_LOGIN_LOOKBACK_HOURS ?? 24));
+const INGESTION_ANOMALY_BUCKET_MINUTES = Math.max(1, Number(process.env.ZONFORGE_DETECTION_INGESTION_ANOMALY_BUCKET_MINUTES ?? 10));
 
 function toIso(value: string | Date): string {
   return new Date(value).toISOString();
 }
 
-function hashFindingKey(parts: Array<string | number | null | undefined>): string {
+function hashDetectionKey(parts: Array<string | number | null | undefined>): string {
   return createHash('sha256').update(parts.map((part) => String(part ?? '')).join('|')).digest('hex');
+}
+
+function bucketIso(value: string, windowMinutes: number): string {
+  const timestamp = new Date(value).getTime();
+  const bucketMs = windowMinutes * 60_000;
+  return new Date(Math.floor(timestamp / bucketMs) * bucketMs).toISOString();
 }
 
 function buildEvidenceEvent(event: Pick<DetectionEvent, 'id' | 'eventTime' | 'actorEmail' | 'actorIp' | 'targetResource' | 'sourceEventId' | 'canonicalEventType'>) {
@@ -84,7 +118,136 @@ function classifyPrivilegeSeverity(event: DetectionEvent): 'high' | 'critical' {
   return /(owner|admin|global admin|super.?user|root|privilege admin)/.test(flattened) ? 'critical' : 'high';
 }
 
-async function insertFinding(input: DetectionFindingInput) {
+function emitRuleTriggered(payload: Record<string, unknown>) {
+  console.info('detection_rule_triggered', payload);
+  console.info('detection_rule_matched', payload);
+}
+
+async function insertDetection(input: DetectionRecordInput) {
+  const pool = getPool();
+  const result = await pool.query(
+    `INSERT INTO detections (
+       rule_id,
+       tenant_id,
+       connector_id,
+       detection_key,
+       rule_key,
+       severity,
+       title,
+       explanation,
+       mitre_tactic,
+       mitre_technique,
+       source_type,
+       first_event_at,
+       last_event_at,
+       event_count,
+       evidence_json,
+       created_at,
+       updated_at
+     )
+     SELECT
+       dr.id,
+       $1::integer,
+       $2::bigint,
+       $3::varchar(128),
+       $4::varchar(64),
+       $5::varchar(32),
+       $6::text,
+       $7::text,
+       $8::varchar(128),
+       $9::varchar(128),
+       $10::varchar(64),
+       $11::timestamptz,
+       $12::timestamptz,
+       $13::integer,
+       $14::jsonb,
+       NOW(),
+       NOW()
+     FROM detection_rules dr
+     WHERE dr.rule_key = $4::varchar(64) AND dr.enabled = TRUE
+     ON CONFLICT (detection_key) DO NOTHING
+     RETURNING id`,
+    [
+      input.tenantId,
+      input.connectorId,
+      input.detectionKey,
+      input.ruleKey,
+      input.severity,
+      input.title,
+      input.explanation,
+      input.mitreTactic,
+      input.mitreTechnique,
+      input.sourceType,
+      input.firstEventAt,
+      input.lastEventAt,
+      input.eventCount,
+      JSON.stringify(input.evidence),
+    ],
+  );
+
+  const detectionId = result.rows[0]?.id as number | undefined;
+  if (detectionId == null) {
+    return null;
+  }
+
+  for (const eventRow of input.eventRows) {
+    await pool.query(
+      `INSERT INTO detection_events (
+         detection_id,
+         tenant_id,
+         normalized_event_id,
+         ingestion_security_event_id,
+         event_kind,
+         event_time,
+         source_event_id,
+         actor_email,
+         actor_ip,
+         target_resource,
+         evidence_json,
+         created_at
+       ) VALUES (
+         $1::bigint,
+         $2::integer,
+         $3::bigint,
+         $4::bigint,
+         $5::varchar(64),
+         $6::timestamptz,
+         $7::varchar(255),
+         $8::varchar(255),
+         $9::varchar(128),
+         $10::varchar(512),
+         $11::jsonb,
+         NOW()
+       )`,
+      [
+        detectionId,
+        input.tenantId,
+        eventRow.normalizedEventId ?? null,
+        eventRow.ingestionSecurityEventId ?? null,
+        eventRow.eventKind,
+        eventRow.eventTime,
+        eventRow.sourceEventId ?? null,
+        eventRow.actorEmail ?? null,
+        eventRow.actorIp ?? null,
+        eventRow.targetResource ?? null,
+        JSON.stringify(eventRow.evidence),
+      ],
+    );
+  }
+
+  console.info('detection_created', {
+    detectionId: String(detectionId),
+    tenantId: input.tenantId,
+    ruleKey: input.ruleKey,
+    severity: input.severity,
+    sourceType: input.sourceType,
+    eventCount: input.eventCount,
+  });
+
+  return detectionId;
+}
+
+async function insertLegacyFinding(input: DetectionRecordInput) {
   const pool = getPool();
   const result = await pool.query(
     `INSERT INTO detection_findings (
@@ -131,7 +294,7 @@ async function insertFinding(input: DetectionFindingInput) {
     [
       input.tenantId,
       input.connectorId,
-      input.findingKey,
+      input.detectionKey,
       input.ruleKey,
       input.severity,
       input.title,
@@ -146,28 +309,37 @@ async function insertFinding(input: DetectionFindingInput) {
     ],
   );
 
-  const createdId = result.rows[0]?.id;
-  if (createdId != null) {
-    console.info('detection_finding_created', {
+  const createdId = result.rows[0]?.id as number | undefined;
+  if (createdId == null) {
+    return null;
+  }
+
+  console.info('detection_finding_created', {
+    findingId: String(createdId),
+    tenantId: input.tenantId,
+    ruleKey: input.ruleKey,
+    severity: input.severity,
+    sourceType: input.sourceType,
+    eventCount: input.eventCount,
+  });
+
+  try {
+    await materializeAlertForFinding(Number(createdId));
+  } catch (error) {
+    console.error('alert_materialization_failed', {
       findingId: String(createdId),
       tenantId: input.tenantId,
       ruleKey: input.ruleKey,
-      severity: input.severity,
-      sourceType: input.sourceType,
-      eventCount: input.eventCount,
+      error: error instanceof Error ? error.message : 'unknown',
     });
-
-    try {
-      await materializeAlertForFinding(Number(createdId));
-    } catch (error) {
-      console.error('alert_materialization_failed', {
-        findingId: String(createdId),
-        tenantId: input.tenantId,
-        ruleKey: input.ruleKey,
-        error: error instanceof Error ? error.message : 'unknown',
-      });
-    }
   }
+
+  return createdId;
+}
+
+async function persistDetection(input: DetectionRecordInput) {
+  await insertDetection(input);
+  await insertLegacyFinding(input);
 }
 
 async function evaluateSuspiciousLogin(event: DetectionEvent) {
@@ -198,7 +370,7 @@ async function evaluateSuspiciousLogin(event: DetectionEvent) {
   }
 
   const firstEventAt = toIso(historical[historical.length - 1]!.event_time);
-  const findingKey = hashFindingKey([
+  const detectionKey = hashDetectionKey([
     event.tenantId,
     'suspicious_login',
     event.actorEmail.toLowerCase(),
@@ -206,7 +378,7 @@ async function evaluateSuspiciousLogin(event: DetectionEvent) {
     event.eventTime.slice(0, 10),
   ]);
 
-  console.info('detection_rule_matched', {
+  emitRuleTriggered({
     tenantId: event.tenantId,
     ruleKey: 'suspicious_login',
     normalizedEventId: String(event.id),
@@ -215,8 +387,27 @@ async function evaluateSuspiciousLogin(event: DetectionEvent) {
     historicalIpCount: historical.length,
   });
 
-  await insertFinding({
-    findingKey,
+  const historicalEvents = historical.map((row) => ({
+    normalizedEventId: row.id,
+    eventKind: 'normalized_event',
+    eventTime: toIso(row.event_time),
+    sourceEventId: row.source_event_id,
+    actorEmail: event.actorEmail,
+    actorIp: row.actor_ip,
+    targetResource: row.target_resource,
+    evidence: {
+      normalizedEventId: String(row.id),
+      canonicalEventType: 'signin_success',
+      eventTime: toIso(row.event_time),
+      actorEmail: event.actorEmail,
+      actorIp: row.actor_ip,
+      targetResource: row.target_resource,
+      sourceEventId: row.source_event_id,
+    },
+  }));
+
+  await persistDetection({
+    detectionKey,
     ruleKey: 'suspicious_login',
     tenantId: event.tenantId,
     connectorId: event.connectorId,
@@ -246,6 +437,19 @@ async function evaluateSuspiciousLogin(event: DetectionEvent) {
         })),
       ],
     },
+    eventRows: [
+      {
+        normalizedEventId: event.id,
+        eventKind: 'normalized_event',
+        eventTime: event.eventTime,
+        sourceEventId: event.sourceEventId,
+        actorEmail: event.actorEmail,
+        actorIp: event.actorIp,
+        targetResource: event.targetResource,
+        evidence: buildEvidenceEvent(event),
+      },
+      ...historicalEvents,
+    ],
   });
 }
 
@@ -279,17 +483,15 @@ async function evaluateBruteForce(event: DetectionEvent) {
     return;
   }
 
-  const bucketTime = new Date(aggregate.last_event_at).getTime();
-  const bucketStart = new Date(Math.floor(bucketTime / (BRUTE_FORCE_WINDOW_MINUTES * 60_000)) * BRUTE_FORCE_WINDOW_MINUTES * 60_000).toISOString();
-  const findingKey = hashFindingKey([
+  const detectionKey = hashDetectionKey([
     event.tenantId,
     'brute_force',
     actorField,
     actorValue.toLowerCase(),
-    bucketStart,
+    bucketIso(toIso(aggregate.last_event_at), BRUTE_FORCE_WINDOW_MINUTES),
   ]);
 
-  console.info('detection_rule_matched', {
+  emitRuleTriggered({
     tenantId: event.tenantId,
     ruleKey: 'brute_force',
     normalizedEventId: String(event.id),
@@ -298,8 +500,8 @@ async function evaluateBruteForce(event: DetectionEvent) {
     eventCount,
   });
 
-  await insertFinding({
-    findingKey,
+  await persistDetection({
+    detectionKey,
     ruleKey: 'brute_force',
     tenantId: event.tenantId,
     connectorId: event.connectorId,
@@ -320,6 +522,25 @@ async function evaluateBruteForce(event: DetectionEvent) {
       normalizedEventIds: (aggregate.event_ids ?? []).slice(0, 10).map((id) => String(id)),
       sourceEventIds: (aggregate.source_event_ids ?? []).filter((value): value is string => typeof value === 'string').slice(0, 10),
     },
+    eventRows: [
+      {
+        normalizedEventId: event.id,
+        eventKind: 'normalized_event_window',
+        eventTime: event.eventTime,
+        sourceEventId: event.sourceEventId,
+        actorEmail: event.actorEmail,
+        actorIp: event.actorIp,
+        targetResource: event.targetResource,
+        evidence: {
+          actorEmail: event.actorEmail,
+          actorIp: event.actorIp,
+          threshold: BRUTE_FORCE_THRESHOLD,
+          windowMinutes: BRUTE_FORCE_WINDOW_MINUTES,
+          normalizedEventIds: (aggregate.event_ids ?? []).slice(0, 10).map((id) => String(id)),
+          sourceEventIds: (aggregate.source_event_ids ?? []).filter((value): value is string => typeof value === 'string').slice(0, 10),
+        },
+      },
+    ],
   });
 }
 
@@ -329,13 +550,13 @@ async function evaluatePrivilegeEscalation(event: DetectionEvent) {
   }
 
   const severity = classifyPrivilegeSeverity(event);
-  const findingKey = hashFindingKey([
+  const detectionKey = hashDetectionKey([
     event.tenantId,
     'privilege_escalation',
     event.sourceEventId ?? event.id,
   ]);
 
-  console.info('detection_rule_matched', {
+  emitRuleTriggered({
     tenantId: event.tenantId,
     ruleKey: 'privilege_escalation',
     normalizedEventId: String(event.id),
@@ -344,8 +565,8 @@ async function evaluatePrivilegeEscalation(event: DetectionEvent) {
     severity,
   });
 
-  await insertFinding({
-    findingKey,
+  await persistDetection({
+    detectionKey,
     ruleKey: 'privilege_escalation',
     tenantId: event.tenantId,
     connectorId: event.connectorId,
@@ -364,7 +585,123 @@ async function evaluatePrivilegeEscalation(event: DetectionEvent) {
       targetResource: event.targetResource,
       events: [buildEvidenceEvent(event)],
     },
+    eventRows: [
+      {
+        normalizedEventId: event.id,
+        eventKind: 'normalized_event',
+        eventTime: event.eventTime,
+        sourceEventId: event.sourceEventId,
+        actorEmail: event.actorEmail,
+        actorIp: event.actorIp,
+        targetResource: event.targetResource,
+        evidence: buildEvidenceEvent(event),
+      },
+    ],
   });
+}
+
+function buildIngestionAnomalyTitle(event: IngestionSecurityDetectionEvent) {
+  switch (event.eventType) {
+    case 'rate_limited':
+      return 'Ingestion throttling detected';
+    case 'replay_detected':
+      return 'Ingestion replay activity detected';
+    default:
+      return 'Ingestion anomaly detected';
+  }
+}
+
+function buildIngestionAnomalyExplanation(event: IngestionSecurityDetectionEvent) {
+  switch (event.eventType) {
+    case 'rate_limited':
+      return `The ingestion edge rate-limited connector traffic${event.clientIp ? ` from ${event.clientIp}` : ''}${event.reasonCode ? ` due to ${event.reasonCode}` : ''}.`;
+    case 'replay_detected':
+      return 'The ingestion edge rejected a replayed source event before queueing a duplicate batch.';
+    default:
+      return `The ingestion edge recorded anomaly telemetry${event.reasonCode ? ` for ${event.reasonCode}` : ''}.`;
+  }
+}
+
+function buildIngestionAnomalySeverity(event: IngestionSecurityDetectionEvent): 'medium' | 'high' {
+  if (event.eventType === 'rate_limited') {
+    return 'high';
+  }
+  if (event.reasonCode === 'queue_overload' || event.reasonCode === 'payload_too_large') {
+    return 'high';
+  }
+  return 'medium';
+}
+
+export async function evaluateDetectionsForIngestionSecurityEvent(event: IngestionSecurityDetectionEvent) {
+  try {
+    const severity = buildIngestionAnomalySeverity(event);
+    const detectionKey = hashDetectionKey([
+      event.tenantId,
+      'ingestion_anomaly',
+      event.eventType,
+      event.reasonCode,
+      event.tokenPrefix,
+      event.clientIp,
+      bucketIso(event.createdAt, INGESTION_ANOMALY_BUCKET_MINUTES),
+    ]);
+
+    emitRuleTriggered({
+      tenantId: event.tenantId,
+      ruleKey: 'ingestion_anomaly',
+      ingestionSecurityEventId: String(event.id),
+      securityEventType: event.eventType,
+      reasonCode: event.reasonCode,
+      severity,
+    });
+
+    await persistDetection({
+      detectionKey,
+      ruleKey: 'ingestion_anomaly',
+      tenantId: event.tenantId,
+      connectorId: event.connectorId,
+      severity,
+      title: buildIngestionAnomalyTitle(event),
+      explanation: buildIngestionAnomalyExplanation(event),
+      mitreTactic: 'Impact',
+      mitreTechnique: 'T1499 Endpoint Denial of Service',
+      sourceType: event.sourceType ?? 'ingestion',
+      firstEventAt: event.createdAt,
+      lastEventAt: event.createdAt,
+      eventCount: 1,
+      evidence: {
+        requestId: event.requestId,
+        clientIp: event.clientIp,
+        tokenPrefix: event.tokenPrefix,
+        securityEventType: event.eventType,
+        reasonCode: event.reasonCode,
+        metadata: event.metadata ?? {},
+      },
+      eventRows: [
+        {
+          ingestionSecurityEventId: event.id,
+          eventKind: event.eventType,
+          eventTime: event.createdAt,
+          actorIp: event.clientIp,
+          targetResource: event.tokenPrefix,
+          evidence: {
+            requestId: event.requestId,
+            clientIp: event.clientIp,
+            tokenPrefix: event.tokenPrefix,
+            securityEventType: event.eventType,
+            reasonCode: event.reasonCode,
+            metadata: event.metadata ?? {},
+          },
+        },
+      ],
+    });
+  } catch (error) {
+    console.error('detection_evaluation_failed', {
+      tenantId: event.tenantId,
+      ingestionSecurityEventId: String(event.id),
+      ruleContext: event.eventType,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+  }
 }
 
 export async function evaluateDetectionsForNormalizedEvent(event: DetectionEvent) {

@@ -163,6 +163,46 @@ type DetectionFindingRow = {
   updated_at: string | Date;
 };
 
+type DetectionRow = {
+  id: number;
+  rule_id: number | null;
+  tenant_id: number;
+  connector_id: number | null;
+  detection_key: string;
+  rule_key: string;
+  severity: string;
+  status: string;
+  title: string;
+  explanation: string;
+  mitre_tactic: string;
+  mitre_technique: string;
+  source_type: string | null;
+  first_event_at: string | Date;
+  last_event_at: string | Date;
+  event_count: number;
+  evidence_json: Record<string, unknown> | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
+type DetectionEventRow = {
+  id: number;
+  detection_id: number;
+  tenant_id: number;
+  normalized_event_id: number | null;
+  ingestion_security_event_id: number | null;
+  event_kind: string;
+  event_time: string | Date;
+  source_event_id: string | null;
+  actor_email: string | null;
+  actor_ip: string | null;
+  target_resource: string | null;
+  evidence_json: Record<string, unknown> | null;
+  created_at: string | Date;
+};
+
+type DetectionRecordRow = DetectionFindingRow | DetectionRow;
+
 type RiskScoreRow = {
   id: number;
   tenant_id: number;
@@ -550,13 +590,14 @@ function alertDetail(row: AlertRow) {
   };
 }
 
-function detectionSummary(row: DetectionFindingRow) {
+function detectionSummary(row: DetectionRecordRow) {
   return {
     id: String(row.id),
     tenantId: String(row.tenant_id),
     connectorId: row.connector_id != null ? String(row.connector_id) : null,
     ruleKey: row.rule_key,
     severity: (row.severity ?? 'info').toLowerCase(),
+    status: 'status' in row ? row.status : 'open',
     title: row.title,
     explanation: row.explanation,
     mitreTactic: row.mitre_tactic,
@@ -570,10 +611,27 @@ function detectionSummary(row: DetectionFindingRow) {
   };
 }
 
-function detectionDetail(row: DetectionFindingRow) {
+function detectionEventView(row: DetectionEventRow) {
+  return {
+    id: String(row.id),
+    detectionId: String(row.detection_id),
+    normalizedEventId: row.normalized_event_id != null ? String(row.normalized_event_id) : null,
+    ingestionSecurityEventId: row.ingestion_security_event_id != null ? String(row.ingestion_security_event_id) : null,
+    eventKind: row.event_kind,
+    eventTime: toIso(row.event_time),
+    sourceEventId: row.source_event_id ?? undefined,
+    actorEmail: row.actor_email ?? undefined,
+    actorIp: row.actor_ip ?? undefined,
+    targetResource: row.target_resource ?? undefined,
+    evidence: row.evidence_json ?? {},
+  };
+}
+
+function detectionDetail(row: DetectionRecordRow, events: DetectionEventRow[] = []) {
   return {
     ...detectionSummary(row),
     evidence: row.evidence_json ?? {},
+    events: events.map(detectionEventView),
   };
 }
 
@@ -1173,7 +1231,7 @@ async function buildInvestigationDetailResponse(access: TenantAccess, investigat
     closedAt: workflow ? toIso(workflow.closed_at) : null,
     linkedAlert: alert ? alertDetail(alert) : null,
     relatedAlerts: await listRelatedAlertsForInvestigation(access.tenantId, alert),
-    relatedFindings: findings.map(detectionDetail),
+    relatedFindings: findings.map((row) => detectionDetail(row)),
     linkedEvidence,
     evidenceCount: linkedEvidence.length,
     notes,
@@ -1346,6 +1404,32 @@ async function getDetectionFindingForTenant(tenantId: number, id: number): Promi
   );
 
   return (result.rows[0] as DetectionFindingRow | undefined) ?? null;
+}
+
+async function getDetectionForTenant(tenantId: number, id: number): Promise<DetectionRow | null> {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT *
+     FROM detections
+     WHERE tenant_id = $1 AND id = $2
+     LIMIT 1`,
+    [tenantId, id],
+  );
+
+  return (result.rows[0] as DetectionRow | undefined) ?? null;
+}
+
+async function getDetectionEventsForDetection(tenantId: number, detectionId: number): Promise<DetectionEventRow[]> {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT *
+     FROM detection_events
+     WHERE tenant_id = $1 AND detection_id = $2
+     ORDER BY event_time DESC, id DESC`,
+    [tenantId, detectionId],
+  );
+
+  return result.rows as DetectionEventRow[];
 }
 
 async function getConnectorsForTenant(tenantId: number): Promise<ConnectorRow[]> {
@@ -2517,14 +2601,33 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const pool = getPool();
     const result = await pool.query(
       `SELECT *
-       FROM detection_findings
+       FROM detections
        WHERE ${conditions.join(' AND ')}
        ORDER BY created_at DESC, id DESC
        LIMIT $${params.length}`,
       params,
     );
 
-    const rows = result.rows as DetectionFindingRow[];
+    const rows = result.rows as DetectionRow[];
+    if (rows.length === 0) {
+      const legacyResult = await pool.query(
+        `SELECT *
+         FROM detection_findings
+         WHERE ${conditions.join(' AND ')}
+         ORDER BY created_at DESC, id DESC
+         LIMIT $${params.length}`,
+        params,
+      );
+      const legacyRows = legacyResult.rows as DetectionFindingRow[];
+      const legacyItems = legacyRows.slice(0, limit).map(detectionSummary);
+      return c.json({
+        items: legacyItems,
+        nextCursor: legacyRows.length > limit ? legacyItems[legacyItems.length - 1]?.createdAt ?? null : null,
+        hasMore: legacyRows.length > limit,
+        totalCount: legacyItems.length,
+      });
+    }
+
     const items = rows.slice(0, limit).map(detectionSummary);
 
     return c.json({
@@ -2542,6 +2645,12 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const detectionId = Number(c.req.param('id'));
     if (!Number.isFinite(detectionId) || detectionId <= 0) {
       return sendError(c, 400, 'invalid_detection_id', 'Detection id is invalid');
+    }
+
+    const detection = await getDetectionForTenant(access.tenantId, detectionId);
+    if (detection) {
+      const events = await getDetectionEventsForDetection(access.tenantId, detectionId);
+      return c.json(detectionDetail(detection, events));
     }
 
     const finding = await getDetectionFindingForTenant(access.tenantId, detectionId);

@@ -1,0 +1,39 @@
+Backend build command:
+
+`npm --prefix c:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform-main-release\apps\backend run build`
+
+Output:
+
+> @zonforge/backend@1.0.0 build
+> tsc
+
+Runtime excerpt from the fresh SERIAL 12 proof run on port 3109:
+
+- POST /v1/auth/signup -> 200
+- POST /v1/auth/step-up/verify -> 200
+- POST /v1/connectors -> 201
+- POST /v1/connectors/4/ingestion-token -> 201
+- POST /v1/events/ingest -> 202
+- GET /v1/detections -> 200
+- POST /v1/events/ingest -> 202
+- POST /v1/events/ingest -> 202
+- POST /v1/events/ingest -> 202
+
+Detection logs:
+
+- detection_rule_triggered { tenantId: 8, ruleKey: 'suspicious_login', normalizedEventId: '25', actorEmail: 'alice@example.com', actorIp: '198.51.100.20', historicalIpCount: 1 }
+- detection_created { detectionId: '8', tenantId: 8, ruleKey: 'suspicious_login', severity: 'medium', sourceType: 'aws', eventCount: 2 }
+- detection_rule_triggered { tenantId: 8, ruleKey: 'privilege_escalation', normalizedEventId: '26', actorEmail: 'carol@example.com', targetResource: 'GlobalAdmin', severity: 'critical' }
+- detection_created { detectionId: '9', tenantId: 8, ruleKey: 'privilege_escalation', severity: 'critical', sourceType: 'aws', eventCount: 1 }
+- detection_rule_triggered { tenantId: 8, ruleKey: 'ingestion_anomaly', ingestionSecurityEventId: '3', securityEventType: 'anomaly_detected', reasonCode: 'invalid_payload', severity: 'medium' }
+- detection_created { detectionId: '10', tenantId: 8, ruleKey: 'ingestion_anomaly', severity: 'medium', sourceType: 'ingestion', eventCount: 1 }
+
+Queue and worker excerpt:
+
+- [ingestion-api] queued batch { tenantId: 8, connectorId: '4', sourceType: 'aws', acceptedCount: 1, rejectedCount: 0 }
+- [ingestion-worker] processing batch { tenantId: 8, connectorId: '4', sourceType: 'aws', eventCount: 1, attemptsMade: 0 }
+- [ingestion-worker] processed batch { tenantId: 8, connectorId: '4' }
+
+Operational note:
+
+- Redis still reports eviction policy `allkeys-lru`; the runtime expects `noeviction`.

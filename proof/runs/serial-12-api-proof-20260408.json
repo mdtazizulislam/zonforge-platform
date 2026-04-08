@@ -1,0 +1,181 @@
+{
+  "users": {
+    "owner": "serial12.owner+1775627671236@example.com",
+    "secondTenantOwner": "serial12.owner2+1775627671236@example.com"
+  },
+  "api": {
+    "owner_signup": {
+      "status": 200,
+      "userId": 8
+    },
+    "step_up": {
+      "status": 200
+    },
+    "connector_create": {
+      "status": 201,
+      "connectorId": "4"
+    },
+    "token_create": {
+      "status": 201,
+      "tokenPrefix": "zfi_5191f3c7848e4e"
+    },
+    "baseline_success_ingest": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "no_detection_after_normal_event": {
+      "status": 200,
+      "totalCount": 0
+    },
+    "suspicious_login_ingest": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "brute_force_ingest": {
+      "status": 202,
+      "acceptedCount": 5
+    },
+    "privilege_escalation_ingest": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "ingestion_anomaly_ingest": {
+      "status": 400,
+      "code": "invalid_ingestion_payload"
+    },
+    "detections_list": {
+      "status": 200,
+      "totalCount": 4,
+      "ruleKeys": [
+        "brute_force",
+        "ingestion_anomaly",
+        "privilege_escalation",
+        "suspicious_login"
+      ]
+    },
+    "detections_detail": {
+      "brute_force": {
+        "status": 200,
+        "severity": "high",
+        "mitreTactic": "Credential Access",
+        "mitreTechnique": "T1110 Brute Force",
+        "explanation": "5 failed sign-in events were observed within 10 minutes for bob@example.com.",
+        "evidence": {
+          "actorIp": "203.0.113.44",
+          "threshold": 5,
+          "actorEmail": "bob@example.com",
+          "windowMinutes": 10,
+          "sourceEventIds": [
+            "serial12-bruteforce-1775627671236-0",
+            "serial12-bruteforce-1775627671236-1",
+            "serial12-bruteforce-1775627671236-2",
+            "serial12-bruteforce-1775627671236-3",
+            "serial12-bruteforce-1775627671236-4"
+          ],
+          "normalizedEventIds": [
+            "27",
+            "28",
+            "29",
+            "30",
+            "31"
+          ]
+        },
+        "eventCount": 1
+      },
+      "ingestion_anomaly": {
+        "status": 200,
+        "severity": "medium",
+        "mitreTactic": "Impact",
+        "mitreTechnique": "T1499 Endpoint Denial of Service",
+        "explanation": "The ingestion edge recorded anomaly telemetry for invalid_payload.",
+        "evidence": {
+          "clientIp": "unknown",
+          "metadata": {
+            "message": "Request body must be valid JSON."
+          },
+          "requestId": "1775627671833-df23b097c4",
+          "reasonCode": "invalid_payload",
+          "tokenPrefix": "zfi_5191f3c7848e4e",
+          "securityEventType": "anomaly_detected"
+        },
+        "eventCount": 1
+      },
+      "privilege_escalation": {
+        "status": 200,
+        "severity": "critical",
+        "mitreTactic": "Privilege Escalation",
+        "mitreTechnique": "T1098 Account Manipulation",
+        "explanation": "carol@example.com performed a privilege-related change affecting GlobalAdmin.",
+        "evidence": {
+          "events": [
+            {
+              "actorIp": "203.0.113.77",
+              "eventTime": "2026-04-08T05:49:31.705Z",
+              "actorEmail": "carol@example.com",
+              "sourceEventId": "serial12-privilege-1775627671236",
+              "targetResource": "GlobalAdmin",
+              "normalizedEventId": "26",
+              "canonicalEventType": "privilege_change"
+            }
+          ],
+          "actorIp": "203.0.113.77",
+          "actorEmail": "carol@example.com",
+          "targetResource": "GlobalAdmin"
+        },
+        "eventCount": 1
+      },
+      "suspicious_login": {
+        "status": 200,
+        "severity": "medium",
+        "mitreTactic": "Initial Access",
+        "mitreTechnique": "T1078 Valid Accounts",
+        "explanation": "alice@example.com signed in successfully from 198.51.100.20, which differs from recent successful sign-in IP activity for the same tenant-scoped account.",
+        "evidence": {
+          "events": [
+            {
+              "actorIp": "198.51.100.20",
+              "eventTime": "2026-04-08T05:47:31.705Z",
+              "actorEmail": "alice@example.com",
+              "sourceEventId": "serial12-suspicious-1775627671236",
+              "targetResource": "aws-console",
+              "normalizedEventId": "25",
+              "canonicalEventType": "signin_success"
+            },
+            {
+              "actorIp": "203.0.113.10",
+              "eventTime": "2026-04-08T05:46:31.705Z",
+              "actorEmail": "alice@example.com",
+              "sourceEventId": "serial12-baseline-1775627671236",
+              "targetResource": "aws-console",
+              "normalizedEventId": "24",
+              "canonicalEventType": "signin_success"
+            }
+          ],
+          "currentIp": "198.51.100.20",
+          "actorEmail": "alice@example.com",
+          "historicalIps": [
+            "203.0.113.10"
+          ]
+        },
+        "eventCount": 2
+      }
+    },
+    "queue_health": {
+      "status": 200,
+      "recentEvents24h": 8,
+      "failedEvents24h": 0,
+      "queueAvailable": true,
+      "securitySummary": {
+        "rateLimited24h": 0,
+        "replayDetected24h": 0,
+        "anomalyDetected24h": 1
+      }
+    },
+    "tenant_isolation": {
+      "listStatus": 200,
+      "listCount": 0,
+      "detailStatus": 404,
+      "detailCode": "not_found"
+    }
+  }
+}

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { Queue, QueueEvents, Worker, type JobsOptions } from 'bullmq';
 import Redis from 'ioredis';
 import { getPool } from './db.js';
-import { evaluateDetectionsForNormalizedEvent } from './detectionEngine.js';
+import { evaluateDetectionsForIngestionSecurityEvent, evaluateDetectionsForNormalizedEvent } from './detectionEngine.js';
 import { type TenantMembershipRole } from './auth.js';
 import {
   requireRole as sharedRequireRole,
@@ -651,11 +651,12 @@ class EventPipelineRuntime {
   }) {
     try {
       const pool = getPool();
-      await pool.query(
+      const result = await pool.query(
         `INSERT INTO ingestion_security_events (
            tenant_id, connector_id, token_id, request_id, source_type,
            event_type, client_ip, token_prefix, reason_code, metadata_json, created_at
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())`,
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+         RETURNING id, created_at`,
         [
           input.tenantId ?? null,
           input.connectorId ?? null,
@@ -669,6 +670,23 @@ class EventPipelineRuntime {
           input.metadata ? JSON.stringify(input.metadata) : null,
         ],
       );
+
+      const createdRow = result.rows[0] as { id: number; created_at: string | Date } | undefined;
+      if (createdRow?.id != null && input.tenantId != null && input.eventType) {
+        await evaluateDetectionsForIngestionSecurityEvent({
+          id: createdRow.id,
+          tenantId: input.tenantId,
+          connectorId: input.connectorId ?? null,
+          sourceType: input.sourceType ?? null,
+          eventType: input.eventType,
+          requestId: input.requestId ?? null,
+          clientIp: input.clientIp ?? null,
+          tokenPrefix: input.tokenPrefix ?? null,
+          reasonCode: input.reasonCode ?? null,
+          metadata: input.metadata ?? null,
+          createdAt: new Date(createdRow.created_at).toISOString(),
+        });
+      }
     } catch (error) {
       console.error('[ingestion-security] failed to persist security event', {
         eventType: input.eventType,

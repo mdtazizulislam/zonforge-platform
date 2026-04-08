@@ -711,6 +711,48 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS detections (
+        id BIGSERIAL PRIMARY KEY,
+        rule_id BIGINT REFERENCES detection_rules(id) ON DELETE SET NULL,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL,
+        detection_key VARCHAR(128) NOT NULL UNIQUE,
+        rule_key VARCHAR(64) NOT NULL,
+        severity VARCHAR(32) NOT NULL,
+        status VARCHAR(32) NOT NULL DEFAULT 'open',
+        title TEXT NOT NULL,
+        explanation TEXT NOT NULL,
+        mitre_tactic VARCHAR(128) NOT NULL,
+        mitre_technique VARCHAR(128) NOT NULL,
+        source_type VARCHAR(64),
+        first_event_at TIMESTAMPTZ NOT NULL,
+        last_event_at TIMESTAMPTZ NOT NULL,
+        event_count INTEGER NOT NULL DEFAULT 1,
+        evidence_json JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS detection_events (
+        id BIGSERIAL PRIMARY KEY,
+        detection_id BIGINT NOT NULL REFERENCES detections(id) ON DELETE CASCADE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        normalized_event_id BIGINT REFERENCES normalized_events(id) ON DELETE SET NULL,
+        ingestion_security_event_id BIGINT REFERENCES ingestion_security_events(id) ON DELETE SET NULL,
+        event_kind VARCHAR(64) NOT NULL,
+        event_time TIMESTAMPTZ NOT NULL,
+        source_event_id VARCHAR(255),
+        actor_email VARCHAR(255),
+        actor_ip VARCHAR(128),
+        target_resource VARCHAR(512),
+        evidence_json JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS alerts (
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -1153,6 +1195,12 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_created ON detection_findings(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_rule ON detection_findings(tenant_id, rule_key, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_severity ON detection_findings(tenant_id, severity, created_at DESC)`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_detections_detection_key ON detections(detection_key)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detections_tenant_created ON detections(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detections_tenant_rule ON detections(tenant_id, rule_key, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detections_tenant_severity ON detections(tenant_id, severity, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_events_detection_created ON detection_events(detection_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_events_tenant_time ON detection_events(tenant_id, event_time DESC)`);
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_alerts_grouping_key ON alerts(tenant_id, grouping_key, created_at)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_alerts_tenant_created ON alerts(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_alerts_tenant_status ON alerts(tenant_id, status, created_at DESC)`);
@@ -1181,7 +1229,8 @@ export async function initDatabase() {
       ) VALUES
         ('suspicious_login', 'Suspicious login', 'Successful sign-in from an IP that differs from recent tenant-scoped successful activity for the same identity.', 'medium', 'Initial Access', 'T1078 Valid Accounts', TRUE, NOW(), NOW()),
         ('brute_force', 'Brute force', 'Repeated sign-in failures for the same tenant-scoped identity or IP inside a bounded time window.', 'high', 'Credential Access', 'T1110 Brute Force', TRUE, NOW(), NOW()),
-        ('privilege_escalation', 'Privilege escalation', 'Privilege or role change activity that may expand administrative access.', 'high', 'Privilege Escalation', 'T1098 Account Manipulation', TRUE, NOW(), NOW())
+        ('privilege_escalation', 'Privilege escalation', 'Privilege or role change activity that may expand administrative access.', 'high', 'Privilege Escalation', 'T1098 Account Manipulation', TRUE, NOW(), NOW()),
+        ('ingestion_anomaly', 'Ingestion anomaly', 'Replay, malformed payload, payload abuse, or ingestion throttling activity that indicates hostile or unstable ingestion behavior.', 'high', 'Impact', 'T1499 Endpoint Denial of Service', TRUE, NOW(), NOW())
       ON CONFLICT (rule_key) DO UPDATE
       SET title = EXCLUDED.title,
           description = EXCLUDED.description,

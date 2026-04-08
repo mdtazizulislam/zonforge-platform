@@ -19,9 +19,11 @@
 ### Storage Model
 
 - Add `detection_rules` to store seeded rule metadata and ATT&CK mappings.
-- Add `detection_findings` to store generated findings.
-- Do not add `detection_state_windows` in the MVP because the three rules can be evaluated directly from `normalized_events` using bounded lookback windows.
-- Add a deduplication key per finding so repeated worker retries or adjacent events do not create duplicate findings for the same window.
+- Add `detections` as the primary tenant-scoped detection summary table exposed by `GET /v1/detections`.
+- Add `detection_events` to persist sanitized evidence rows linked to each detection.
+- Keep additive compatibility writes to `detection_findings` so later alert and risk workflows that already depend on findings do not break.
+- Do not add `detection_state_windows` in the MVP because the core rules can be evaluated directly from `normalized_events` and `ingestion_security_events` using bounded lookback windows.
+- Add a deduplication key per detection so repeated worker retries or adjacent events do not create duplicate detections for the same window.
 
 ### Rules
 
@@ -45,9 +47,16 @@
 - Severity is `critical` when the target or metadata indicates `owner`, `admin`, or equivalent privileged scope; otherwise `high`.
 - MITRE mapping: `Privilege Escalation` / `T1098 Account Manipulation`.
 
-### Finding Shape
+#### Ingestion Anomaly
 
-Each finding stores:
+- Trigger when additive `ingestion_security_events` records replay, malformed payload, oversized payload, or ingestion throttling activity for a tenant-scoped connector token window.
+- Persist one deduplicated detection per tenant, event type, reason code, and short time bucket.
+- Severity defaults to `medium` and rises to `high` for throttling or queue/payload pressure conditions.
+- MITRE mapping: `Impact` / `T1499 Endpoint Denial of Service`.
+
+### Detection Shape
+
+Each detection stores:
 
 - `tenant_id`
 - `rule_key`
@@ -62,18 +71,22 @@ Each finding stores:
 - `event_count`
 - `evidence_json`
 
+Each detection also stores additive evidence rows in `detection_events` with normalized-event references or ingestion-security-event references plus sanitized actor, IP, target, and event metadata.
+
 `evidence_json` remains sanitized and bounded to safe fields such as normalized event ids, actor email, actor IP, target resource, source event ids, and window counts.
 
 ### API Surface
 
 - Add `GET /v1/detections` for tenant-scoped listing with optional severity, rule key, and source type filters.
-- Add `GET /v1/detections/:id` for tenant-scoped detail lookup.
+- Add `GET /v1/detections/:id` for tenant-scoped detail lookup, returning both summary evidence and linked `detection_events` rows.
 - Use the current tenant access model and existing safe read policy used for security data in the standalone backend.
 
 ### Observability
 
-- Emit `detection_rule_matched` when a rule condition is satisfied.
-- Emit `detection_finding_created` when a finding row is inserted.
+- Emit `detection_rule_triggered` when a rule condition is satisfied.
+- Keep `detection_rule_matched` as a compatibility log alias for existing proof and search workflows.
+- Emit `detection_created` when a primary `detections` row is inserted.
+- Keep `detection_finding_created` as a compatibility log alias for legacy finding writes.
 - Emit `detection_evaluation_failed` when evaluation errors are caught.
 
 ### Rollout Strategy
