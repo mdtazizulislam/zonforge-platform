@@ -26,6 +26,15 @@ import {
   normalizeAlertLifecycleStatus,
   updateAlertStatusForTenant,
 } from './alertSystem.js';
+import {
+  buildTenantRiskSummary,
+  ensureTenantRiskScores,
+  getRiskScoreForTenant,
+  listRiskScoresForTenant,
+  normalizeRiskEntityKey,
+  normalizeRiskEntityType,
+  type RiskEntityType,
+} from './riskScoring.js';
 
 type OnboardingStepDefinition = {
   stepKey: 'welcome' | 'connect_environment' | 'first_scan';
@@ -152,6 +161,20 @@ type DetectionFindingRow = {
   evidence_json: Record<string, unknown> | null;
   created_at: string | Date;
   updated_at: string | Date;
+};
+
+type RiskScoreRow = {
+  id: number;
+  tenant_id: number;
+  entity_type: RiskEntityType;
+  entity_key: string;
+  entity_label: string;
+  score: number;
+  score_band: string;
+  top_factors_json: Array<Record<string, unknown>> | null;
+  signal_count: number;
+  last_event_at: string | Date | null;
+  last_calculated_at: string | Date;
 };
 
 type ConnectorRow = {
@@ -950,57 +973,145 @@ async function testConnectorConnection(access: TenantAccess, connectorId: number
 }
 
 async function buildRiskSummary(tenantId: number) {
-  const pool = getPool();
-  const [alertCounts, riskyUsers, connectors] = await Promise.all([
-    pool.query(
-      `SELECT severity, COUNT(*)::int AS count
-       FROM alerts
-       WHERE tenant_id = $1 AND status IN ('open', 'in_progress')
-       GROUP BY severity`,
-      [tenantId],
-    ),
-    pool.query(
-      `SELECT affected_user_id,
-              AVG(CASE severity
-                    WHEN 'critical' THEN 90
-                    WHEN 'high' THEN 72
-                    WHEN 'medium' THEN 48
-                    WHEN 'low' THEN 22
-                    ELSE 10 END)::numeric(10,2) AS avg_score
-       FROM alerts
-       WHERE tenant_id = $1
-         AND affected_user_id IS NOT NULL
-         AND status IN ('open', 'in_progress')
-       GROUP BY affected_user_id
-       ORDER BY avg_score DESC
-       LIMIT 5`,
-      [tenantId],
-    ),
-    getConnectorsForTenant(tenantId),
-  ]);
+  await ensureTenantRiskScores(tenantId);
+  return buildTenantRiskSummary(tenantId);
+}
 
-  const critical = Number(alertCounts.rows.find((row: any) => row.severity === 'critical')?.count ?? 0);
-  const high = Number(alertCounts.rows.find((row: any) => row.severity === 'high')?.count ?? 0);
-  const scores = riskyUsers.rows.map((row: any) => Number(row.avg_score ?? 0)).filter((value: number) => Number.isFinite(value));
-  const avgUserRiskScore = scores.length > 0
-    ? Math.round(scores.reduce((sum: number, value: number) => sum + value, 0) / scores.length)
-    : 0;
-  const connectorSummaries = connectors.map(connectorSummary);
-  const healthyConnectors = connectorSummaries.filter((item) => item.isHealthy).length;
-  const connectorHealthScore = connectorSummaries.length > 0
-    ? Math.round((healthyConnectors / connectorSummaries.length) * 100)
-    : 0;
+function riskListItem(row: RiskScoreRow) {
+  return {
+    entityId: row.entity_key,
+    entityKey: row.entity_key,
+    entityType: row.entity_type,
+    entityLabel: row.entity_label,
+    score: Number(row.score ?? 0),
+    severity: row.score_band,
+    scoreBand: row.score_band,
+    confidenceBand: 'deterministic',
+    calculatedAt: toIso(row.last_calculated_at) ?? new Date().toISOString(),
+    signalCount: Number(row.signal_count ?? 0),
+    lastEventAt: toIso(row.last_event_at) ?? undefined,
+    topFactors: row.top_factors_json ?? [],
+  };
+}
+
+function riskContributingSignals(row: RiskScoreRow) {
+  return (row.top_factors_json ?? []).map((factor) => ({
+    signalType: typeof factor.factorKey === 'string' ? factor.factorKey : 'risk_factor',
+    description: typeof factor.label === 'string' ? factor.label : 'Risk factor',
+    contribution: Number(factor.contribution ?? 0),
+    weight: Number(factor.weight ?? 0),
+    sourceAlertId: null,
+    detectedAt: typeof factor.lastSeenAt === 'string'
+      ? factor.lastSeenAt
+      : toIso(row.last_event_at) ?? toIso(row.last_calculated_at) ?? new Date().toISOString(),
+  }));
+}
+
+async function getRecentAlertsForRiskEntity(tenantId: number, entityType: 'user' | 'asset', entityKey: string, limit = 10): Promise<AlertRow[]> {
+  const pool = getPool();
+  const normalizedKey = entityType === 'user'
+    ? normalizeRiskEntityKey('user', entityKey)
+    : normalizeRiskEntityKey('asset', entityKey);
+
+  if (!normalizedKey) {
+    return [];
+  }
+
+  const result = await pool.query(
+    `SELECT
+       id::text AS alert_id,
+       tenant_id,
+       rule_key,
+       principal_type,
+       principal_key,
+       title,
+       description,
+       severity,
+       priority,
+       status,
+       affected_user_id,
+       affected_ip,
+       evidence_json,
+       mitre_tactics_json,
+       mitre_techniques_json,
+       detection_gap_minutes,
+       mttd_sla_breached,
+       assigned_to,
+       assigned_at,
+       recommended_actions_json,
+       first_signal_time,
+       first_seen_at,
+       last_seen_at,
+       finding_count,
+       llm_narrative_json,
+       llm_narrative_generated_at,
+       created_at,
+       updated_at,
+       resolved_at
+     FROM alerts
+     WHERE tenant_id = $1
+       AND (
+         ($2 = 'user' AND (LOWER(COALESCE(affected_user_id, '')) = LOWER($3) OR (principal_type = 'user' AND LOWER(principal_key) = LOWER($3))))
+         OR
+         ($2 = 'asset' AND principal_type = 'resource' AND principal_key = $3)
+       )
+     ORDER BY last_seen_at DESC, created_at DESC
+     LIMIT $4`,
+    [tenantId, entityType, normalizedKey, limit],
+  );
+
+  return result.rows as AlertRow[];
+}
+
+async function getUserRecordForTenant(tenantId: number, email: string) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT u.id, u.email, u.full_name, tm.role
+     FROM tenant_memberships tm
+     JOIN users u ON u.id = tm.user_id
+     WHERE tm.tenant_id = $1 AND LOWER(u.email) = LOWER($2)
+     LIMIT 1`,
+    [tenantId, email],
+  );
+
+  const row = result.rows[0] as { id: number; email: string; full_name: string | null; role: string | null } | undefined;
+  if (!row) {
+    return {
+      id: email,
+      email,
+      name: email,
+      role: 'external',
+      department: null,
+      jobTitle: null,
+      isContractor: false,
+      mfaEnabled: false,
+      lastLoginAt: null,
+      lastLoginIp: null,
+    };
+  }
 
   return {
-    postureScore: 0,
-    openCriticalAlerts: critical,
-    openHighAlerts: high,
-    avgUserRiskScore,
-    topRiskUserIds: riskyUsers.rows.map((row: any) => String(row.affected_user_id)),
-    topRiskAssetIds: [],
-    connectorHealthScore,
-    mttdP50Minutes: null,
-    calculatedAt: new Date().toISOString(),
+    id: String(row.id),
+    email: row.email,
+    name: row.full_name ?? row.email,
+    role: row.role ?? 'member',
+    department: null,
+    jobTitle: null,
+    isContractor: false,
+    mfaEnabled: false,
+    lastLoginAt: null,
+    lastLoginIp: null,
+  };
+}
+
+function buildAssetRecord(assetKey: string, scoreBand: string) {
+  return {
+    id: assetKey,
+    hostname: assetKey,
+    assetType: 'resource',
+    environment: 'production',
+    isInternetFacing: false,
+    criticalityLevel: scoreBand,
   };
 }
 
@@ -1958,6 +2069,182 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     if (access instanceof Response) return access;
 
     return c.json(await buildRiskSummary(access.tenantId));
+  });
+
+  router.get('/v1/risk/org', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    await ensureTenantRiskScores(access.tenantId);
+    const score = await getRiskScoreForTenant(access.tenantId, 'org', 'org');
+    if (!score) {
+      return sendError(c, 404, 'not_found', 'Organization risk score not found');
+    }
+
+    const summary = await buildTenantRiskSummary(access.tenantId);
+    return c.json({
+      entityType: 'org',
+      entityKey: 'org',
+      entityLabel: score.entity_label,
+      score: Number(score.score ?? 0),
+      scoreBand: score.score_band,
+      topFactors: score.top_factors_json ?? [],
+      signalCount: Number(score.signal_count ?? 0),
+      lastEventAt: toIso(score.last_event_at),
+      lastCalculatedAt: toIso(score.last_calculated_at),
+      postureScore: summary.postureScore,
+      openCriticalAlerts: summary.openCriticalAlerts,
+      openHighAlerts: summary.openHighAlerts,
+      topRiskUserIds: summary.topRiskUserIds,
+      topRiskAssetIds: summary.topRiskAssetIds,
+      connectorHealthScore: summary.connectorHealthScore,
+      mttdP50Minutes: summary.mttdP50Minutes,
+    });
+  });
+
+  router.get('/v1/risk/users', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    await ensureTenantRiskScores(access.tenantId);
+    const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 50), 1), 100);
+    const list = await listRiskScoresForTenant({
+      tenantId: access.tenantId,
+      entityType: 'user',
+      limit,
+      cursor: c.req.query('cursor') ?? undefined,
+    });
+
+    return c.json({
+      items: list.items.map(riskListItem),
+      nextCursor: list.nextCursor,
+      hasMore: list.hasMore,
+      totalCount: list.totalCount,
+    });
+  });
+
+  router.get('/v1/risk/users/:userId', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    await ensureTenantRiskScores(access.tenantId);
+    const userId = normalizeRiskEntityKey('user', c.req.param('userId'));
+    if (!userId) {
+      return sendError(c, 404, 'not_found', 'User risk score not found');
+    }
+
+    const score = await getRiskScoreForTenant(access.tenantId, 'user', userId);
+    if (!score) {
+      return sendError(c, 404, 'not_found', 'User risk score not found');
+    }
+
+    const recentAlertRows = await getRecentAlertsForRiskEntity(access.tenantId, 'user', userId, 10);
+    const recentAlerts = recentAlertRows.map(alertSummary);
+
+    return c.json({
+      riskScore: {
+        ...riskListItem(score),
+        contributingSignals: riskContributingSignals(score),
+      },
+      score: Number(score.score ?? 0),
+      severity: score.score_band,
+      confidenceBand: 'deterministic',
+      contributingSignals: riskContributingSignals(score),
+      user: await getUserRecordForTenant(access.tenantId, userId),
+      recentAlerts,
+      alertCount: recentAlerts.length,
+      recommendedActions: (score.top_factors_json ?? []).slice(0, 3).map((factor) => {
+        const label = typeof factor.label === 'string' ? factor.label : 'recent security activity';
+        return `Review ${label.toLowerCase()} and validate whether the identity should be investigated further.`;
+      }),
+    });
+  });
+
+  router.get('/v1/risk/assets', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    await ensureTenantRiskScores(access.tenantId);
+    const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 50), 1), 100);
+    const list = await listRiskScoresForTenant({
+      tenantId: access.tenantId,
+      entityType: 'asset',
+      limit,
+      cursor: c.req.query('cursor') ?? undefined,
+    });
+
+    return c.json({
+      items: list.items.map(riskListItem),
+      nextCursor: list.nextCursor,
+      hasMore: list.hasMore,
+      totalCount: list.totalCount,
+    });
+  });
+
+  router.get('/v1/risk/assets/:assetId', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    await ensureTenantRiskScores(access.tenantId);
+    const assetId = normalizeRiskEntityKey('asset', c.req.param('assetId'));
+    if (!assetId) {
+      return sendError(c, 404, 'not_found', 'Asset risk score not found');
+    }
+
+    const score = await getRiskScoreForTenant(access.tenantId, 'asset', assetId);
+    if (!score) {
+      return sendError(c, 404, 'not_found', 'Asset risk score not found');
+    }
+
+    const activeAlertRows = await getRecentAlertsForRiskEntity(access.tenantId, 'asset', assetId, 10);
+
+    return c.json({
+      riskScore: {
+        ...riskListItem(score),
+        contributingSignals: riskContributingSignals(score),
+      },
+      asset: buildAssetRecord(assetId, score.score_band),
+      vulnerabilities: [],
+      activeAlerts: activeAlertRows.map(alertSummary),
+    });
+  });
+
+  router.get('/v1/risk/:entityType/:entityKey', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const entityType = normalizeRiskEntityType(c.req.param('entityType'));
+    if (!entityType) {
+      return sendError(c, 404, 'not_found', 'Risk entity type not found');
+    }
+
+    await ensureTenantRiskScores(access.tenantId);
+    const entityKey = normalizeRiskEntityKey(entityType, c.req.param('entityKey'));
+    if (!entityKey) {
+      return sendError(c, 404, 'not_found', 'Risk score not found');
+    }
+
+    const score = await getRiskScoreForTenant(access.tenantId, entityType, entityKey);
+    if (!score) {
+      return sendError(c, 404, 'not_found', 'Risk score not found');
+    }
+
+    const recentAlerts = entityType === 'org'
+      ? []
+      : (await getRecentAlertsForRiskEntity(access.tenantId, entityType, entityKey, 10)).map(alertSummary);
+
+    return c.json({
+      entityType,
+      entityKey,
+      entityLabel: score.entity_label,
+      score: Number(score.score ?? 0),
+      scoreBand: score.score_band,
+      topFactors: score.top_factors_json ?? [],
+      signalCount: Number(score.signal_count ?? 0),
+      lastEventAt: toIso(score.last_event_at),
+      lastCalculatedAt: toIso(score.last_calculated_at),
+      recentAlerts,
+    });
   });
 
   router.get('/v1/metrics/mttd', async (c) => {

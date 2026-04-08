@@ -769,6 +769,25 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS risk_scores (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        entity_type VARCHAR(16) NOT NULL,
+        entity_key VARCHAR(512) NOT NULL,
+        entity_label VARCHAR(512) NOT NULL,
+        score INTEGER NOT NULL,
+        score_band VARCHAR(32) NOT NULL,
+        top_factors_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+        signal_count INTEGER NOT NULL DEFAULT 0,
+        last_event_at TIMESTAMPTZ,
+        last_calculated_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(tenant_id, entity_type, entity_key)
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS failed_ingestion_events (
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -1033,6 +1052,8 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_alert_findings_alert ON alert_findings(alert_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_alert_events_alert ON alert_events(alert_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_alert_events_tenant_type ON alert_events(tenant_id, event_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_risk_scores_tenant_entity ON risk_scores(tenant_id, entity_type, score DESC, entity_key ASC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_risk_scores_tenant_calculated ON risk_scores(tenant_id, last_calculated_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_tenant ON failed_ingestion_events(tenant_id, failed_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_source_type ON failed_ingestion_events(source_type, failed_at DESC)`);
 

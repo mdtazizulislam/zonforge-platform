@@ -196,6 +196,17 @@ export function useRiskAssets() {
   })
 }
 
+export function useRiskAsset(assetId: string) {
+  return useQuery({
+    queryKey: QK.riskAsset(assetId),
+    queryFn:  async (): Promise<WithData<AssetRiskProfile, AssetRiskProfile>> => {
+      const profile = await api.risk.assetProfile(assetId)
+      return { ...profile, data: profile }
+    },
+    enabled: !!assetId,
+  })
+}
+
 export function useMttd() {
   return useQuery({
     queryKey: QK.mttd,

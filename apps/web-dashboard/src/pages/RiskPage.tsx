@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { clsx } from 'clsx'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  useRiskSummary, useRiskUsers, useRiskUser, useMttdMetrics,
+  useRiskSummary, useRiskUsers, useRiskUser, useRiskAssets, useRiskAsset, useMttdMetrics,
 } from '@/hooks/queries'
 import { AppShell, PageContent } from '@/components/layout/AppShell'
 import { PostureGauge }         from '@/components/widgets/PostureGauge'
@@ -66,7 +66,7 @@ function EntityRow({ rank, entityId, score, severity, selected, onSelect }: {
 
 // ── Entity detail ─────────────────────────────
 
-function EntityDetail({ userId }: { userId: string }) {
+function UserDetail({ userId }: { userId: string }) {
   const { data: profile, isLoading } = useRiskUser(userId)
   const risk = profile?.riskScore
 
@@ -165,6 +165,78 @@ function EntityDetail({ userId }: { userId: string }) {
   )
 }
 
+function AssetDetail({ assetId }: { assetId: string }) {
+  const { data: profile, isLoading } = useRiskAsset(assetId)
+  const risk = profile?.riskScore
+
+  if (isLoading) return (
+    <div className="p-6 space-y-4">
+      {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+    </div>
+  )
+
+  if (!risk) return (
+    <EmptyState icon={Server} title="No risk data"
+      description="Insufficient signal history for scoring." />
+  )
+
+  const scoreColor = risk.score >= 70 ? 'text-red-400' : risk.score >= 50 ? 'text-orange-400'
+                   : risk.score >= 25 ? 'text-yellow-400' : 'text-green-400'
+  const strokeColor = risk.score >= 70 ? '#ef4444' : risk.score >= 50 ? '#f97316'
+                    : risk.score >= 25 ? '#eab308' : '#22c55e'
+  const circumference = 2 * Math.PI * 30
+  const strokeDash = (risk.score / 100) * circumference
+
+  return (
+    <div className="p-5 space-y-5 overflow-y-auto h-full">
+      <div className="flex items-center gap-5">
+        <div className="relative flex-shrink-0">
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="30" fill="none" stroke="#1f2937" strokeWidth="6" />
+            <circle cx="40" cy="40" r="30" fill="none" stroke={strokeColor} strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={`${strokeDash} ${circumference}`}
+              transform="rotate(-90 40 40)"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className={clsx('text-xl font-bold', scoreColor)}>{risk.score}</span>
+          </div>
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant={risk.severity as any}>{risk.severity}</Badge>
+            <span className="text-xs text-gray-600">Asset risk</span>
+          </div>
+          <p className="text-xs font-mono text-gray-500">{assetId.length > 28 ? `${assetId.slice(0, 28)}…` : assetId}</p>
+          <p className="text-xs text-gray-700 mt-1">Updated {new Date(risk.calculatedAt).toLocaleString()}</p>
+        </div>
+      </div>
+
+      {profile?.activeAlerts?.length > 0 ? (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Recent Alerts</p>
+          <div className="space-y-2">
+            {profile.activeAlerts.map((alert) => (
+              <Link key={alert.id} to={`/alerts/${alert.id}`}
+                className="flex items-center justify-between rounded-lg border border-gray-800 px-3 py-2 hover:border-gray-700 transition-colors">
+                <div className="min-w-0">
+                  <p className="text-sm text-gray-200 truncate">{alert.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{alert.status.replace('_', ' ')} • {alert.severity}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-600 flex-shrink-0" />
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <EmptyState icon={Shield} title="No related alerts"
+          description="This asset has no recent grouped alerts in the current scoring window." />
+      )}
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────
 // RISK PAGE
 // ─────────────────────────────────────────────
@@ -172,13 +244,15 @@ function EntityDetail({ userId }: { userId: string }) {
 export default function RiskPage() {
   const [searchParams] = useSearchParams()
   const [view, setView] = useState<'users' | 'assets'>('users')
-  const [selectedId, setId] = useState<string | null>(searchParams.get('userId'))
+  const [selectedId, setId] = useState<string | null>(searchParams.get('userId') ?? searchParams.get('assetId'))
 
   const { data: summary, isLoading: sumLoading } = useRiskSummary()
   const { data: usersData, isLoading: usersLoading } = useRiskUsers()
+  const { data: assetsData, isLoading: assetsLoading } = useRiskAssets()
   const { data: mttd } = useMttdMetrics()
 
-  const entities = usersData?.items ?? []
+  const entities = view === 'users' ? (usersData?.items ?? []) : (assetsData?.items ?? [])
+  const entitiesLoading = view === 'users' ? usersLoading : assetsLoading
   const mttdBucket = mttd
     ? (Object.values(mttd).find(
         (v): v is { p50: number; p75: number; p95: number; count: number } =>
@@ -237,7 +311,7 @@ export default function RiskPage() {
               ))}
             </div>
             <div className="max-h-[520px] overflow-y-auto">
-              {usersLoading ? (
+              {entitiesLoading ? (
                 <div className="divide-y divide-gray-800">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="flex items-center gap-3 p-4">
@@ -253,10 +327,10 @@ export default function RiskPage() {
                 <EmptyState icon={Shield} title="No risk scores yet"
                   description="Risk scores are calculated as alerts are processed." />
               ) : (
-                entities.map((u: any, i: number) => (
-                  <EntityRow key={u.entityId} rank={i + 1}
-                    entityId={u.entityId} score={u.score} severity={u.severity}
-                    selected={selectedId === u.entityId} onSelect={() => setId(u.entityId)} />
+                entities.map((entity: any, i: number) => (
+                  <EntityRow key={entity.entityId} rank={i + 1}
+                    entityId={entity.entityLabel ?? entity.entityId} score={entity.score} severity={entity.severity}
+                    selected={selectedId === entity.entityId} onSelect={() => setId(entity.entityId)} />
                 ))
               )}
             </div>
@@ -266,9 +340,9 @@ export default function RiskPage() {
           <div className="lg:col-span-2 space-y-6">
             <Card padding="none" className="min-h-[300px]">
               {selectedId
-                ? <EntityDetail userId={selectedId} />
+                ? (view === 'users' ? <UserDetail userId={selectedId} /> : <AssetDetail assetId={selectedId} />)
                 : <EmptyState icon={Shield} title="Select an entity"
-                    description="Click a user or asset to view their full risk profile." />}
+                    description={`Click a ${view === 'users' ? 'user' : 'resource'} to view the full risk profile.`} />}
             </Card>
 
             {/* MTTD section */}

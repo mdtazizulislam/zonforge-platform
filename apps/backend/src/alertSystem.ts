@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getPool } from './db.js';
+import { recalculateTenantRiskScores } from './riskScoring.js';
 
 type FindingRow = {
   id: number;
@@ -277,6 +278,11 @@ export async function materializeAlertForFinding(findingId: number) {
     const evidenceList = buildEvidenceList(finding, principal.principalType, principal.principalKey);
     const recommendedActions = buildRecommendedActions(finding);
 
+    await client.query(
+      'SELECT pg_advisory_xact_lock($1::integer, hashtext($2))',
+      [finding.tenant_id, groupingKey],
+    );
+
     const existingResult = await client.query(
       `SELECT id, severity, created_at, first_seen_at, status
        FROM alerts
@@ -369,6 +375,13 @@ export async function materializeAlertForFinding(findingId: number) {
       }
 
       await client.query('COMMIT');
+      await recalculateTenantRiskScores(finding.tenant_id).catch((error) => {
+        console.error('risk_score_failed', {
+          tenantId: finding.tenant_id,
+          trigger: 'alert_grouped',
+          error: error instanceof Error ? error.message : 'unknown',
+        });
+      });
       return;
     }
 
@@ -468,6 +481,14 @@ export async function materializeAlertForFinding(findingId: number) {
       principalKey: principal.principalKey,
       severity: normalizeSeverity(finding.severity),
     });
+
+    await recalculateTenantRiskScores(finding.tenant_id).catch((error) => {
+      console.error('risk_score_failed', {
+        tenantId: finding.tenant_id,
+        trigger: 'alert_created',
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+    });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => null);
     console.error('alert_materialization_failed', {
@@ -539,6 +560,14 @@ export async function updateAlertStatusForTenant(input: {
       previousStatus: normalizeAlertLifecycleStatus(current.status),
       newStatus: nextStatus,
       actorUserId: input.actorUserId,
+    });
+
+    await recalculateTenantRiskScores(input.tenantId).catch((error) => {
+      console.error('risk_score_failed', {
+        tenantId: input.tenantId,
+        trigger: 'alert_status_changed',
+        error: error instanceof Error ? error.message : 'unknown',
+      });
     });
 
     return true;
