@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { Queue, QueueEvents, Worker, type JobsOptions } from 'bullmq';
 import Redis from 'ioredis';
 import { getPool } from './db.js';
+import { evaluateDetectionsForNormalizedEvent } from './detectionEngine.js';
 import { type TenantMembershipRole } from './auth.js';
 import {
   requireRole as sharedRequireRole,
@@ -1025,13 +1026,14 @@ class EventPipelineRuntime {
         const normalizedPayload = buildNormalizedPayload(payload.sourceType, event, canonicalEventType);
         const severity = resolveSeverity(canonicalEventType, event);
         const pool = getPool();
-        await pool.query(
+        const normalizedInsert = await pool.query(
           `INSERT INTO normalized_events (
              tenant_id, connector_id, source_type, canonical_event_type,
              actor_email, actor_ip, target_resource, event_time,
              ingested_at, severity, raw_event_id, source_event_id, normalized_payload_json
            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9,$10,$11,$12)
-           ON CONFLICT (raw_event_id) DO NOTHING`,
+           ON CONFLICT (raw_event_id) DO NOTHING
+           RETURNING id`,
           [
             payload.tenantId,
             payload.connectorId,
@@ -1047,6 +1049,23 @@ class EventPipelineRuntime {
             JSON.stringify(normalizedPayload),
           ],
         );
+
+        const normalizedEventId = Number(normalizedInsert.rows[0]?.id ?? NaN);
+        if (Number.isFinite(normalizedEventId)) {
+          await evaluateDetectionsForNormalizedEvent({
+            id: normalizedEventId,
+            tenantId: payload.tenantId,
+            connectorId: payload.connectorId,
+            sourceType: payload.sourceType,
+            canonicalEventType,
+            actorEmail: event.actor.email,
+            actorIp: event.actor.ip,
+            targetResource: event.target.resource,
+            eventTime: event.timestamp,
+            sourceEventId: event.eventId,
+            normalizedPayload,
+          });
+        }
 
         await this.markRawEventProcessed(rawEventId, attemptsMade, null);
         this.counters.totalProcessed += 1;

@@ -121,6 +121,27 @@ type AlertRow = {
   resolved_at: string | Date | null;
 };
 
+type DetectionFindingRow = {
+  id: number;
+  rule_id: number | null;
+  tenant_id: number;
+  connector_id: number | null;
+  finding_key: string;
+  rule_key: string;
+  severity: string;
+  title: string;
+  explanation: string;
+  mitre_tactic: string;
+  mitre_technique: string;
+  source_type: string | null;
+  first_event_at: string | Date;
+  last_event_at: string | Date;
+  event_count: number;
+  evidence_json: Record<string, unknown> | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
+
 type ConnectorRow = {
   id: number;
   tenant_id: number;
@@ -410,6 +431,33 @@ function alertDetail(row: AlertRow) {
   };
 }
 
+function detectionSummary(row: DetectionFindingRow) {
+  return {
+    id: String(row.id),
+    tenantId: String(row.tenant_id),
+    connectorId: row.connector_id != null ? String(row.connector_id) : null,
+    ruleKey: row.rule_key,
+    severity: (row.severity ?? 'info').toLowerCase(),
+    title: row.title,
+    explanation: row.explanation,
+    mitreTactic: row.mitre_tactic,
+    mitreTechnique: row.mitre_technique,
+    sourceType: row.source_type,
+    firstEventAt: toIso(row.first_event_at),
+    lastEventAt: toIso(row.last_event_at),
+    eventCount: Number(row.event_count ?? 0),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+function detectionDetail(row: DetectionFindingRow) {
+  return {
+    ...detectionSummary(row),
+    evidence: row.evidence_json ?? {},
+  };
+}
+
 function investigationView(row: InvestigationRow) {
   return {
     id: String(row.id),
@@ -652,6 +700,19 @@ async function getAlertForTenant(tenantId: number, alertId: string): Promise<Ale
     [tenantId, alertId],
   );
   return (result.rows[0] as AlertRow | undefined) ?? null;
+}
+
+async function getDetectionFindingForTenant(tenantId: number, id: number): Promise<DetectionFindingRow | null> {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT *
+     FROM detection_findings
+     WHERE tenant_id = $1 AND id = $2
+     LIMIT 1`,
+    [tenantId, id],
+  );
+
+  return (result.rows[0] as DetectionFindingRow | undefined) ?? null;
 }
 
 async function getConnectorsForTenant(tenantId: number): Promise<ConnectorRow[]> {
@@ -1645,6 +1706,71 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     }
 
     return c.json(alertDetail(alert));
+  });
+
+  router.get('/v1/detections', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const severity = c.req.query('severity');
+    const ruleKey = c.req.query('ruleKey') ?? c.req.query('rule_key');
+    const sourceType = c.req.query('sourceType') ?? c.req.query('source_type');
+    const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20), 1), 100);
+
+    const conditions = ['tenant_id = $1'];
+    const params: unknown[] = [access.tenantId];
+
+    if (severity) {
+      params.push(String(severity).toLowerCase());
+      conditions.push(`LOWER(severity) = $${params.length}`);
+    }
+    if (ruleKey) {
+      params.push(String(ruleKey));
+      conditions.push(`rule_key = $${params.length}`);
+    }
+    if (sourceType) {
+      params.push(String(sourceType));
+      conditions.push(`source_type = $${params.length}`);
+    }
+
+    params.push(limit + 1);
+
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT *
+       FROM detection_findings
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY created_at DESC, id DESC
+       LIMIT $${params.length}`,
+      params,
+    );
+
+    const rows = result.rows as DetectionFindingRow[];
+    const items = rows.slice(0, limit).map(detectionSummary);
+
+    return c.json({
+      items,
+      nextCursor: rows.length > limit ? items[items.length - 1]?.createdAt ?? null : null,
+      hasMore: rows.length > limit,
+      totalCount: items.length,
+    });
+  });
+
+  router.get('/v1/detections/:id', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const detectionId = Number(c.req.param('id'));
+    if (!Number.isFinite(detectionId) || detectionId <= 0) {
+      return sendError(c, 400, 'invalid_detection_id', 'Detection id is invalid');
+    }
+
+    const finding = await getDetectionFindingForTenant(access.tenantId, detectionId);
+    if (!finding) {
+      return sendError(c, 404, 'not_found', 'Detection not found');
+    }
+
+    return c.json(detectionDetail(finding));
   });
 
   router.patch('/v1/alerts/:id/status', async (c) => {

@@ -1,0 +1,52 @@
+Backend build command:
+
+`npm --prefix c:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform-main-release\apps\backend run build`
+
+Output:
+
+> @zonforge/backend@1.0.0 build
+> tsc
+
+Frontend build:
+
+Not required for SERIAL 12 because no frontend files were changed.
+
+Runtime excerpt:
+
+Connected to database.
+Database tables created.
+Default plans seeded.
+IMPORTANT! Eviction policy is allkeys-lru. It should be "noeviction"
+[ingestion] Queue runtime ready on zf-ingestion-events.
+
+ZonForge SaaS Backend starting on port 3109
+
+POST /v1/auth/signup -> 200
+POST /v1/auth/step-up/verify -> 200
+POST /v1/connectors -> 201
+POST /v1/connectors/1/ingestion-token -> 201
+POST /v1/events/ingest -> 202
+POST /v1/events/ingest -> 202
+POST /v1/events/ingest -> 202
+POST /v1/events/ingest -> 202
+GET /v1/detections -> 200
+GET /v1/detections/1 -> 200
+GET /v1/detections/3 -> 200
+GET /v1/detections/2 -> 200
+GET /v1/detections/3 -> 404
+
+Detection runtime logs:
+
+detection_rule_matched ruleKey=suspicious_login normalizedEventId=2 actorEmail=alice@example.com actorIp=198.51.100.20 historicalIpCount=1
+detection_finding_created findingId=1 ruleKey=suspicious_login severity=medium sourceType=microsoft365 eventCount=2
+detection_rule_matched ruleKey=privilege_escalation normalizedEventId=3 actorEmail=carol@example.com targetResource=GlobalAdmin severity=critical
+detection_finding_created findingId=2 ruleKey=privilege_escalation severity=critical sourceType=microsoft365 eventCount=1
+detection_rule_matched ruleKey=brute_force normalizedEventId=8 actorField=actor_email actorValue=bob@example.com eventCount=5
+detection_finding_created findingId=3 ruleKey=brute_force severity=high sourceType=microsoft365 eventCount=5
+
+Queue/runtime evidence:
+
+- `recentEvents24h: 8`
+- `failedEvents24h: 0`
+- `queueAvailable: true`
+- Findings were created from worker-processed normalized events, not from direct DB seeding.

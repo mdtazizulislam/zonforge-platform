@@ -673,6 +673,44 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS detection_rules (
+        id BIGSERIAL PRIMARY KEY,
+        rule_key VARCHAR(64) NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        description TEXT,
+        severity VARCHAR(32) NOT NULL,
+        mitre_tactic VARCHAR(128) NOT NULL,
+        mitre_technique VARCHAR(128) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS detection_findings (
+        id BIGSERIAL PRIMARY KEY,
+        rule_id BIGINT REFERENCES detection_rules(id) ON DELETE SET NULL,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL,
+        finding_key VARCHAR(128) NOT NULL UNIQUE,
+        rule_key VARCHAR(64) NOT NULL,
+        severity VARCHAR(32) NOT NULL,
+        title TEXT NOT NULL,
+        explanation TEXT NOT NULL,
+        mitre_tactic VARCHAR(128) NOT NULL,
+        mitre_technique VARCHAR(128) NOT NULL,
+        source_type VARCHAR(64),
+        first_event_at TIMESTAMPTZ NOT NULL,
+        last_event_at TIMESTAMPTZ NOT NULL,
+        event_count INTEGER NOT NULL DEFAULT 1,
+        evidence_json JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS failed_ingestion_events (
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -824,6 +862,32 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE normalized_events ADD COLUMN IF NOT EXISTS raw_event_id BIGINT REFERENCES raw_ingestion_events(id) ON DELETE SET NULL`);
     await client.query(`ALTER TABLE normalized_events ADD COLUMN IF NOT EXISTS source_event_id VARCHAR(255)`);
     await client.query(`ALTER TABLE normalized_events ADD COLUMN IF NOT EXISTS normalized_payload_json JSONB`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS rule_key VARCHAR(64)`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS title TEXT`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS description TEXT`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS severity VARCHAR(32)`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS mitre_tactic VARCHAR(128)`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS mitre_technique VARCHAR(128)`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE detection_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS rule_id BIGINT REFERENCES detection_rules(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS finding_key VARCHAR(128)`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS rule_key VARCHAR(64)`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS severity VARCHAR(32)`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS title TEXT`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS explanation TEXT`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS mitre_tactic VARCHAR(128)`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS mitre_technique VARCHAR(128)`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS source_type VARCHAR(64)`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS first_event_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS last_event_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS event_count INTEGER NOT NULL DEFAULT 1`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS evidence_json JSONB`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`ALTER TABLE detection_findings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`ALTER TABLE failed_ingestion_events ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE failed_ingestion_events ADD COLUMN IF NOT EXISTS connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL`);
     await client.query(`ALTER TABLE failed_ingestion_events ADD COLUMN IF NOT EXISTS raw_event_id BIGINT REFERENCES raw_ingestion_events(id) ON DELETE SET NULL`);
@@ -894,9 +958,41 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_normalized_events_connector ON normalized_events(connector_id, event_time DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_normalized_events_source_type ON normalized_events(source_type, event_time DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_normalized_events_event_type ON normalized_events(canonical_event_type, event_time DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_normalized_events_actor_email ON normalized_events(tenant_id, actor_email, event_time DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_normalized_events_actor_ip ON normalized_events(tenant_id, actor_ip, event_time DESC)`);
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_normalized_events_raw_event ON normalized_events(raw_event_id) WHERE raw_event_id IS NOT NULL`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_detection_rules_rule_key ON detection_rules(rule_key)`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_detection_findings_finding_key ON detection_findings(finding_key)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_created ON detection_findings(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_rule ON detection_findings(tenant_id, rule_key, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_detection_findings_tenant_severity ON detection_findings(tenant_id, severity, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_tenant ON failed_ingestion_events(tenant_id, failed_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_source_type ON failed_ingestion_events(source_type, failed_at DESC)`);
+
+    await client.query(`
+      INSERT INTO detection_rules (
+        rule_key,
+        title,
+        description,
+        severity,
+        mitre_tactic,
+        mitre_technique,
+        enabled,
+        created_at,
+        updated_at
+      ) VALUES
+        ('suspicious_login', 'Suspicious login', 'Successful sign-in from an IP that differs from recent tenant-scoped successful activity for the same identity.', 'medium', 'Initial Access', 'T1078 Valid Accounts', TRUE, NOW(), NOW()),
+        ('brute_force', 'Brute force', 'Repeated sign-in failures for the same tenant-scoped identity or IP inside a bounded time window.', 'high', 'Credential Access', 'T1110 Brute Force', TRUE, NOW(), NOW()),
+        ('privilege_escalation', 'Privilege escalation', 'Privilege or role change activity that may expand administrative access.', 'high', 'Privilege Escalation', 'T1098 Account Manipulation', TRUE, NOW(), NOW())
+      ON CONFLICT (rule_key) DO UPDATE
+      SET title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          severity = EXCLUDED.severity,
+          mitre_tactic = EXCLUDED.mitre_tactic,
+          mitre_technique = EXCLUDED.mitre_technique,
+          enabled = EXCLUDED.enabled,
+          updated_at = NOW()
+    `);
 
     // ─── LEGACY BILLING_SUBSCRIPTIONS (USER-BASED, FOR BACKWARD COMPAT) ───
     await client.query(`

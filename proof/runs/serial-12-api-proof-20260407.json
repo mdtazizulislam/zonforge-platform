@@ -1,0 +1,146 @@
+{
+  "users": {
+    "owner": "serial12.owner+1775620981808@example.com",
+    "secondTenantOwner": "serial12.owner2+1775620981808@example.com"
+  },
+  "api": {
+    "owner_signup": {
+      "status": 200,
+      "userId": 1
+    },
+    "step_up": {
+      "status": 200
+    },
+    "connector_create": {
+      "status": 201,
+      "connectorId": "1"
+    },
+    "token_create": {
+      "status": 201,
+      "tokenPrefix": "zfi_563a227fcaf09e"
+    },
+    "baseline_success_ingest": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "suspicious_login_ingest": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "brute_force_ingest": {
+      "status": 202,
+      "acceptedCount": 5
+    },
+    "privilege_escalation_ingest": {
+      "status": 202,
+      "acceptedCount": 1
+    },
+    "detections_list": {
+      "status": 200,
+      "totalCount": 3,
+      "ruleKeys": [
+        "brute_force",
+        "privilege_escalation",
+        "suspicious_login"
+      ]
+    },
+    "detections_detail": {
+      "suspicious_login": {
+        "status": 200,
+        "severity": "medium",
+        "mitreTactic": "Initial Access",
+        "mitreTechnique": "T1078 Valid Accounts",
+        "explanation": "alice@example.com signed in successfully from 198.51.100.20, which differs from recent successful sign-in IP activity for the same tenant-scoped account.",
+        "evidence": {
+          "events": [
+            {
+              "actorIp": "198.51.100.20",
+              "eventTime": "2026-04-08T04:03:02.343Z",
+              "actorEmail": "alice@example.com",
+              "sourceEventId": "serial12-suspicious-1775620981808",
+              "targetResource": "m365-portal",
+              "normalizedEventId": "2",
+              "canonicalEventType": "signin_success"
+            },
+            {
+              "actorIp": "203.0.113.10",
+              "eventTime": "2026-04-08T04:03:02.309Z",
+              "actorEmail": "alice@example.com",
+              "sourceEventId": "serial12-baseline-1775620981808",
+              "targetResource": "m365-portal",
+              "normalizedEventId": "1",
+              "canonicalEventType": "signin_success"
+            }
+          ],
+          "currentIp": "198.51.100.20",
+          "actorEmail": "alice@example.com",
+          "historicalIps": [
+            "203.0.113.10"
+          ]
+        }
+      },
+      "brute_force": {
+        "status": 200,
+        "severity": "high",
+        "mitreTactic": "Credential Access",
+        "mitreTechnique": "T1110 Brute Force",
+        "explanation": "5 failed sign-in events were observed within 10 minutes for bob@example.com.",
+        "evidence": {
+          "actorIp": "203.0.113.44",
+          "threshold": 5,
+          "actorEmail": "bob@example.com",
+          "windowMinutes": 10,
+          "sourceEventIds": [
+            "serial12-bruteforce-1775620981808-0",
+            "serial12-bruteforce-1775620981808-1",
+            "serial12-bruteforce-1775620981808-2",
+            "serial12-bruteforce-1775620981808-3",
+            "serial12-bruteforce-1775620981808-4"
+          ],
+          "normalizedEventIds": [
+            "4",
+            "5",
+            "6",
+            "7",
+            "8"
+          ]
+        }
+      },
+      "privilege_escalation": {
+        "status": 200,
+        "severity": "critical",
+        "mitreTactic": "Privilege Escalation",
+        "mitreTechnique": "T1098 Account Manipulation",
+        "explanation": "carol@example.com performed a privilege-related change affecting GlobalAdmin.",
+        "evidence": {
+          "events": [
+            {
+              "actorIp": "203.0.113.77",
+              "eventTime": "2026-04-08T04:03:02.387Z",
+              "actorEmail": "carol@example.com",
+              "sourceEventId": "serial12-privilege-1775620981808",
+              "targetResource": "GlobalAdmin",
+              "normalizedEventId": "3",
+              "canonicalEventType": "privilege_change"
+            }
+          ],
+          "actorIp": "203.0.113.77",
+          "actorEmail": "carol@example.com",
+          "targetResource": "GlobalAdmin"
+        }
+      }
+    },
+    "queue_health": {
+      "status": 200,
+      "recentEvents24h": 8,
+      "failedEvents24h": 0,
+      "queueAvailable": true
+    },
+    "tenant_isolation": {
+      "listStatus": 200,
+      "listCount": 0,
+      "detailStatus": 404,
+      "detailCode": "not_found"
+    }
+  }
+}
