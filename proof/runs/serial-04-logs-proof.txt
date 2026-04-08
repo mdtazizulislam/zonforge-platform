@@ -1,0 +1,50 @@
+SERIAL S4 live logs and DB proof
+Backend: http://localhost:3112
+Database: zonforge_serial_15_investigations
+Tenant: 3
+Connector: 2
+Token prefix: zfi_dec4d18edfeae0
+
+Runtime log evidence
+
+Backend startup on port 3112:
+- Connected to database.
+- Database tables created.
+- Default plans seeded.
+- IMPORTANT! Eviction policy is allkeys-lru. It should be "noeviction"
+- [ingestion] Queue runtime ready on zf-ingestion-events.
+- ZonForge SaaS Backend starting on port 3112
+
+Runtime request and worker excerpt:
+- POST /v1/events/ingest -> 202
+- [ingestion-api] queued batch { tenantId: 3, connectorId: '2', connectorName: 'Serial S4 AWS Connector', sourceType: 'aws', acceptedCount: 1, rejectedCount: 0 }
+- [ingestion-worker] processed batch { tenantId: 3, connectorId: '2' }
+- POST /v1/events/ingest -> 429 (11ms)
+- GET /internal/ingestion/queue-health -> 200
+
+Live database evidence from ingestion_security_events:
+- replay_detected | api_duplicate_source_event | zfi_dec4d18edfeae0 | {"count": 1, "eventIds": ["serial-s4-live-1775626077452-valid-1"]}
+- anomaly_detected | invalid_payload | zfi_dec4d18edfeae0 | {"message": "Request body must be valid JSON."}
+- anomaly_detected | payload_too_large | zfi_dec4d18edfeae0 | {"contentLength": 2100321, "maxPayloadBytes": 512000}
+- rate_limited | token_limit | zfi_dec4d18edfeae0 | {"ipLimit": 240, "resetAt": "2026-04-08T05:29:14.985Z", "tokenLimit": 120}
+
+Live database evidence from ingestion_request_logs:
+- request rows for tenant 3 were persisted with status=processed, accepted_count=1, rejected_count=0, source_type=aws
+- recent request ids included 1775626129151-8fa738a97d through 1775626128946-b16402e647
+
+Live database evidence from raw_ingestion_events:
+- serial-s4-live-1775626077452-rate-116 | processed
+- serial-s4-live-1775626077452-rate-115 | processed
+- serial-s4-live-1775626077452-rate-114 | processed
+
+Live database evidence from normalized_events:
+- serial-s4-live-1775626077452-rate-116 | signin_success
+- serial-s4-live-1775626077452-rate-115 | signin_success
+- serial-s4-live-1775626077452-rate-114 | signin_success
+
+Security validation
+
+- Raw token persistence check against ingestion_security_events metadata_json returned 0 matches.
+- Raw token search against the captured runtime log stream returned 0 matches.
+- Queue health remained available=true with waiting=0, active=0, totalProcessed=117, totalFailed=0, totalDeadLettered=0.
+- Tenant-scoped queue security counters were rateLimited24h=1, replayDetected24h=1, anomalyDetected24h=2.

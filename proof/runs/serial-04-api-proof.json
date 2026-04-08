@@ -1,0 +1,99 @@
+{
+  "metadata": {
+    "backend": "http://localhost:3112",
+    "database": "zonforge_serial_15_investigations",
+    "tenantId": "3",
+    "userId": 3,
+    "email": "serial.s4.live+1775626077452@example.com",
+    "workspaceName": "Serial S4 Live 1775626077452",
+    "connectorId": "2",
+    "tokenPrefix": "zfi_dec4d18edfeae0"
+  },
+  "api": {
+    "signup": {
+      "status": 200,
+      "userId": 3,
+      "tenantId": "3"
+    },
+    "stepUp": {
+      "status": 200,
+      "expiresAt": "2026-04-08T05:38:05.027Z"
+    },
+    "connectorCreate": {
+      "status": 201,
+      "connectorId": "2"
+    },
+    "tokenCreate": {
+      "status": 201,
+      "tokenPrefix": "zfi_dec4d18edfeae0"
+    },
+    "validIngestion": {
+      "status": 202,
+      "acceptedCount": 1,
+      "batchId": "490bf32b-1632-4400-adc3-480551681071"
+    },
+    "replayAfterPersistence": {
+      "status": 409,
+      "code": "replay_detected",
+      "message": "All events in this request were previously ingested."
+    },
+    "malformedPayload": {
+      "status": 400,
+      "code": "invalid_ingestion_payload",
+      "message": "Request body must be valid JSON."
+    },
+    "oversizedPayload": {
+      "status": 413,
+      "code": "payload_too_large",
+      "message": "Payload exceeds 512000 bytes."
+    },
+    "rateLimit": {
+      "totalBurstRequests": 117,
+      "first429At": 117,
+      "status": 429,
+      "code": "ingestion_rate_limited"
+    },
+    "queueHealth": {
+      "status": 200,
+      "body": {
+        "queue": {
+          "available": true,
+          "reason": null,
+          "counts": {
+            "waiting": 0,
+            "active": 0,
+            "delayed": 0,
+            "failed": 2,
+            "completed": 159
+          },
+          "counters": {
+            "totalReceived": 117,
+            "totalProcessed": 117,
+            "totalFailed": 0,
+            "totalDeadLettered": 0
+          }
+        },
+        "tenantSummary": {
+          "recentEvents24h": 117,
+          "failedEvents24h": 0,
+          "requests24h": 117
+        },
+        "securitySummary": {
+          "rateLimited24h": 1,
+          "replayDetected24h": 1,
+          "anomalyDetected24h": 2
+        }
+      }
+    },
+    "healthAfterTests": {
+      "status": 200,
+      "body": {
+        "status": "healthy"
+      }
+    }
+  },
+  "notes": [
+    "Replay protection was verified after the first valid event reached raw_ingestion_events, because replay detection checks persisted source_event_id values before enqueue.",
+    "Rate limiting used the live default token limit of 120 requests per 60 seconds; the first 429 response arrived on the 117th burst request in this run because the earlier valid request and replay-path traffic consumed the same token window."
+  ]
+}

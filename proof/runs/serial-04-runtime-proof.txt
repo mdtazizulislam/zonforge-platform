@@ -1,0 +1,49 @@
+SERIAL S4 live runtime proof
+
+Execution target
+- Backend process: node --import tsx src/index.ts
+- Port: 3112
+- Database URL target: postgresql://zonforge:changeme_local@127.0.0.1:5432/zonforge_serial_15_investigations
+- Redis host: 127.0.0.1:6379
+
+Operational notes
+- The pre-existing 3112 listener was no longer present during proof execution, so the standalone backend was restarted on the same port with the same database and Redis settings to finish the live proof and capture runtime logs.
+- Redis reported eviction policy warnings: allkeys-lru is configured, while the runtime expects noeviction.
+
+API and runtime outcomes
+- Valid ingestion returned 202 and queued batch 490bf32b-1632-4400-adc3-480551681071.
+- Replay of the same event after persistence returned 409 replay_detected.
+- Malformed JSON returned 400 invalid_ingestion_payload.
+- Oversized payload returned 413 payload_too_large.
+- The live token burst hit 429 ingestion_rate_limited on request 117.
+- GET /internal/ingestion/queue-health returned 200 with available=true.
+- GET /health returned 200 with {"status":"healthy"} after the burst.
+
+Queue health snapshot
+- waiting=0
+- active=0
+- delayed=0
+- failed=2
+- completed=159
+- totalReceived=117
+- totalProcessed=117
+- totalFailed=0
+- totalDeadLettered=0
+- tenant recentEvents24h=117
+- tenant failedEvents24h=0
+- tenant requests24h=117
+- security rateLimited24h=1
+- security replayDetected24h=1
+- security anomalyDetected24h=2
+
+Build verification
+- Command: npm --prefix c:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform-main-release\apps\backend run build
+- Result: success
+- Output:
+  > @zonforge/backend@1.0.0 build
+  > tsc
+
+System stability
+- The restarted 3112 backend remained healthy after proof execution.
+- Accepted ingestion requests were processed through raw_ingestion_events and normalized_events.
+- No raw ingestion token value was found in captured runtime logs or persisted ingestion security telemetry.
