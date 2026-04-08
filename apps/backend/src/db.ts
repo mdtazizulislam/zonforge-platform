@@ -554,7 +554,12 @@ export async function initDatabase() {
         status VARCHAR(32) NOT NULL DEFAULT 'pending',
         config_json JSONB,
         secret_ciphertext TEXT,
+        secret_storage_provider VARCHAR(64),
+        secret_reference VARCHAR(255),
+        secret_fingerprint VARCHAR(128),
         secret_key_version INTEGER NOT NULL DEFAULT 1,
+        secret_last_rotated_at TIMESTAMPTZ,
+        secret_rotation_count INTEGER NOT NULL DEFAULT 0,
         poll_interval_minutes INTEGER DEFAULT 15,
         last_poll_at TIMESTAMPTZ,
         last_event_at TIMESTAMPTZ,
@@ -577,6 +582,7 @@ export async function initDatabase() {
         token_hash VARCHAR(128) NOT NULL UNIQUE,
         label VARCHAR(128) NOT NULL DEFAULT 'default',
         status VARCHAR(32) NOT NULL DEFAULT 'active',
+        rotated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         expires_at TIMESTAMPTZ,
         last_used_at TIMESTAMPTZ,
         last_used_ip VARCHAR(128),
@@ -718,7 +724,12 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'pending'`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS config_json JSONB`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_ciphertext TEXT`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_storage_provider VARCHAR(64)`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_reference VARCHAR(255)`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_fingerprint VARCHAR(128)`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_key_version INTEGER NOT NULL DEFAULT 1`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_last_rotated_at TIMESTAMPTZ`);
+    await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS secret_rotation_count INTEGER NOT NULL DEFAULT 0`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS poll_interval_minutes INTEGER DEFAULT 15`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE connector_configs ADD COLUMN IF NOT EXISTS last_event_at TIMESTAMPTZ`);
@@ -736,6 +747,7 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS token_hash VARCHAR(128)`);
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS label VARCHAR(128) NOT NULL DEFAULT 'default'`);
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'active'`);
+    await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS last_used_ip VARCHAR(128)`);
@@ -743,6 +755,7 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ`);
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`ALTER TABLE connector_ingestion_tokens ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+    await client.query(`UPDATE connector_ingestion_tokens SET rotated_at = COALESCE(rotated_at, created_at, NOW()) WHERE rotated_at IS NULL`);
     await client.query(`ALTER TABLE ingestion_request_logs ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE ingestion_request_logs ADD COLUMN IF NOT EXISTS connector_id BIGINT REFERENCES connector_configs(id) ON DELETE SET NULL`);
     await client.query(`ALTER TABLE ingestion_request_logs ADD COLUMN IF NOT EXISTS request_id VARCHAR(128)`);

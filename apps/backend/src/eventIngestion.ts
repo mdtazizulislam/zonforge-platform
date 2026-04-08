@@ -907,8 +907,8 @@ class EventPipelineRuntime {
     await pool.query(
       `INSERT INTO connector_ingestion_tokens (
          tenant_id, connector_id, token_prefix, token_hash, label,
-         status, created_by_user_id, created_at, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,'active',$6,NOW(),NOW())`,
+         status, rotated_at, created_by_user_id, created_at, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,'active',NOW(),$6,NOW(),NOW())`,
       [access.tenantId, connectorId, tokenPrefix, tokenHash, label ?? 'default', access.userId],
     );
 
@@ -933,6 +933,7 @@ class EventPipelineRuntime {
         token: rawToken,
         tokenPrefix,
         status: 'active',
+        rotatedAt: new Date().toISOString(),
       },
     };
   }
@@ -981,7 +982,7 @@ class EventPipelineRuntime {
 
     const pool = getPool();
     const result = await pool.query(
-      `SELECT token_prefix, status, expires_at, last_used_at, last_used_ip, revoked_at, created_at
+      `SELECT token_prefix, status, rotated_at, expires_at, last_used_at, last_used_ip, revoked_at, created_at
        FROM connector_ingestion_tokens
        WHERE tenant_id = $1 AND connector_id = $2
        ORDER BY created_at DESC
@@ -992,6 +993,7 @@ class EventPipelineRuntime {
     const row = result.rows[0] as {
       token_prefix: string;
       status: string;
+      rotated_at: string | Date | null;
       expires_at: string | Date | null;
       last_used_at: string | Date | null;
       last_used_ip: string | null;
@@ -1006,6 +1008,7 @@ class EventPipelineRuntime {
         configured: Boolean(row),
         tokenPrefix: row?.token_prefix ?? null,
         status: row?.status ?? 'missing',
+        rotatedAt: toIso(row?.rotated_at),
         expiresAt: toIso(row?.expires_at),
         lastUsedAt: toIso(row?.last_used_at),
         lastUsedIp: row?.last_used_ip ?? null,
@@ -1318,6 +1321,32 @@ export function createEventPipelineRouter(runtime: EventPipelineRuntime) {
   });
 
   router.post('/v1/connectors/:id/ingestion-token', async (c) => {
+    const access = await getTenantAccess(c);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, TOKEN_MANAGER_ROLES, 'Only owners and admins can manage ingestion credentials.', 'connector.ingestion_token.rotate');
+    if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to rotate ingestion credentials.', {
+      action: 'connector.ingestion_token.rotate',
+    });
+    if (stepUpRequired) return stepUpRequired;
+
+    const connectorId = Number(c.req.param('id'));
+    if (!Number.isFinite(connectorId) || connectorId <= 0) {
+      return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid.');
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const label = normalizeOptionalString(body.label);
+    const result = await runtime.createConnectorToken(access, connectorId, label);
+    if (result.error === 'not_found') {
+      return sendError(c, 404, 'not_found', 'Connector not found.');
+    }
+    return c.json(result.payload, 201);
+  });
+
+  router.post('/v1/connectors/:id/rotate-ingestion-token', async (c) => {
     const access = await getTenantAccess(c);
     if (access instanceof Response) return access;
 

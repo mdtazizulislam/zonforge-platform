@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 export const SUPPORTED_CONNECTOR_TYPES = ['aws', 'microsoft_365', 'google_workspace'] as const;
 export const CONNECTOR_STATUSES = ['pending', 'connected', 'failed', 'disabled'] as const;
@@ -8,6 +8,27 @@ export type ConnectorStatus = (typeof CONNECTOR_STATUSES)[number];
 
 export type ConnectorSettings = Record<string, unknown>;
 export type ConnectorSecrets = Record<string, string>;
+export type ConnectorSecretStorageProvider = 'database_encrypted';
+
+export type ConnectorSecretMetadata = {
+  hasStoredSecrets: boolean;
+  storageProvider: ConnectorSecretStorageProvider | null;
+  reference: string | null;
+  keyVersion: number;
+  fingerprint: string | null;
+  lastRotatedAt: string | null;
+  rotationCount: number;
+};
+
+export type StoredConnectorSecretRecord = {
+  ciphertext: string | null;
+  storageProvider: ConnectorSecretStorageProvider | null;
+  reference: string | null;
+  fingerprint: string | null;
+  keyVersion: number;
+  rotatedAt: string | null;
+  rotationCount: number;
+};
 
 export type ConnectorValidationResult = {
   valid: boolean;
@@ -76,6 +97,86 @@ function compactSecrets(value: Record<string, string | undefined>): ConnectorSec
 function getEncryptionKey(): Buffer {
   const secret = process.env.CONNECTOR_CREDENTIALS_SECRET ?? process.env.JWT_SECRET ?? 'zonforge-dev-connector-secret';
   return createHash('sha256').update(secret).digest();
+}
+
+function stableSecretPayload(secrets: ConnectorSecrets): string {
+  return JSON.stringify(
+    Object.keys(secrets)
+      .sort((left, right) => left.localeCompare(right))
+      .reduce<Record<string, string>>((accumulator, key) => {
+        accumulator[key] = secrets[key] ?? '';
+        return accumulator;
+      }, {}),
+  );
+}
+
+function buildSecretReference(): string {
+  return `database_encrypted:connector:${randomUUID()}`;
+}
+
+export function storeConnectorSecrets(input: {
+  secrets: ConnectorSecrets;
+  currentRotationCount?: number | null;
+}): StoredConnectorSecretRecord {
+  const keyVersion = 1;
+  if (Object.keys(input.secrets).length === 0) {
+    return {
+      ciphertext: null,
+      storageProvider: null,
+      reference: null,
+      fingerprint: null,
+      keyVersion,
+      rotatedAt: null,
+      rotationCount: Math.max(0, Number(input.currentRotationCount ?? 0)),
+    };
+  }
+
+  const rotatedAt = new Date().toISOString();
+  const fingerprint = createHmac('sha256', getEncryptionKey())
+    .update(stableSecretPayload(input.secrets))
+    .digest('hex');
+
+  return {
+    ciphertext: encryptConnectorSecrets(input.secrets),
+    storageProvider: 'database_encrypted',
+    reference: buildSecretReference(),
+    fingerprint,
+    keyVersion,
+    rotatedAt,
+    rotationCount: Math.max(0, Number(input.currentRotationCount ?? 0)) + 1,
+  };
+}
+
+export function describeStoredConnectorSecrets(input: {
+  connectorId?: number | null;
+  secretCiphertext?: string | null;
+  secretStorageProvider?: string | null;
+  secretReference?: string | null;
+  secretKeyVersion?: number | null;
+  secretFingerprint?: string | null;
+  secretLastRotatedAt?: string | Date | null;
+  secretRotationCount?: number | null;
+}): ConnectorSecretMetadata {
+  const hasStoredSecrets = Boolean(input.secretCiphertext);
+  const fallbackReference = hasStoredSecrets && input.connectorId
+    ? `database_encrypted:connector:legacy:${input.connectorId}`
+    : null;
+
+  return {
+    hasStoredSecrets,
+    storageProvider: hasStoredSecrets
+      ? ((input.secretStorageProvider as ConnectorSecretStorageProvider | null) ?? 'database_encrypted')
+      : null,
+    reference: hasStoredSecrets ? input.secretReference ?? fallbackReference : null,
+    keyVersion: Math.max(1, Number(input.secretKeyVersion ?? 1)),
+    fingerprint: hasStoredSecrets ? input.secretFingerprint ?? null : null,
+    lastRotatedAt: hasStoredSecrets && input.secretLastRotatedAt
+      ? new Date(input.secretLastRotatedAt).toISOString()
+      : null,
+    rotationCount: hasStoredSecrets
+      ? Math.max(1, Number(input.secretRotationCount ?? 1))
+      : Math.max(0, Number(input.secretRotationCount ?? 0)),
+  };
 }
 
 export function normalizeConnectorType(value: unknown): SupportedConnectorType | null {

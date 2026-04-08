@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  describeStoredConnectorSecrets,
   decryptConnectorSecrets,
-  encryptConnectorSecrets,
   normalizeConnectorStatus,
   normalizeConnectorType,
   parseConnectorPayload,
+  storeConnectorSecrets,
   validateConnectorConfiguration,
   type SupportedConnectorType,
 } from './connectorFoundation.js';
@@ -128,7 +129,12 @@ type ConnectorRow = {
   status: string;
   config_json: Record<string, unknown> | null;
   secret_ciphertext: string | null;
+  secret_storage_provider: string | null;
+  secret_reference: string | null;
+  secret_fingerprint: string | null;
   secret_key_version: number | null;
+  secret_last_rotated_at: string | Date | null;
+  secret_rotation_count: number | null;
   poll_interval_minutes: number | null;
   last_poll_at: string | Date | null;
   last_event_at: string | Date | null;
@@ -337,6 +343,16 @@ function connectorSummary(row: ConnectorRow) {
     ? Math.max(0, Math.round((Date.now() - new Date(row.last_event_at).getTime()) / 60_000))
     : null;
   const normalizedType = normalizeConnectorType(row.type);
+  const secretMetadata = describeStoredConnectorSecrets({
+    connectorId: row.id,
+    secretCiphertext: row.secret_ciphertext,
+    secretStorageProvider: row.secret_storage_provider,
+    secretReference: row.secret_reference,
+    secretKeyVersion: row.secret_key_version,
+    secretFingerprint: row.secret_fingerprint,
+    secretLastRotatedAt: row.secret_last_rotated_at,
+    secretRotationCount: row.secret_rotation_count,
+  });
 
   return {
     id: String(row.id),
@@ -345,7 +361,7 @@ function connectorSummary(row: ConnectorRow) {
     typeLabel: normalizedType ? CONNECTOR_TYPE_LABELS[normalizedType] : row.type,
     status,
     settings: row.config_json ?? {},
-    hasStoredSecrets: Boolean(row.secret_ciphertext),
+    hasStoredSecrets: secretMetadata.hasStoredSecrets,
     lastPollAt: toIso(row.last_poll_at),
     lastEventAt: toIso(row.last_event_at),
     lastValidatedAt: toIso(row.last_validated_at),
@@ -661,6 +677,61 @@ async function getConnectorForTenant(tenantId: number, connectorId: number): Pro
   );
 
   return (result.rows[0] as ConnectorRow | undefined) ?? null;
+}
+
+async function getLatestConnectorIngestionToken(tenantId: number, connectorId: number) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT token_prefix, status, rotated_at, expires_at, last_used_at, last_used_ip, revoked_at, created_at
+     FROM connector_ingestion_tokens
+     WHERE tenant_id = $1 AND connector_id = $2
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [tenantId, connectorId],
+  );
+
+  return (result.rows[0] as {
+    token_prefix: string;
+    status: string;
+    rotated_at: string | Date | null;
+    expires_at: string | Date | null;
+    last_used_at: string | Date | null;
+    last_used_ip: string | null;
+    revoked_at: string | Date | null;
+    created_at: string | Date | null;
+  } | undefined) ?? null;
+}
+
+async function getConnectorSecuritySnapshot(row: ConnectorRow) {
+  const tokenRow = await getLatestConnectorIngestionToken(row.tenant_id, row.id);
+  const secretMetadata = describeStoredConnectorSecrets({
+    connectorId: row.id,
+    secretCiphertext: row.secret_ciphertext,
+    secretStorageProvider: row.secret_storage_provider,
+    secretReference: row.secret_reference,
+    secretKeyVersion: row.secret_key_version,
+    secretFingerprint: row.secret_fingerprint,
+    secretLastRotatedAt: row.secret_last_rotated_at,
+    secretRotationCount: row.secret_rotation_count,
+  });
+
+  return {
+    connectorId: String(row.id),
+    connectorName: row.name,
+    connectorType: normalizeConnectorType(row.type) ?? row.type,
+    secrets: secretMetadata,
+    ingestionToken: {
+      configured: Boolean(tokenRow),
+      tokenPrefix: tokenRow?.token_prefix ?? null,
+      status: tokenRow?.status ?? 'missing',
+      rotatedAt: toIso(tokenRow?.rotated_at),
+      expiresAt: toIso(tokenRow?.expires_at),
+      lastUsedAt: toIso(tokenRow?.last_used_at),
+      lastUsedIp: tokenRow?.last_used_ip ?? null,
+      revokedAt: toIso(tokenRow?.revoked_at),
+      createdAt: toIso(tokenRow?.created_at),
+    },
+  };
 }
 
 function evaluateConnectorReadiness(row: ConnectorRow) {
@@ -1705,6 +1776,46 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     return c.json(connectors.map(connectorSummary));
   });
 
+  router.get('/v1/connectors/:id/security', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can view connector security metadata.', 'connector.security.read');
+    if (denied) return denied;
+
+    const connectorId = Number(c.req.param('id'));
+    if (!Number.isFinite(connectorId) || connectorId <= 0) {
+      return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
+    }
+
+    const existing = await requireOwnership(c, {
+      access,
+      resource: await getConnectorForTenant(access.tenantId, connectorId),
+      canAccess: () => true,
+      forbiddenMessage: 'You do not have permission to view this connector.',
+      notFoundCode: 'not_found',
+      notFoundMessage: 'Connector not found',
+      action: 'connector.security.read',
+      metadata: { connectorId },
+    });
+    if (existing instanceof Response) return existing;
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'connector.security_viewed',
+      source: 'connector_security',
+      message: 'Connector security metadata viewed',
+      payload: {
+        connectorId,
+        name: existing.name,
+        type: existing.type,
+      },
+    });
+
+    return c.json(await getConnectorSecuritySnapshot(existing));
+  });
+
   router.post('/v1/connectors', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
@@ -1737,14 +1848,15 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
 
     const enabled = body.enabled !== false;
     const status = enabled ? 'pending' : 'disabled';
-    const secretCiphertext = encryptConnectorSecrets(connectorInput.secrets);
+    const storedSecrets = storeConnectorSecrets({ secrets: connectorInput.secrets });
 
     const pool = getPool();
     const result = await pool.query(
       `INSERT INTO connector_configs (
-         tenant_id, name, type, status, config_json, secret_ciphertext, secret_key_version,
-         poll_interval_minutes, is_enabled, last_error_message, consecutive_errors
-       ) VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $8, NULL, 0)
+         tenant_id, name, type, status, config_json, secret_ciphertext, secret_storage_provider,
+         secret_reference, secret_fingerprint, secret_key_version, secret_last_rotated_at,
+         secret_rotation_count, poll_interval_minutes, is_enabled, last_error_message, consecutive_errors
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL, 0)
        RETURNING *`,
       [
         access.tenantId,
@@ -1752,7 +1864,13 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
         connectorInput.type,
         status,
         JSON.stringify(connectorInput.settings),
-        secretCiphertext,
+        storedSecrets.ciphertext,
+        storedSecrets.storageProvider,
+        storedSecrets.reference,
+        storedSecrets.fingerprint,
+        storedSecrets.keyVersion,
+        storedSecrets.rotatedAt,
+        storedSecrets.rotationCount,
         connectorInput.pollIntervalMinutes,
         enabled,
       ],
@@ -1770,11 +1888,125 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
         name,
         type: connectorInput.type,
         status,
-        hasStoredSecrets: Boolean(secretCiphertext),
+        hasStoredSecrets: Boolean(storedSecrets.ciphertext),
       },
     });
 
     return c.json({ connectorId: String(created.id), status }, 201);
+  });
+
+  router.post('/v1/connectors/:id/rotate-secret', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can rotate connector secrets.', 'connector.secret.rotate');
+    if (denied) return denied;
+
+    const stepUpRequired = await requireStepUpAuth(c, access, 'Step-up authentication is required to rotate connector secrets.', {
+      action: 'connector.secret.rotate',
+    });
+    if (stepUpRequired) return stepUpRequired;
+
+    const connectorId = Number(c.req.param('id'));
+    if (!Number.isFinite(connectorId) || connectorId <= 0) {
+      return sendError(c, 400, 'invalid_connector_id', 'Connector id is invalid');
+    }
+
+    const existing = await requireOwnership(c, {
+      access,
+      resource: await getConnectorForTenant(access.tenantId, connectorId),
+      canAccess: () => true,
+      forbiddenMessage: 'You do not have permission to rotate secrets for this connector.',
+      notFoundCode: 'not_found',
+      notFoundMessage: 'Connector not found',
+      action: 'connector.secret.rotate',
+      metadata: { connectorId },
+    });
+    if (existing instanceof Response) return existing;
+
+    const body = await c.req.json().catch(() => ({}));
+    if (!body.secrets || typeof body.secrets !== 'object' || Array.isArray(body.secrets)) {
+      return sendError(c, 400, 'invalid_connector', 'secrets object is required');
+    }
+
+    let nextSecrets: Record<string, string>;
+    try {
+      nextSecrets = {
+        ...decryptConnectorSecrets(existing.secret_ciphertext),
+        ...body.secrets,
+      };
+    } catch {
+      nextSecrets = body.secrets as Record<string, string>;
+    }
+
+    let connectorInput;
+    try {
+      connectorInput = parseConnectorPayload({
+        type: existing.type,
+        settings: existing.config_json ?? {},
+        secrets: nextSecrets,
+        pollIntervalMinutes: existing.poll_interval_minutes,
+      });
+    } catch (error) {
+      return sendError(c, 400, 'invalid_connector', error instanceof Error ? error.message : 'Invalid connector payload');
+    }
+
+    const storedSecrets = storeConnectorSecrets({
+      secrets: connectorInput.secrets,
+      currentRotationCount: existing.secret_rotation_count,
+    });
+    const pool = getPool();
+    await pool.query(
+      `UPDATE connector_configs
+       SET secret_ciphertext = $3,
+           secret_storage_provider = $4,
+           secret_reference = $5,
+           secret_fingerprint = $6,
+           secret_key_version = $7,
+           secret_last_rotated_at = $8,
+           secret_rotation_count = $9,
+           status = 'pending',
+           last_error_message = NULL,
+           updated_at = NOW()
+       WHERE tenant_id = $1 AND id = $2`,
+      [
+        access.tenantId,
+        connectorId,
+        storedSecrets.ciphertext,
+        storedSecrets.storageProvider,
+        storedSecrets.reference,
+        storedSecrets.fingerprint,
+        storedSecrets.keyVersion,
+        storedSecrets.rotatedAt,
+        storedSecrets.rotationCount,
+      ],
+    );
+
+    await writeTenantAuditLog({
+      tenantId: access.tenantId,
+      userId: access.userId,
+      eventType: 'connector.secret_rotated',
+      source: 'connector_security',
+      message: 'Connector secret rotated',
+      payload: {
+        connectorId,
+        name: existing.name,
+        type: existing.type,
+        storageProvider: storedSecrets.storageProvider,
+        secretReference: storedSecrets.reference,
+      },
+    });
+
+    const updated = await getConnectorForTenant(access.tenantId, connectorId);
+    if (!updated) {
+      return sendError(c, 404, 'not_found', 'Connector not found');
+    }
+
+    return c.json({
+      rotated: true,
+      status: 'pending',
+      security: await getConnectorSecuritySnapshot(updated),
+    });
   });
 
   router.get('/v1/connectors/:id/validate', async (c) => {
@@ -1916,7 +2148,21 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     }
 
     const status = enabled ? 'pending' : 'disabled';
-    const secretCiphertext = encryptConnectorSecrets(connectorInput.secrets);
+    const rotatingSecrets = typeof body.secrets === 'object' && body.secrets !== null && !Array.isArray(body.secrets);
+    const storedSecrets = rotatingSecrets
+      ? storeConnectorSecrets({
+        secrets: connectorInput.secrets,
+        currentRotationCount: existing.secret_rotation_count,
+      })
+      : {
+        ciphertext: existing.secret_ciphertext,
+        storageProvider: existing.secret_storage_provider,
+        reference: existing.secret_reference,
+        fingerprint: existing.secret_fingerprint,
+        keyVersion: Math.max(1, Number(existing.secret_key_version ?? 1)),
+        rotatedAt: existing.secret_last_rotated_at ? new Date(existing.secret_last_rotated_at).toISOString() : null,
+        rotationCount: Math.max(0, Number(existing.secret_rotation_count ?? 0)),
+      };
     const pool = getPool();
     await pool.query(
       `UPDATE connector_configs
@@ -1925,9 +2171,14 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
            status = $5,
            config_json = $6,
            secret_ciphertext = $7,
-           secret_key_version = 1,
-           poll_interval_minutes = $8,
-           is_enabled = $9,
+           secret_storage_provider = $8,
+           secret_reference = $9,
+           secret_fingerprint = $10,
+           secret_key_version = $11,
+           secret_last_rotated_at = $12,
+           secret_rotation_count = $13,
+           poll_interval_minutes = $14,
+           is_enabled = $15,
            last_error_message = NULL,
            updated_at = NOW()
        WHERE tenant_id = $1 AND id = $2`,
@@ -1938,7 +2189,13 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
         connectorInput.type,
         status,
         JSON.stringify(connectorInput.settings),
-        secretCiphertext,
+        storedSecrets.ciphertext,
+        storedSecrets.storageProvider,
+        storedSecrets.reference,
+        storedSecrets.fingerprint,
+        storedSecrets.keyVersion,
+        storedSecrets.rotatedAt,
+        storedSecrets.rotationCount,
         connectorInput.pollIntervalMinutes,
         enabled,
       ],

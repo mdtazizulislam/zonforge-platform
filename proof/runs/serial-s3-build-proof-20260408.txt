@@ -1,0 +1,43 @@
+Backend build command:
+
+`npm --prefix c:\Users\vitor\Downloads\zonforge-sentinel-v4.6.0_1\zonforge-platform-main-release\apps\backend run build`
+
+Output:
+
+> @zonforge/backend@1.0.0 build
+> tsc
+
+Runtime excerpt:
+
+Connected to database.
+Database tables created.
+Default plans seeded.
+IMPORTANT! Eviction policy is allkeys-lru. It should be "noeviction"
+[ingestion] Queue runtime ready on zf-ingestion-events.
+
+ZonForge SaaS Backend starting on port 3107
+
+POST /v1/auth/signup -> 200
+POST /v1/connectors -> 403
+POST /v1/auth/step-up/verify -> 200
+POST /v1/connectors -> 201
+GET /v1/connectors/2/security -> 200
+POST /v1/connectors/2/ingestion-token -> 201
+POST /v1/team/invites -> 201
+POST /v1/auth/invite/accept -> 200
+POST /v1/connectors/2/rotate-secret -> 403
+POST /v1/auth/signup -> 200
+GET /v1/connectors/2/security -> 404
+POST /v1/connectors/2/rotate-secret -> 403
+POST /v1/auth/step-up/verify -> 200
+POST /v1/connectors/2/rotate-secret -> 200
+POST /v1/connectors/2/rotate-ingestion-token -> 201
+POST /v1/events/ingest -> 401
+POST /v1/events/ingest -> 202
+GET /v1/connectors/2/security -> 200
+GET /v1/connectors/2/ingestion-token -> 200
+
+Queue evidence:
+
+[ingestion-worker] processing batch batchId=a7897504-2488-4157-b381-03f8c10abaac connectorId=2 sourceType=microsoft365 eventCount=1
+[ingestion-worker] processed batch batchId=a7897504-2488-4157-b381-03f8c10abaac connectorId=2
