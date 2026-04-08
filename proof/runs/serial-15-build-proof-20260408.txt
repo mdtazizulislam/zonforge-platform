@@ -1,0 +1,59 @@
+SERIAL 15 build and log proof
+Date: 2026-04-08
+
+Build
+-----
+> @zonforge/backend@1.0.0 build
+> tsc
+
+Health
+------
+GET /health -> 200
+{"status":"healthy"}
+
+Investigation workflow logs
+---------------------------
+investigation_created {
+  tenantId: 1,
+  investigationId: '1',
+  workflowStatus: 'open',
+  alertId: '2'
+}
+investigation_created {
+  tenantId: 1,
+  investigationId: '2',
+  workflowStatus: 'open',
+  alertId: null
+}
+investigation_alert_linked { tenantId: 1, investigationId: '1', alertId: '1' }
+investigation_status_changed {
+  tenantId: 1,
+  investigationId: '1',
+  previousStatus: 'open',
+  nextStatus: 'in_progress'
+}
+investigation_status_changed {
+  tenantId: 1,
+  investigationId: '1',
+  previousStatus: 'in_progress',
+  nextStatus: 'closed'
+}
+
+API access logs
+---------------
+POST /v1/investigations -> 201 (95ms)
+POST /v1/investigations -> 201 (27ms)
+GET /v1/investigations -> 200 (10ms)
+GET /v1/investigations/1 -> 200 (28ms)
+POST /v1/investigations/1/link-alert -> 201 (27ms)
+POST /v1/investigations/1/note -> 201 (30ms)
+POST /v1/investigations/1/evidence -> 201 (31ms)
+PATCH /v1/investigations/1/status -> 200 (30ms)
+PATCH /v1/investigations/1/status -> 200 (24ms)
+PATCH /v1/investigations/2/status -> 200 (19ms)
+GET /v1/investigations/1 -> 404 (11ms)
+
+Detection and alert trigger logs
+--------------------------------
+alert_created { alertId: '1', findingId: '1', tenantId: 1, ruleKey: 'suspicious_login', principalKey: 'alice@example.com', severity: 'medium' }
+alert_created { alertId: '2', findingId: '2', tenantId: 1, ruleKey: 'privilege_escalation', principalKey: 'alice@example.com', severity: 'critical' }

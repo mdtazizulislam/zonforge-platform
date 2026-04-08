@@ -1,0 +1,57 @@
+{
+  "ownerTenantId": "1",
+  "ownerUserId": 1,
+  "connectorId": "1",
+  "tokenPrefix": "zfi_274531ca4e50c6",
+  "stepUpExpiresAt": "2026-04-08T07:09:14.467Z",
+  "seededNormalizedEventIds": [1, 2, 3],
+  "alertCount": 2,
+  "detectionCount": 2,
+  "alertInvestigationId": "1",
+  "manualInvestigationId": "2",
+  "listCount": 2,
+  "detailBeforeWorkflowStatus": "open",
+  "detailAfterWorkflowStatus": "closed",
+  "detailAfterLegacyStatus": "completed",
+  "manualWorkflowStatus": "in_progress",
+  "linkedAlertCount": 2,
+  "linkedEvidenceCount": 7,
+  "noteCount": 4,
+  "timelineCount": 7,
+  "relatedFindingCount": 1,
+  "relatedAlertCount": 1,
+  "hasOrgRiskContext": true,
+  "hasUserRiskContext": true,
+  "hasAssetRiskContext": true,
+  "linkAdded": true,
+  "noteAdded": true,
+  "evidenceAdded": true,
+  "statusTransition": "in_progress>closed",
+  "manualStatus": "in_progress",
+  "crossTenantGetStatus": 404,
+  "workflowRows": [
+    "1|closed|2|user|alice@example.com",
+    "2|in_progress|||"
+  ],
+  "linkedAlertRows": [
+    "1|1",
+    "1|2"
+  ],
+  "evidenceRows": [
+    "alert|2",
+    "finding|2",
+    "risk|4"
+  ],
+  "noteRows": [
+    "1|4",
+    "2|1"
+  ],
+  "eventRows": [
+    "investigation_alert_linked|1",
+    "investigation_created|2",
+    "investigation_evidence_added|1",
+    "investigation_note_added|3",
+    "investigation_status_changed|3"
+  ],
+  "secretLeakDetected": false
+}

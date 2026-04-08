@@ -928,6 +928,18 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS investigation_alerts (
+        id BIGSERIAL PRIMARY KEY,
+        investigation_id BIGINT NOT NULL REFERENCES investigations(id) ON DELETE CASCADE,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        alert_id BIGINT NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
+        linked_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(investigation_id, alert_id)
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS investigation_events (
         id BIGSERIAL PRIMARY KEY,
         investigation_id BIGINT NOT NULL REFERENCES investigations(id) ON DELETE CASCADE,
@@ -1157,6 +1169,11 @@ export async function initDatabase() {
     await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
     await client.query(`ALTER TABLE investigation_evidence ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`UPDATE investigation_evidence SET title = COALESCE(NULLIF(title, ''), 'Evidence') WHERE title IS NULL OR title = ''`);
+    await client.query(`ALTER TABLE investigation_alerts ADD COLUMN IF NOT EXISTS investigation_id BIGINT REFERENCES investigations(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_alerts ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_alerts ADD COLUMN IF NOT EXISTS alert_id BIGINT REFERENCES alerts(id) ON DELETE CASCADE`);
+    await client.query(`ALTER TABLE investigation_alerts ADD COLUMN IF NOT EXISTS linked_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+    await client.query(`ALTER TABLE investigation_alerts ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
     await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS investigation_id BIGINT REFERENCES investigations(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE`);
     await client.query(`ALTER TABLE investigation_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(64) NOT NULL DEFAULT 'event'`);
@@ -1181,6 +1198,9 @@ export async function initDatabase() {
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_investigations_ai ON investigations(ai_investigation_id) WHERE ai_investigation_id IS NOT NULL`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_investigations_tenant_status ON investigations(tenant_id, status, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_investigations_alert ON investigations(linked_alert_id, created_at DESC)`);
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_investigation_alerts_pair ON investigation_alerts(investigation_id, alert_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_alerts_investigation ON investigation_alerts(investigation_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_alerts_alert ON investigation_alerts(alert_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_evidence_investigation ON investigation_evidence(investigation_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_evidence_tenant_type ON investigation_evidence(tenant_id, source_type, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_investigation_events_investigation ON investigation_events(investigation_id, created_at DESC)`);
