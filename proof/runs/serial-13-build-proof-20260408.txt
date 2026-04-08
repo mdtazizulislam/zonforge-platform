@@ -1,0 +1,44 @@
+SERIAL 13 build and log proof
+Date: 2026-04-08
+
+Build
+-----
+> @zonforge/backend@1.0.0 build
+> tsc
+
+Health
+------
+GET /health -> 200
+{"status":"healthy"}
+
+Tenant 5 alert workflow logs
+----------------------------
+GET /v1/alerts -> 200 (30ms)
+GET /v1/detections -> 200 (11ms)
+GET /v1/alerts -> 200 (7ms)
+GET /v1/alerts/3 -> 200 (11ms)
+alert_status_changed {
+  alertId: '3',
+  tenantId: 5,
+  previousStatus: 'open',
+  newStatus: 'in_progress',
+  actorUserId: 5
+}
+PATCH /v1/alerts/3/status -> 200 (62ms)
+alert_assigned {
+  alertId: '3',
+  tenantId: 5,
+  previousAssignee: null,
+  assignedTo: 'analyst@zonforge.local',
+  actorUserId: 5
+}
+POST /v1/alerts/3/assign -> 200 (17ms)
+POST /v1/alerts/3/comment -> 200 (18ms)
+GET /v1/alerts/3 -> 200 (10ms)
+POST /v1/auth/signup -> 200 (171ms)
+GET /v1/alerts/3 -> 404 (11ms)
+
+Detection to alert creation logs
+--------------------------------
+alert_created { alertId: '3', findingId: '5', tenantId: 5, ruleKey: 'suspicious_login', principalKey: 'alice@example.com', severity: 'medium' }
+alert_grouped { alertId: '3', findingId: '6', tenantId: 5, ruleKey: 'suspicious_login', principalKey: 'alice@example.com' }

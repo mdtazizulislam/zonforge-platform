@@ -1,0 +1,47 @@
+{
+  "ownerTenantId": "5",
+  "ownerUserId": 5,
+  "connectorId": "3",
+  "tokenPrefix": "zfi_6ce70c91f50a59",
+  "stepUpExpiresAt": "2026-04-08T07:29:47.000Z",
+  "seededNormalizedEventIds": [7, 8, 9],
+  "detectionCount": 2,
+  "alertCount": 1,
+  "groupedAlertId": "3",
+  "groupedAlertFindingCount": 2,
+  "groupedAlertStatusAfterPatch": "in_progress",
+  "groupedAlertAssignedTo": "analyst@zonforge.local",
+  "groupedAlertTimelineCount": 5,
+  "groupedAlertTimelineEventTypes": [
+    "alert_created",
+    "alert_grouped",
+    "alert_status_changed",
+    "alert_assigned",
+    "comment_added"
+  ],
+  "crossTenantGetStatus": 404,
+  "secretLeakDetected": false,
+  "alertsDbRows": [
+    "3|5|suspicious_login|in_progress|analyst@zonforge.local|2|2026-04-08 06:27:47.975+00|2026-04-08 06:29:47.991+00"
+  ],
+  "alertFindingRows": [
+    "3|5",
+    "3|6"
+  ],
+  "alertEventRows": [
+    "3|alert_created||open",
+    "3|alert_grouped||",
+    "3|alert_status_changed|open|in_progress",
+    "3|alert_assigned||",
+    "3|comment_added||"
+  ],
+  "statusUpdate": {
+    "status": "in_progress"
+  },
+  "assignUpdate": {
+    "assigned": true
+  },
+  "commentCreate": {
+    "added": true
+  }
+}

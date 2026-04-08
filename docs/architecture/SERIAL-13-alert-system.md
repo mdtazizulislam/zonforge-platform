@@ -80,8 +80,11 @@ Each alert stores:
   - `GET /v1/alerts`
   - `GET /v1/alerts/:id`
   - `PATCH /v1/alerts/:id/status`
+- Add analyst workflow routes for assignment and timeline comments:
+  - `POST /v1/alerts/:id/assign`
+  - `POST /v1/alerts/:id/comment`
 - Preserve the current response shape where possible so the dashboard, alert center, and detail pages require only lifecycle-alignment changes.
-- Add grouped-alert metadata such as `findingCount`, `firstSeenAt`, and `lastSeenAt` as non-breaking fields.
+- Add grouped-alert metadata such as `findingCount`, `firstSeenAt`, `lastSeenAt`, and `timeline` as non-breaking fields.
 
 ### Security Controls
 
@@ -95,6 +98,7 @@ Each alert stores:
 - Emit `alert_created` when a new grouped alert row is inserted.
 - Emit `alert_grouped` when a new finding attaches to an existing alert.
 - Emit `alert_status_changed` on lifecycle updates.
+- Emit `alert_assigned` when ownership changes.
 - Emit `alert_materialization_failed` when the materializer catches an error.
 
 ## Rollout Strategy

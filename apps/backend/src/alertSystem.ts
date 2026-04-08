@@ -583,21 +583,129 @@ export async function assignAlertForTenant(input: {
   tenantId: number;
   alertId: string;
   analystId: string;
+  actorUserId?: number | null;
 }) {
   if (!/^\d+$/.test(input.alertId)) {
     return false;
   }
 
   const pool = getPool();
-  const result = await pool.query(
-    `UPDATE alerts
-     SET assigned_to = $3,
-         assigned_at = NOW(),
-         updated_at = NOW()
-     WHERE tenant_id = $1 AND id = $2::bigint
-     RETURNING id`,
-    [input.tenantId, input.alertId, input.analystId],
-  );
+  const client = await pool.connect();
 
-  return (result.rowCount ?? 0) > 0;
+  try {
+    await client.query('BEGIN');
+
+    const currentResult = await client.query(
+      `SELECT id, assigned_to
+       FROM alerts
+       WHERE tenant_id = $1 AND id = $2::bigint
+       LIMIT 1
+       FOR UPDATE`,
+      [input.tenantId, input.alertId],
+    );
+
+    const current = currentResult.rows[0] as { id: number; assigned_to: string | null } | undefined;
+    if (!current) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    await client.query(
+      `UPDATE alerts
+       SET assigned_to = $3,
+           assigned_at = NOW(),
+           updated_at = NOW()
+       WHERE tenant_id = $1 AND id = $2::bigint`,
+      [input.tenantId, input.alertId, input.analystId],
+    );
+
+    await insertAlertEvent(client, {
+      alertId: current.id,
+      tenantId: input.tenantId,
+      eventType: 'alert_assigned',
+      actorUserId: input.actorUserId ?? null,
+      payload: {
+        previousAssignee: current.assigned_to,
+        assignedTo: input.analystId,
+      },
+    });
+
+    await client.query('COMMIT');
+
+    console.info('alert_assigned', {
+      alertId: String(current.id),
+      tenantId: input.tenantId,
+      previousAssignee: current.assigned_to,
+      assignedTo: input.analystId,
+      actorUserId: input.actorUserId ?? null,
+    });
+
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => null);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function addAlertCommentForTenant(input: {
+  tenantId: number;
+  alertId: string;
+  comment: string;
+  actorUserId: number;
+}) {
+  if (!/^\d+$/.test(input.alertId)) {
+    return false;
+  }
+
+  const comment = input.comment.trim();
+  if (!comment) {
+    return false;
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const currentResult = await client.query(
+      `SELECT id
+       FROM alerts
+       WHERE tenant_id = $1 AND id = $2::bigint
+       LIMIT 1
+       FOR UPDATE`,
+      [input.tenantId, input.alertId],
+    );
+
+    const current = currentResult.rows[0] as { id: number } | undefined;
+    if (!current) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    await client.query(
+      `UPDATE alerts
+       SET updated_at = NOW()
+       WHERE tenant_id = $1 AND id = $2::bigint`,
+      [input.tenantId, input.alertId],
+    );
+
+    await insertAlertEvent(client, {
+      alertId: current.id,
+      tenantId: input.tenantId,
+      eventType: 'comment_added',
+      actorUserId: input.actorUserId,
+      payload: { comment },
+    });
+
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => null);
+    throw error;
+  } finally {
+    client.release();
+  }
 }

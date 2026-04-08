@@ -22,6 +22,7 @@ import {
   type TenantAccess,
 } from './authz.js';
 import {
+  addAlertCommentForTenant,
   assignAlertForTenant,
   normalizeAlertLifecycleStatus,
   updateAlertStatusForTenant,
@@ -140,6 +141,20 @@ type AlertRow = {
   created_at: string | Date;
   updated_at: string | Date;
   resolved_at: string | Date | null;
+};
+
+type AlertEventRow = {
+  id: number;
+  alert_id: number;
+  tenant_id: number;
+  event_type: string;
+  actor_user_id: number | null;
+  previous_status: string | null;
+  new_status: string | null;
+  payload_json: Record<string, unknown> | null;
+  created_at: string | Date;
+  actor_email?: string | null;
+  actor_full_name?: string | null;
 };
 
 type DetectionFindingRow = {
@@ -587,6 +602,25 @@ function alertDetail(row: AlertRow) {
     firstSignalTime: toIso(row.first_signal_time) ?? undefined,
     assignedAt: toIso(row.assigned_at) ?? undefined,
     recommendedActions: row.recommended_actions_json ?? [],
+  };
+}
+
+function alertTimelineEvent(row: AlertEventRow) {
+  return {
+    id: String(row.id),
+    alertId: String(row.alert_id),
+    eventType: row.event_type,
+    actor: row.actor_user_id
+      ? {
+          userId: String(row.actor_user_id),
+          email: row.actor_email ?? null,
+          fullName: displayPersonName(row.actor_full_name ?? null, row.actor_email ?? null),
+        }
+      : null,
+    previousStatus: row.previous_status ?? undefined,
+    newStatus: row.new_status ?? undefined,
+    payload: row.payload_json ?? {},
+    createdAt: toIso(row.created_at),
   };
 }
 
@@ -1391,6 +1425,25 @@ async function getAlertForTenant(tenantId: number, alertId: string): Promise<Ale
     [tenantId, alertId],
   );
   return (result.rows[0] as AlertRow | undefined) ?? null;
+}
+
+async function getAlertEventsForTenant(tenantId: number, alertId: string): Promise<AlertEventRow[]> {
+  if (!/^\d+$/.test(alertId)) {
+    return [];
+  }
+
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT e.*, u.email AS actor_email, u.full_name AS actor_full_name
+     FROM alert_events e
+     LEFT JOIN users u
+       ON u.id = e.actor_user_id
+     WHERE e.tenant_id = $1 AND e.alert_id = $2::bigint
+     ORDER BY e.created_at ASC, e.id ASC`,
+    [tenantId, alertId],
+  );
+
+  return result.rows as AlertEventRow[];
 }
 
 async function getDetectionFindingForTenant(tenantId: number, id: number): Promise<DetectionFindingRow | null> {
@@ -2568,7 +2621,11 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
       return sendError(c, 404, 'not_found', 'Alert not found');
     }
 
-    return c.json(alertDetail(alert));
+    const timeline = await getAlertEventsForTenant(access.tenantId, c.req.param('id'));
+    return c.json({
+      ...alertDetail(alert),
+      timeline: timeline.map(alertTimelineEvent),
+    });
   });
 
   router.get('/v1/detections', async (c) => {
@@ -2691,15 +2748,54 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
-    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can record alert feedback.', 'alert.feedback');
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can record alert comments.', 'alert.comment');
     if (denied) return denied;
 
-    const alert = await getAlertForTenant(access.tenantId, c.req.param('id'));
-    if (!alert) {
+    const body = await c.req.json().catch(() => ({}));
+    const comment = typeof body.comment === 'string' ? body.comment.trim() : typeof body.notes === 'string' ? body.notes.trim() : '';
+    if (!comment) {
+      return sendError(c, 400, 'invalid_comment', 'Comment is required');
+    }
+
+    const added = await addAlertCommentForTenant({
+      tenantId: access.tenantId,
+      alertId: c.req.param('id'),
+      comment,
+      actorUserId: access.userId,
+    });
+
+    if (!added) {
       return sendError(c, 404, 'not_found', 'Alert not found');
     }
 
-    return c.json({ feedback_saved: true });
+    return c.json({ added: true });
+  });
+
+  router.post('/v1/alerts/:id/comment', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can record alert comments.', 'alert.comment');
+    if (denied) return denied;
+
+    const body = await c.req.json().catch(() => ({}));
+    const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
+    if (!comment) {
+      return sendError(c, 400, 'invalid_comment', 'Comment is required');
+    }
+
+    const added = await addAlertCommentForTenant({
+      tenantId: access.tenantId,
+      alertId: c.req.param('id'),
+      comment,
+      actorUserId: access.userId,
+    });
+
+    if (!added) {
+      return sendError(c, 404, 'not_found', 'Alert not found');
+    }
+
+    return c.json({ added: true });
   });
 
   router.post('/v1/alerts/:id/assign', async (c) => {
@@ -2716,6 +2812,7 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
       tenantId: access.tenantId,
       alertId: c.req.param('id'),
       analystId: analystId || access.email,
+      actorUserId: access.userId,
     });
 
     if (!assigned) {
