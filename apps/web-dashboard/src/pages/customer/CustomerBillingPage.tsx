@@ -7,7 +7,7 @@ export default function CustomerBillingPage() {
   const usageQuery = useUsage()
   const subscriptionQuery = useQuery({
     queryKey: ['customer', 'subscription'],
-    queryFn: () => api.billing.subscription(),
+    queryFn: () => api.plans.me(),
     staleTime: 300_000,
   })
 
@@ -37,7 +37,7 @@ export default function CustomerBillingPage() {
                 <div className="zf-detail-list">
                   <div className="zf-detail-row">
                     <span className="zf-label">Plan Tier</span>
-                    <span className="zf-value">{subscription?.planTier ?? usage?.planTier ?? 'Unknown'}</span>
+                    <span className="zf-value">{subscription?.plan.name ?? usage?.planTier ?? 'Unknown'}</span>
                   </div>
                   <div className="zf-detail-row">
                     <span className="zf-label">Subscription</span>
@@ -84,15 +84,15 @@ export default function CustomerBillingPage() {
                 <div className="zf-customer-shell-detail-grid">
                   <div className="zf-customer-shell-detail">
                     <span>Current period start</span>
-                    <strong>{subscription?.currentPeriodStart ? new Date(subscription.currentPeriodStart).toLocaleDateString() : 'Unknown'}</strong>
+                    <strong>{subscription?.startedAt ? new Date(subscription.startedAt).toLocaleDateString() : 'Unknown'}</strong>
                   </div>
                   <div className="zf-customer-shell-detail">
                     <span>Current period end</span>
-                    <strong>{subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : 'Unknown'}</strong>
+                    <strong>{subscription?.expiresAt ? new Date(subscription.expiresAt).toLocaleDateString() : 'Unknown'}</strong>
                   </div>
                   <div className="zf-customer-shell-detail">
                     <span>Trial ends</span>
-                    <strong>{subscription?.trialEndsAt ? new Date(subscription.trialEndsAt).toLocaleDateString() : 'Not in trial'}</strong>
+                    <strong>{subscription?.status === 'trial' && subscription?.expiresAt ? new Date(subscription.expiresAt).toLocaleDateString() : 'Not in trial'}</strong>
                   </div>
                 </div>
               </section>

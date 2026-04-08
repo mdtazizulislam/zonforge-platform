@@ -52,7 +52,7 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS tenants (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
-        plan VARCHAR(50) DEFAULT 'starter',
+        plan VARCHAR(50) DEFAULT 'free',
         user_id INTEGER NOT NULL REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -136,6 +136,11 @@ export async function initDatabase() {
     await client.query(`
       ALTER TABLE tenants
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+
+    await client.query(`
+      ALTER TABLE tenants
+      ALTER COLUMN plan SET DEFAULT 'free'
     `);
 
     await client.query(`
@@ -277,6 +282,12 @@ export async function initDatabase() {
       )
     `);
 
+    await client.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS price_monthly INTEGER`);
+    await client.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_identities INTEGER`);
+    await client.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS events_per_minute INTEGER`);
+    await client.query(`ALTER TABLE plans ALTER COLUMN retention_days DROP NOT NULL`);
+    await client.query(`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS current_plan_id INTEGER REFERENCES plans(id)`);
+
     // ─── TENANT SUBSCRIPTIONS (TENANT-BASED BILLING) ───
     await client.query(`
       CREATE TABLE IF NOT EXISTS tenant_subscriptions (
@@ -295,6 +306,19 @@ export async function initDatabase() {
         last_invoice_id VARCHAR(255),
         trial_start TIMESTAMPTZ,
         trial_end TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS tenant_plans (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        plan_id INTEGER NOT NULL REFERENCES plans(id),
+        status VARCHAR(32) NOT NULL DEFAULT 'active',
+        started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
@@ -1402,6 +1426,9 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_conversion_events_name ON conversion_events(event_name, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_analytics_events_name ON analytics_events(event_name, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_support_requests_status ON support_requests(status, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_tenants_current_plan ON tenants(current_plan_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_tenant_plans_tenant ON tenant_plans(tenant_id, started_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_tenant_plans_plan ON tenant_plans(plan_id, started_at DESC)`);
 
     // ─── TENANT SUBSCRIPTIONS ENHANCEMENTS (09.2) ───
     await client.query(`ALTER TABLE tenant_subscriptions ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`);
@@ -1412,18 +1439,123 @@ export async function initDatabase() {
 
     // ─── SEED PLANS ───
     await client.query(`
-      INSERT INTO plans (code, name, description, monthly_price_cents, annual_price_cents, 
-        max_users, max_connectors, max_events_per_month, retention_days, is_active)
-      VALUES 
-        ('starter', 'Starter', 'For small teams getting started', 0, 0, 
-         50, 1, 21600000, 7, true),
-        ('growth', 'Growth', 'For growing security teams', 29900, 24900,
-         500, 5, 86400000, 90, true),
-        ('business', 'Business', 'For enterprise security operations', 99900, 79900,
-         2000, 20, 432000000, 180, true),
-        ('enterprise', 'Enterprise', 'Contracted enterprise plan', 0, 0,
-         NULL, NULL, NULL, 365, true)
-      ON CONFLICT (code) DO NOTHING
+      INSERT INTO plans (
+        code,
+        name,
+        description,
+        monthly_price_cents,
+        annual_price_cents,
+        price_monthly,
+        max_users,
+        max_connectors,
+        max_identities,
+        max_events_per_month,
+        events_per_minute,
+        retention_days,
+        features_json,
+        is_active,
+        updated_at
+      ) VALUES
+        (
+          'free',
+          'Free',
+          'Free tier for initial workspace onboarding and basic monitoring.',
+          0,
+          0,
+          0,
+          50,
+          1,
+          50,
+          21600000,
+          500,
+          30,
+          '{"detections":"basic","alerts":"basic","risk":false,"investigation":false,"ai":false}'::jsonb,
+          true,
+          NOW()
+        ),
+        (
+          'starter',
+          'Starter',
+          'Starter operations tier with alerting and limited risk visibility.',
+          4900,
+          4900,
+          49,
+          100,
+          2,
+          100,
+          43200000,
+          1000,
+          30,
+          '{"detections":"basic","alerts":true,"risk":"limited","investigation":false,"ai":false}'::jsonb,
+          true,
+          NOW()
+        ),
+        (
+          'growth',
+          'Growth',
+          'Growth tier with full detections, alerts, risk, and basic investigations.',
+          19900,
+          19900,
+          199,
+          200,
+          3,
+          200,
+          86400000,
+          2000,
+          90,
+          '{"detections":"full","alerts":"full","risk":true,"investigation":"basic","ai":false}'::jsonb,
+          true,
+          NOW()
+        ),
+        (
+          'business',
+          'Business',
+          'Business tier with full platform access and AI-enabled workflows.',
+          49900,
+          49900,
+          499,
+          1000,
+          10,
+          1000,
+          432000000,
+          10000,
+          180,
+          '{"detections":"full","alerts":"full","risk":"full","investigation":"full","ai":true}'::jsonb,
+          true,
+          NOW()
+        ),
+        (
+          'enterprise',
+          'Enterprise',
+          'Enterprise tier with negotiated limits, SSO, compliance, SLA, and dedicated support.',
+          0,
+          0,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          '{"detections":"full","alerts":"full","risk":"full","investigation":"full","ai":true,"sso":true,"compliance":true,"sla":true,"dedicated_support":true,"full_platform":true}'::jsonb,
+          true,
+          NOW()
+        )
+      ON CONFLICT (code) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        monthly_price_cents = EXCLUDED.monthly_price_cents,
+        annual_price_cents = EXCLUDED.annual_price_cents,
+        price_monthly = EXCLUDED.price_monthly,
+        max_users = EXCLUDED.max_users,
+        max_connectors = EXCLUDED.max_connectors,
+        max_identities = EXCLUDED.max_identities,
+        max_events_per_month = EXCLUDED.max_events_per_month,
+        events_per_minute = EXCLUDED.events_per_minute,
+        retention_days = EXCLUDED.retention_days,
+        features_json = EXCLUDED.features_json,
+        is_active = EXCLUDED.is_active,
+        updated_at = NOW()
     `);
 
     const planStripeConfig = [
@@ -1459,6 +1591,61 @@ export async function initDatabase() {
         [config.monthly, config.annual, config.code],
       );
     }
+
+    await client.query(`
+      UPDATE tenants t
+      SET current_plan_id = COALESCE(
+            t.current_plan_id,
+            (SELECT ts.plan_id FROM tenant_subscriptions ts WHERE ts.tenant_id = t.id LIMIT 1),
+            (SELECT p.id FROM plans p WHERE p.code = LOWER(COALESCE(t.plan, '')) LIMIT 1),
+            (SELECT p.id FROM plans p WHERE p.code = 'free' LIMIT 1)
+          ),
+          plan = COALESCE(
+            (SELECT p.code FROM plans p WHERE p.id = COALESCE(
+              t.current_plan_id,
+              (SELECT ts.plan_id FROM tenant_subscriptions ts WHERE ts.tenant_id = t.id LIMIT 1)
+            ) LIMIT 1),
+            (SELECT p.code FROM plans p WHERE p.code = LOWER(COALESCE(t.plan, '')) LIMIT 1),
+            'free'
+          ),
+          updated_at = NOW()
+      WHERE t.current_plan_id IS NULL
+         OR t.plan IS NULL
+         OR t.plan = ''
+         OR t.plan = 'starter'
+    `);
+
+    await client.query(`
+      INSERT INTO tenant_plans (
+        tenant_id,
+        plan_id,
+        status,
+        started_at,
+        created_at,
+        updated_at
+      )
+      SELECT
+        t.id,
+        COALESCE(t.current_plan_id, free_plan.id),
+        CASE
+          WHEN LOWER(COALESCE(ts.subscription_status, '')) = 'trialing' THEN 'trial'
+          WHEN LOWER(COALESCE(ts.subscription_status, '')) IN ('canceled', 'cancelled') THEN 'canceled'
+          ELSE 'active'
+        END,
+        COALESCE(ts.current_period_start, t.created_at, NOW()),
+        NOW(),
+        NOW()
+      FROM tenants t
+      JOIN plans free_plan ON free_plan.code = 'free'
+      LEFT JOIN tenant_subscriptions ts ON ts.tenant_id = t.id
+      LEFT JOIN LATERAL (
+        SELECT tp.id
+        FROM tenant_plans tp
+        WHERE tp.tenant_id = t.id
+        LIMIT 1
+      ) existing ON TRUE
+      WHERE existing.id IS NULL
+    `);
 
     console.log('✓ Default plans seeded.');
     await client.end();
@@ -1523,7 +1710,7 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
        t.id AS tenant_id,
        t.name AS tenant_name,
        t.slug AS tenant_slug,
-       t.plan AS tenant_plan,
+       COALESCE(cp.code, fallback_plan.code, t.plan, 'free') AS tenant_plan,
        t.onboarding_status,
        t.onboarding_started_at,
        t.onboarding_completed_at,
@@ -1532,6 +1719,18 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
      FROM users u
      JOIN tenant_memberships tm ON tm.user_id = u.id
      JOIN tenants t ON t.id = tm.tenant_id
+     LEFT JOIN plans cp ON cp.id = t.current_plan_id
+     LEFT JOIN LATERAL (
+       SELECT p.code
+       FROM tenant_plans tp
+       JOIN plans p ON p.id = tp.plan_id
+       WHERE tp.tenant_id = t.id
+       ORDER BY
+         CASE tp.status WHEN 'active' THEN 0 WHEN 'trial' THEN 1 ELSE 2 END,
+         tp.started_at DESC,
+         tp.id DESC
+       LIMIT 1
+     ) fallback_plan ON TRUE
      WHERE u.id = $1
      ORDER BY tm.created_at ASC, tm.id ASC
      LIMIT 1`,
@@ -1592,12 +1791,24 @@ export async function getUserWorkspaceContext(userId: number): Promise<UserWorks
        t.id AS tenant_id,
        t.name AS tenant_name,
        t.slug AS tenant_slug,
-       t.plan AS tenant_plan,
+       COALESCE(cp.code, fallback_plan.code, t.plan, 'free') AS tenant_plan,
        t.onboarding_status,
        t.onboarding_started_at,
        t.onboarding_completed_at
      FROM users u
      LEFT JOIN tenants t ON t.user_id = u.id
+     LEFT JOIN plans cp ON cp.id = t.current_plan_id
+     LEFT JOIN LATERAL (
+       SELECT p.code
+       FROM tenant_plans tp
+       JOIN plans p ON p.id = tp.plan_id
+       WHERE tp.tenant_id = t.id
+       ORDER BY
+         CASE tp.status WHEN 'active' THEN 0 WHEN 'trial' THEN 1 ELSE 2 END,
+         tp.started_at DESC,
+         tp.id DESC
+       LIMIT 1
+     ) fallback_plan ON TRUE
      WHERE u.id = $1
      LIMIT 1`,
     [userId],

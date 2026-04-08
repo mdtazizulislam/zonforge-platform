@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { getPool, getTenantByUserId, getUserWorkspaceContext } from './db.js';
+import { ensureTenantPlanAssigned } from './billing/tenantPlans.js';
 import { assertValidPassword } from './security.js';
 
 function getJwtSecret(): string {
@@ -812,7 +813,7 @@ export async function buildAuthenticatedUserContext(userId: number): Promise<Aut
   }
 
   const fullName = displayName(context.user.fullName, context.user.email);
-  const tenantPlan = context.tenant.plan ?? 'starter';
+  const tenantPlan = context.tenant.plan ?? 'free';
   const onboardingStatus = context.tenant.onboardingStatus ?? 'pending';
 
   return {
@@ -1070,7 +1071,7 @@ export async function createWorkspaceSignup(
         updated_at
       ) VALUES ($1,$2,$3,$4,$5,NOW(),NOW())
       RETURNING id`,
-      [input.workspaceName, slug, 'starter', 'pending', userId],
+      [input.workspaceName, slug, 'free', 'pending', userId],
     );
 
     const tenantId = Number(tenantInsert.rows[0].id);
@@ -1104,6 +1105,8 @@ export async function createWorkspaceSignup(
     const tokens = await issueAuthTokens(client, userId, userEmail, tenantId, metadata);
 
     await client.query('COMMIT');
+
+    await ensureTenantPlanAssigned(tenantId, userId);
 
     const context = await buildAuthenticatedUserContext(userId);
     if (!context) {

@@ -1,0 +1,75 @@
+{
+    "apiProof":  {
+                     "getPlansStatus":  200,
+                     "getMePlanStatus":  200,
+                     "signupDefaultPlan":  "free",
+                     "upgradeStarterStatus":  200,
+                     "upgradeGrowthStatus":  200,
+                     "cancelStatus":  200,
+                     "finalPlan":  "free"
+                 },
+    "enforcementProof":  {
+                             "freeInvestigationBlockedStatus":  402,
+                             "freeInvestigationBlockedCode":  null,
+                             "connectorOneStatus":  201,
+                             "connectorLimitBlockedStatus":  402,
+                             "connectorLimitBlockedCode":  null,
+                             "starterRiskSummaryStatus":  200,
+                             "starterInvestigationBlockedStatus":  402,
+                             "starterInvestigationBlockedCode":  null,
+                             "growthInvestigationStatus":  201
+                         },
+    "frontendProof":  {
+                          "builtBillingBundle":  "BillingPage-DWIysnjt.js",
+                          "builtConnectorsBundle":  "ConnectorsPage-CrBJmUKp.js",
+                          "builtInvestigationsBundle":  "InvestigationsPage-BKMZKeax.js",
+                          "pricingPageReadsPlans":  true,
+                          "currentPlanReadsBackend":  true,
+                          "upgradeActionBound":  true,
+                          "cancelActionBound":  true,
+                          "currentPlanMarked":  true,
+                          "connectorUpgradePrompt":  true,
+                          "investigationUpgradePrompt":  true
+                      },
+    "dbProof":  {
+                    "proofTenantId":  "5",
+                    "planRows":  [
+                                     "free|0|1|50|500|30",
+                                     "starter|49|2|100|1000|30",
+                                     "growth|199|3|200|2000|90",
+                                     "business|499|10|1000|10000|180",
+                                     "enterprise|null|null|null|null|null"
+                                 ],
+                    "tenantPlanRows":  [
+                                           "5|free|canceled",
+                                           "5|starter|canceled",
+                                           "5|growth|canceled",
+                                           "5|free|active"
+                                       ],
+                    "tenantCurrentRows":  [
+                                              "5|free"
+                                          ]
+                },
+    "logsProof":  {
+                      "containsPlanAssigned":  true,
+                      "containsPlanUpgraded":  true,
+                      "containsPlanDowngraded":  true,
+                      "containsPlanCanceled":  true,
+                      "containsPlanLimitExceeded":  true,
+                      "containsFeatureGateBlocked":  true,
+                      "rows":  [
+                                   "plan_assigned|{\"limit_key\": null, \"next_plan\": \"free\", \"request_id\": null, \"feature_key\": null, \"previous_plan\": null}",
+                                   "auth.signup|{\"email\": \"serial16-20260408-035054@zonforge.test\", \"clientIp\": \"unknown\", \"workspaceName\": \"Serial 16 Workspace\", \"workspaceSlug\": \"serial-16-workspace-9d84\"}",
+                                   "feature_gate_blocked|{\"route\": \"/v1/investigations\", \"limit_key\": null, \"next_plan\": \"growth\", \"request_id\": \"1775634654899-45fba34eb3\", \"feature_key\": \"investigation\", \"previous_plan\": \"free\", \"required_level\": \"basic\"}",
+                                   "connector.created|{\"name\": \"AWS Primary\", \"type\": \"aws\", \"status\": \"pending\", \"connectorId\": \"9\", \"hasStoredSecrets\": true}",
+                                   "plan_limit_exceeded|{\"route\": \"/v1/connectors\", \"increment\": 1, \"limit_key\": \"max_connectors\", \"next_plan\": \"starter\", \"request_id\": \"1775634654983-e724166829\", \"feature_key\": null, \"current_usage\": 1, \"previous_plan\": \"free\"}",
+                                   "plan_upgraded|{\"limit_key\": null, \"next_plan\": \"starter\", \"request_id\": \"1775634655005-693ab831ab\", \"feature_key\": null, \"plan_status\": \"active\", \"previous_plan\": \"free\"}",
+                                   "connector.created|{\"name\": \"AWS Secondary\", \"type\": \"aws\", \"status\": \"pending\", \"connectorId\": \"10\", \"hasStoredSecrets\": true}",
+                                   "feature_gate_blocked|{\"route\": \"/v1/investigations\", \"limit_key\": null, \"next_plan\": \"growth\", \"request_id\": \"1775634655170-fe725423f7\", \"feature_key\": \"investigation\", \"previous_plan\": \"starter\", \"required_level\": \"basic\"}",
+                                   "plan_upgraded|{\"limit_key\": null, \"next_plan\": \"growth\", \"request_id\": \"1775634655197-8ea7094abf\", \"feature_key\": null, \"plan_status\": \"active\", \"previous_plan\": \"starter\"}",
+                                   "investigation.create|{\"alertId\": null, \"workflowStatus\": \"open\", \"investigationId\": \"5\"}",
+                                   "plan_downgraded|{\"limit_key\": null, \"next_plan\": \"free\", \"request_id\": \"1775634655305-6ee9fb2c33\", \"feature_key\": null, \"plan_status\": \"active\", \"previous_plan\": \"growth\"}",
+                                   "plan_canceled|{\"limit_key\": null, \"next_plan\": \"free\", \"request_id\": \"1775634655305-6ee9fb2c33\", \"feature_key\": null, \"previous_plan\": \"growth\"}"
+                               ]
+                  }
+}

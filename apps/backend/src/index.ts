@@ -36,6 +36,12 @@ import {
   incrementUsage,
   UpgradeRequiredError,
 } from './billing/enforcement.js';
+import {
+  assignTenantPlan,
+  cancelTenantPlan as cancelTenantPlanState,
+  getActivePlans,
+  getTenantPlanState,
+} from './billing/tenantPlans.js';
 import { isActiveUser } from './middleware/isActiveUser.js';
 import {
   AppError,
@@ -1150,23 +1156,20 @@ app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
     if (!userId) return sendError(c, 401, 'unauthorized', 'Unauthorized');
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
-    const subscription = await getTenantBillingStatus(tenantId);
-    if (!subscription) return c.json({ subscription: null, eligible_for_checkout: true });
+    const state = await getTenantPlanState(tenantId);
     return c.json({
       subscription: {
-        tenantId: subscription.tenantId,
-        planCode: subscription.planCode,
-        planName: subscription.planName,
-        status: subscription.subscriptionStatus,
-        currentPeriodStart: subscription.currentPeriodStart,
-        currentPeriodEnd: subscription.currentPeriodEnd,
-        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-        stripeCustomerId: subscription.stripeCustomerId,
-        stripeSubscriptionId: subscription.stripeSubscriptionId,
-        hasStripeCustomer: Boolean(subscription.stripeCustomerId),
-        limits: subscription.limits,
+        tenantId: String(state.tenantId),
+        planCode: state.plan.code,
+        planName: state.plan.name,
+        planTier: state.plan.code,
+        status: state.status,
+        currentPeriodStart: state.startedAt,
+        currentPeriodEnd: state.expiresAt,
+        cancelAtPeriodEnd: false,
+        limits: state.limits,
       },
-      eligible_for_checkout: !subscription.stripeSubscriptionId || subscription.subscriptionStatus === 'none',
+      eligible_for_checkout: state.plan.code !== 'enterprise',
     });
   } catch (error) {
     const normalized = normalizeAppError(error);
@@ -1177,19 +1180,29 @@ app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
 // GET /billing/plans — plan catalog source-of-truth (09.6)
 app.get(`${API_PREFIX}/billing/plans`, async (c) => {
   try {
-    const pool = getPool();
-    const result = await pool.query(
-      `SELECT code, name, description,
-              monthly_price_cents, annual_price_cents,
-              max_users, max_connectors, max_events_per_month,
-              retention_days,
-              (stripe_monthly_price_id IS NOT NULL) AS has_stripe_monthly,
-              (stripe_annual_price_id IS NOT NULL) AS has_stripe_annual
-       FROM plans
-       WHERE is_active = true
-       ORDER BY monthly_price_cents ASC`
-    );
-    return c.json({ plans: result.rows });
+    const plans = await getActivePlans();
+    return c.json({
+      plans: plans.map((plan) => ({
+        code: plan.code,
+        name: plan.name,
+        planTier: plan.code,
+        displayName: plan.name,
+        monthlyPriceCents: plan.priceMonthly == null ? 0 : plan.priceMonthly * 100,
+        annualPriceCents: plan.priceMonthly == null ? 0 : plan.priceMonthly * 100,
+        trialDays: 0,
+        highlighted: plan.code === 'growth',
+        limits: {
+          identities: plan.limits.max_identities ?? 'unlimited',
+          connectors: plan.limits.max_connectors ?? 'unlimited',
+          eventsPerMin: plan.limits.events_per_minute ?? 'unlimited',
+          retentionDays: plan.limits.retention_days ?? 365,
+          customRules: 'unlimited',
+        },
+        features: Object.entries(plan.features)
+          .filter(([, value]) => value !== false)
+          .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${String(value)}`),
+      })),
+    });
   } catch (error) {
     const normalized = normalizeAppError(error);
     return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
@@ -1208,12 +1221,27 @@ app.get(`${API_PREFIX}/billing/usage`, async (c) => {
       return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     }
 
-    const usage = await getUsageSummary(tenantId);
+    const state = await getTenantPlanState(tenantId);
     return c.json({
-      plan: usage.plan,
-      status: usage.status,
-      limits: usage.limits,
-      usage: usage.usage,
+      plan: state.plan.code,
+      status: state.status,
+      limits: state.limits,
+      usage: state.usage,
+      planTier: state.plan.code,
+      retentionDays: state.limits.retention_days ?? 365,
+      features: state.features,
+      planLimits: {
+        maxConnectors: state.limits.max_connectors,
+        maxIdentities: state.limits.max_identities,
+        retentionDays: state.limits.retention_days,
+        maxCustomRules: null,
+      },
+      connectorsActive: state.usage.connectors,
+      identitiesMonitor: state.usage.identities,
+      usagePct: {
+        connectors: state.limits.max_connectors ? Math.min(100, Math.round((state.usage.connectors / state.limits.max_connectors) * 100)) : 0,
+        identities: state.limits.max_identities ? Math.min(100, Math.round((state.usage.identities / state.limits.max_identities) * 100)) : 0,
+      },
     });
   } catch (error) {
     const normalized = normalizeAppError(error);
@@ -1243,27 +1271,18 @@ app.post(`${API_PREFIX}/billing/portal`, async (c) => {
 
 app.post(`${API_PREFIX}/billing/change-plan`, async (c) => {
   try {
-    const userId = await requireAuthUserId(c);
-    if (!userId) {
-      return sendError(c, 401, 'unauthorized', 'Unauthorized');
-    }
-
-    const tenantId = await getTenantIdForUser(userId);
-    if (!tenantId) {
-      return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
+    const access = await requireTenantContext(c);
+    if (access instanceof Response) return access;
+    if (access.membershipRole !== 'owner' && access.membershipRole !== 'admin') {
+      return sendError(c, 403, 'forbidden', 'Only owners and admins can change plans.');
     }
 
     const body = await c.req.json();
-    const planCode = assertValidPlanId(body.planCode ?? body.plan_id);
-
-    const updated = await changeTenantPlan(tenantId, planCode);
-    await writeAuditLog({
-      eventType: 'billing.plan_change',
-      message: `Plan changed to ${planCode}`,
-      userId,
-      tenantId,
-      source: 'billing',
-      payload: { planCode },
+    const planCode = typeof body.planCode === 'string' ? body.planCode : body.plan_id;
+    const updated = await assignTenantPlan({
+      tenantId: access.tenantId,
+      planCode,
+      actorUserId: access.userId,
     });
     return c.json({ billing: updated });
   } catch (error) {
@@ -1274,23 +1293,15 @@ app.post(`${API_PREFIX}/billing/change-plan`, async (c) => {
 
 app.post(`${API_PREFIX}/billing/cancel`, async (c) => {
   try {
-    const userId = await requireAuthUserId(c);
-    if (!userId) {
-      return sendError(c, 401, 'unauthorized', 'Unauthorized');
+    const access = await requireTenantContext(c);
+    if (access instanceof Response) return access;
+    if (access.membershipRole !== 'owner' && access.membershipRole !== 'admin') {
+      return sendError(c, 403, 'forbidden', 'Only owners and admins can cancel paid plans.');
     }
 
-    const tenantId = await getTenantIdForUser(userId);
-    if (!tenantId) {
-      return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
-    }
-
-    const cancelled = await cancelTenantSubscription(tenantId);
-    await writeAuditLog({
-      eventType: 'billing.plan_cancel',
-      message: 'Subscription cancellation requested',
-      userId,
-      tenantId,
-      source: 'billing',
+    const cancelled = await cancelTenantPlanState({
+      tenantId: access.tenantId,
+      actorUserId: access.userId,
     });
     return c.json({ billing: cancelled });
   } catch (error) {

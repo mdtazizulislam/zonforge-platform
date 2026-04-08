@@ -5,7 +5,7 @@ import { clsx } from 'clsx'
 import { Search, Plus, Clock, AlertCircle, CheckCircle2, Loader2, FileText, Brain, ArrowRight } from 'lucide-react'
 import { AppShell, PageContent } from '@/components/layout/AppShell'
 import { Button, Spinner, EmptyState, Skeleton, Card } from '@/components/shared/ui'
-import { api, type AiInvestigation } from '@/lib/api'
+import { ApiError, api, type AiInvestigation } from '@/lib/api'
 import { useInvestigations, useInvestigationStats } from '@/hooks/queries'
 
 const STATUS_META: Record<AiInvestigation['status'], { label: string; color: string; icon: React.ElementType }> = {
@@ -55,6 +55,7 @@ export default function InvestigationsPage() {
   const [context, setContext] = useState('')
   const [showForm, setShowForm] = useState(requestedStart || requestedAlertId.length > 0)
   const [formError, setFormError] = useState<string | null>(null)
+  const [upgradePrompt, setUpgradePrompt] = useState(false)
 
   useEffect(() => {
     if (requestedAlertId) {
@@ -80,8 +81,12 @@ export default function InvestigationsPage() {
       setContext('')
       setShowForm(false)
       setFormError(null)
+      setUpgradePrompt(false)
     },
     onError: (err: unknown) => {
+      if (err instanceof ApiError && err.code.toLowerCase() === 'upgrade_required') {
+        setUpgradePrompt(true)
+      }
       setFormError(err instanceof Error ? err.message : 'Failed to create investigation')
     },
   })
@@ -92,6 +97,7 @@ export default function InvestigationsPage() {
       return
     }
     setFormError(null)
+    setUpgradePrompt(false)
     createInvestigation()
   }
 
@@ -168,10 +174,18 @@ export default function InvestigationsPage() {
               </div>
 
               {formError && (
-                <p className="flex items-center gap-1.5 text-xs text-red-400">
-                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                  {formError}
-                </p>
+                <div className="space-y-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-3 text-xs text-red-300">
+                  <p className="flex items-center gap-1.5 text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                    {formError}
+                  </p>
+                  {upgradePrompt && (
+                    <Link to="/billing" className="inline-flex items-center gap-1.5 font-semibold text-blue-300 hover:text-blue-200">
+                      Upgrade to Growth or higher
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
+                </div>
               )}
 
               <div className="flex items-center gap-2 pt-1">

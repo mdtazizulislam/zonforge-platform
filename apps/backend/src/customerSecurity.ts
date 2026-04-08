@@ -11,7 +11,7 @@ import {
   type SupportedConnectorType,
 } from './connectorFoundation.js';
 import { getPool, getUserWorkspaceContext } from './db.js';
-import { assertValidEmail, sendError } from './security.js';
+import { assertValidEmail, getRequestId, sendError } from './security.js';
 import { sendProductEmail } from './email.js';
 import { assertTenantInviteRole, normalizeTenantRole, type TenantInviteRole, type TenantMembershipRole } from './auth.js';
 import {
@@ -36,6 +36,19 @@ import {
   normalizeRiskEntityType,
   type RiskEntityType,
 } from './riskScoring.js';
+import {
+  assignTenantPlan,
+  cancelTenantPlan,
+  getActivePlans,
+  getTenantPlanState,
+  normalizePlanCode,
+  writePlanAuditLog,
+  type LockedPlanCode,
+  type PlanFeatureKey,
+  type PlanLimitKey,
+  type TenantPlanState,
+} from './billing/tenantPlans.js';
+import { requirePlanFeature, requirePlanLimit, UpgradeRequiredError } from './billing/enforcement.js';
 
 type OnboardingStepDefinition = {
   stepKey: 'welcome' | 'connect_environment' | 'first_scan';
@@ -1399,6 +1412,103 @@ async function writeTenantAuditLog(input: {
   );
 }
 
+function isBillingManager(role: TenantMembershipRole): boolean {
+  return role === 'owner' || role === 'admin';
+}
+
+function serializePlanState(state: TenantPlanState, membershipRole?: string | null) {
+  return {
+    tenantId: String(state.tenantId),
+    status: state.status,
+    startedAt: state.startedAt,
+    expiresAt: state.expiresAt,
+    canManageBilling: membershipRole ? isBillingManager(normalizeTenantRole(membershipRole)) : false,
+    plan: {
+      id: String(state.plan.id),
+      code: state.plan.code,
+      name: state.plan.name,
+      priceMonthly: state.plan.priceMonthly,
+      limits: state.plan.limits,
+      features: state.plan.features,
+    },
+    limits: state.limits,
+    features: state.features,
+    usage: state.usage,
+  };
+}
+
+async function enforceFeatureGate(
+  c: any,
+  access: TenantAccess,
+  featureKey: PlanFeatureKey,
+  requiredLevel: 'summary' | 'basic' | 'full',
+  message: string,
+) {
+  const state = await getTenantPlanState(access.tenantId);
+  try {
+    requirePlanFeature(state, featureKey, requiredLevel);
+    return state;
+  } catch (error) {
+    if (!(error instanceof UpgradeRequiredError)) {
+      throw error;
+    }
+
+    await writePlanAuditLog({
+      tenantId: access.tenantId,
+      actorUserId: access.userId,
+      eventType: 'feature_gate_blocked',
+      requestId: getRequestId(c),
+      previousPlan: state.plan.code,
+      nextPlan: error.recommendedPlan ?? null,
+      featureKey,
+      message,
+      payload: {
+        required_level: requiredLevel,
+        route: c.req.path,
+      },
+    });
+
+    throw new UpgradeRequiredError(state.plan.code, featureKey, error.limit, error.recommendedPlan, message);
+  }
+}
+
+async function enforceLimitGate(
+  c: any,
+  access: TenantAccess,
+  limitKey: PlanLimitKey,
+  currentUsage: number,
+  increment: number,
+  message: string,
+) {
+  const state = await getTenantPlanState(access.tenantId);
+  try {
+    requirePlanLimit(state, limitKey, currentUsage, increment);
+    return state;
+  } catch (error) {
+    if (!(error instanceof UpgradeRequiredError)) {
+      throw error;
+    }
+
+    await writePlanAuditLog({
+      tenantId: access.tenantId,
+      actorUserId: access.userId,
+      eventType: 'plan_limit_exceeded',
+      requestId: getRequestId(c),
+      previousPlan: state.plan.code,
+      nextPlan: error.recommendedPlan ?? null,
+      limitKey,
+      message,
+      payload: {
+        current_usage: currentUsage,
+        increment,
+        route: c.req.path,
+      },
+    });
+
+    throw new UpgradeRequiredError(state.plan.code, limitKey, error.limit, error.recommendedPlan, message);
+  }
+}
+
 async function ensureDefaultOnboardingSteps(tenantId: number) {
   const pool = getPool();
   for (const step of DEFAULT_ONBOARDING_STEPS) {
@@ -1991,6 +2101,21 @@ async function buildAssistantReply(tenantId: number, message: string) {
 export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Promise<number | null>) {
   const router = new Hono();
 
+  router.get('/v1/plans', async (c) => {
+    const plans = await getActivePlans();
+    return c.json({
+      items: plans.map((plan) => ({
+        id: String(plan.id),
+        code: plan.code,
+        name: plan.name,
+        priceMonthly: plan.priceMonthly,
+        limits: plan.limits,
+        features: plan.features,
+        isActive: plan.isActive,
+      })),
+    });
+  });
+
   router.get('/v1/auth/me', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
@@ -2023,6 +2148,66 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
       tenantId: String(access.tenantId),
       mfaEnabled: false,
     });
+  });
+
+  router.get('/v1/me/plan', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const state = await getTenantPlanState(access.tenantId);
+    return c.json(serializePlanState(state, access.membershipRole));
+  });
+
+  router.get('/v1/plan/limits', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const state = await getTenantPlanState(access.tenantId);
+    return c.json({
+      planCode: state.plan.code,
+      limits: state.limits,
+      usage: state.usage,
+    });
+  });
+
+  router.post('/v1/plan/upgrade', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can change plans.', 'plan.upgrade');
+    if (denied) return denied;
+
+    const body = await c.req.json().catch(() => ({}));
+    const nextCode = normalizePlanCode(typeof body.planCode === 'string' ? body.planCode : null);
+    const allowedTargets = new Set<LockedPlanCode>(['starter', 'growth', 'business', 'enterprise']);
+    if (!allowedTargets.has(nextCode)) {
+      return sendError(c, 400, 'invalid_plan_code', 'planCode must be starter, growth, business, or enterprise');
+    }
+
+    const state = await assignTenantPlan({
+      tenantId: access.tenantId,
+      planCode: nextCode,
+      actorUserId: access.userId,
+      requestId: getRequestId(c),
+    });
+
+    return c.json(serializePlanState(state, access.membershipRole));
+  });
+
+  router.post('/v1/plan/cancel', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can cancel paid plans.', 'plan.cancel');
+    if (denied) return denied;
+
+    const state = await cancelTenantPlan({
+      tenantId: access.tenantId,
+      actorUserId: access.userId,
+      requestId: getRequestId(c),
+    });
+
+    return c.json(serializePlanState(state, access.membershipRole));
   });
 
   router.get('/v1/team/members', async (c) => {
@@ -2911,12 +3096,16 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    await enforceFeatureGate(c, access, 'risk', 'summary', 'Risk summary requires Starter or higher. Upgrade to unlock risk visibility.');
+
     return c.json(await buildRiskSummary(access.tenantId));
   });
 
   router.get('/v1/risk', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    await enforceFeatureGate(c, access, 'risk', 'summary', 'Risk summary requires Starter or higher. Upgrade to unlock risk visibility.');
 
     await ensureTenantRiskScores(access.tenantId);
     const score = await getRiskScoreForTenant(access.tenantId, 'org', 'org');
@@ -2945,6 +3134,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
   router.get('/v1/risk/org', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    await enforceFeatureGate(c, access, 'risk', 'full', 'Detailed risk requires Growth or higher. Upgrade to unlock full risk analysis.');
 
     await ensureTenantRiskScores(access.tenantId);
     const score = await getRiskScoreForTenant(access.tenantId, 'org', 'org');
@@ -2977,6 +3168,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    await enforceFeatureGate(c, access, 'risk', 'full', 'Detailed risk requires Growth or higher. Upgrade to unlock full risk analysis.');
+
     await ensureTenantRiskScores(access.tenantId);
     const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 50), 1), 100);
     const list = await listRiskScoresForTenant({
@@ -2997,6 +3190,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
   router.get('/v1/risk/users/:userId', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    await enforceFeatureGate(c, access, 'risk', 'full', 'Detailed risk requires Growth or higher. Upgrade to unlock full risk analysis.');
 
     await ensureTenantRiskScores(access.tenantId);
     const userId = normalizeRiskEntityKey('user', c.req.param('userId'));
@@ -3035,6 +3230,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    await enforceFeatureGate(c, access, 'risk', 'full', 'Detailed risk requires Growth or higher. Upgrade to unlock full risk analysis.');
+
     await ensureTenantRiskScores(access.tenantId);
     const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 50), 1), 100);
     const list = await listRiskScoresForTenant({
@@ -3055,6 +3252,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
   router.get('/v1/risk/assets/:assetId', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    await enforceFeatureGate(c, access, 'risk', 'full', 'Detailed risk requires Growth or higher. Upgrade to unlock full risk analysis.');
 
     await ensureTenantRiskScores(access.tenantId);
     const assetId = normalizeRiskEntityKey('asset', c.req.param('assetId'));
@@ -3083,6 +3282,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
   router.get('/v1/risk/:entityType/:entityKey', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    await enforceFeatureGate(c, access, 'risk', 'full', 'Detailed risk requires Growth or higher. Upgrade to unlock full risk analysis.');
 
     const entityType = normalizeRiskEntityType(c.req.param('entityType'));
     if (!entityType) {
@@ -3221,6 +3422,22 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     });
     if (stepUpRequired) return stepUpRequired;
 
+    const pool = getPool();
+    const currentConnectorsResult = await pool.query(
+      `SELECT COUNT(*) AS count
+       FROM connector_configs
+       WHERE tenant_id = $1`,
+      [access.tenantId],
+    );
+    await enforceLimitGate(
+      c,
+      access,
+      'max_connectors',
+      Number(currentConnectorsResult.rows[0]?.count ?? 0),
+      1,
+      'Your workspace has reached its connector limit. Upgrade your plan to add another connector.',
+    );
+
     const body = await c.req.json().catch(() => ({}));
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name || typeof body.type !== 'string') {
@@ -3243,7 +3460,6 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const status = enabled ? 'pending' : 'disabled';
     const storedSecrets = storeConnectorSecrets({ secrets: connectorInput.secrets });
 
-    const pool = getPool();
     const result = await pool.query(
       `INSERT INTO connector_configs (
          tenant_id, name, type, status, config_json, secret_ciphertext, secret_storage_provider,
@@ -3695,6 +3911,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
 
+    await enforceFeatureGate(c, access, 'ai', 'basic', 'AI assistant access requires Business or higher. Upgrade to unlock AI workflows.');
+
     const risk = await buildRiskSummary(access.tenantId);
     const suggestions = [
       'Explain latest alert',
@@ -3712,6 +3930,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
   router.post('/v1/assistant/chat', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
+
+    await enforceFeatureGate(c, access, 'ai', 'basic', 'AI assistant access requires Business or higher. Upgrade to unlock AI workflows.');
 
     const body = await c.req.json().catch(() => ({}));
     const messages = Array.isArray(body.messages) ? body.messages : [];
@@ -3811,6 +4031,8 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
 
     const denied = await requireRole(c, access, INCIDENT_RESPONDERS, 'Only analysts, admins, and owners can create investigations.', 'investigation.create');
     if (denied) return denied;
+
+    await enforceFeatureGate(c, access, 'investigation', 'basic', 'Investigations require the Growth plan or higher. Upgrade to open an investigation.');
 
     const body = await c.req.json().catch(() => ({}));
     const alertId = typeof body.alertId === 'string' ? body.alertId.trim() : '';

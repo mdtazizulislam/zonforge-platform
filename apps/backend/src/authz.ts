@@ -121,7 +121,7 @@ export async function requireAuth(c: any): Promise<AuthContext | Response> {
       fullName: fallbackName(payload.email),
       tenantName: null,
       tenantSlug: '',
-      tenantPlan: 'starter',
+      tenantPlan: 'free',
       onboardingStatus: 'pending',
       onboardingStartedAt: null,
       onboardingCompletedAt: null,

@@ -1,4 +1,5 @@
 import { type ElementType, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { useAuthStore } from '@/stores/auth.store'
 import { ApiError, type ConnectorSummary, type ConnectorType, type ValidationResult } from '@/lib/api'
@@ -599,7 +600,7 @@ export default function ConnectorsPage() {
 
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
   const [selectedConnector, setSelectedConnector] = useState<ConnectorSummary | null>(null)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string; upgradeHref?: string } | null>(null)
   const [activeAction, setActiveAction] = useState<string | null>(null)
   const [validationResults, setValidationResults] = useState<Record<string, ValidationResult>>({})
 
@@ -634,6 +635,13 @@ export default function ConnectorsPage() {
         setNotice({ tone: 'success', text: `Created ${payload.name}.` })
       }
     } catch (error) {
+      if (error instanceof ApiError && (error.code.toLowerCase() === 'upgrade_required' || error.code.toLowerCase() === 'plan_limit_exceeded')) {
+        setNotice({
+          tone: 'error',
+          text: error.message,
+          upgradeHref: '/billing',
+        })
+      }
       throw error
     } finally {
       setActiveAction(null)
@@ -768,7 +776,14 @@ export default function ConnectorsPage() {
             'mb-6 rounded-2xl border px-5 py-4 text-sm',
             notice.tone === 'success' ? 'border-green-500/20 bg-green-500/10 text-green-200' : 'border-red-500/20 bg-red-500/10 text-red-200',
           )}>
-            {notice.text}
+            <div className="flex items-center justify-between gap-3">
+              <span>{notice.text}</span>
+              {notice.upgradeHref && (
+                <Link to={notice.upgradeHref} className="flex-shrink-0 text-xs font-semibold text-blue-300 hover:text-blue-200">
+                  Upgrade plan
+                </Link>
+              )}
+            </div>
           </div>
         )}
 

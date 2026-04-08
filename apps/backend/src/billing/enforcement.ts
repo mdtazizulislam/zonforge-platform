@@ -1,9 +1,18 @@
 import { getPool } from '../db.js'
-import { getPlanLimits } from './planDefinitions.js'
-import { getTenantPlan, isSubscriptionActive } from './subscriptionService.js'
+import {
+  getLimitValue,
+  getTenantPlanState,
+  isFeatureEnabled,
+  normalizeLimitForComparison,
+  type PlanFeatureKey,
+  type PlanLimitKey,
+  type TenantPlanState,
+} from './tenantPlans.js'
 
 export type FeatureCode = 'AI_ANALYSIS' | 'ADVANCED_DETECTION' | 'EXPORT_REPORT' | 'THREAT_HUNTING'
 export type MetricCode = 'CONNECTORS' | 'IDENTITIES' | 'EVENTS_PER_MIN'
+
+export type RequiredFeatureLevel = 'summary' | 'basic' | 'full'
 
 export class UpgradeRequiredError extends Error {
   public readonly code = 'UPGRADE_REQUIRED'
@@ -12,6 +21,7 @@ export class UpgradeRequiredError extends Error {
     public readonly plan: string,
     public readonly metric: string,
     public readonly limit: number | string,
+    public readonly recommendedPlan?: string,
     message?: string,
   ) {
     super(message ?? 'Upgrade required')
@@ -24,15 +34,16 @@ export class UpgradeRequiredError extends Error {
       plan: this.plan,
       metric: this.metric,
       limit: this.limit,
+      recommendedPlan: this.recommendedPlan ?? null,
       message: this.message,
     }
   }
 }
 
-function metricToLimitKey(metricCode: MetricCode): 'connectors' | 'identities' | 'max_events_per_min' {
-  if (metricCode === 'CONNECTORS') return 'connectors'
-  if (metricCode === 'IDENTITIES') return 'identities'
-  return 'max_events_per_min'
+function metricToLimitKey(metricCode: MetricCode): PlanLimitKey {
+  if (metricCode === 'CONNECTORS') return 'max_connectors'
+  if (metricCode === 'IDENTITIES') return 'max_identities'
+  return 'events_per_minute'
 }
 
 function periodForMetric(metricCode: MetricCode): 'day' | 'hour' {
@@ -73,9 +84,7 @@ export async function incrementUsage(tenantId: number, metricCode: MetricCode, i
 
 export async function getUsageSummary(tenantId: number) {
   const pool = getPool()
-  const plan = await getTenantPlan(tenantId)
-  const limits = getPlanLimits(plan)
-  const active = await isSubscriptionActive(tenantId)
+  const state = await getTenantPlanState(tenantId)
 
   const dayStart = periodBounds('day').start
   const hourStart = periodBounds('hour').start
@@ -99,9 +108,14 @@ export async function getUsageSummary(tenantId: number) {
   ])
 
   return {
-    plan,
-    status: active ? 'ACTIVE' : 'INACTIVE',
-    limits,
+    plan: state.plan.code,
+    status: state.status === 'canceled' ? 'INACTIVE' : 'ACTIVE',
+    limits: {
+      max_connectors: state.limits.max_connectors,
+      max_identities: state.limits.max_identities,
+      events_per_minute: state.limits.events_per_minute,
+      retention_days: state.limits.retention_days,
+    },
     usage: {
       CONNECTORS: Number(connectorCount.rows[0]?.cnt ?? 0),
       IDENTITIES: Number(identityCount.rows[0]?.cnt ?? 0),
@@ -114,29 +128,64 @@ export async function getUsageSummary(tenantId: number) {
   }
 }
 
+export function requirePlanFeature(
+  state: TenantPlanState,
+  featureKey: PlanFeatureKey,
+  requiredLevel: RequiredFeatureLevel = 'basic',
+): void {
+  if (isFeatureEnabled(state, featureKey, requiredLevel)) {
+    return
+  }
+
+  const recommendedPlan = featureKey === 'ai'
+    ? 'business'
+    : featureKey === 'investigation' || requiredLevel === 'full'
+      ? 'growth'
+      : 'starter'
+
+  throw new UpgradeRequiredError(
+    state.plan.code,
+    featureKey,
+    requiredLevel,
+    recommendedPlan,
+    `${featureKey} requires the ${recommendedPlan} plan or higher.`,
+  )
+}
+
+export function requirePlanLimit(
+  state: TenantPlanState,
+  limitKey: PlanLimitKey,
+  currentUsage: number,
+  increment = 1,
+): void {
+  const limit = getLimitValue(state, limitKey)
+  if (currentUsage + increment <= normalizeLimitForComparison(limit)) {
+    return
+  }
+
+  throw new UpgradeRequiredError(
+    state.plan.code,
+    limitKey,
+    limit ?? 'unlimited',
+    limitKey === 'max_connectors' ? 'starter' : limitKey === 'max_identities' ? 'starter' : 'growth',
+    `${limitKey} exceeds the ${state.plan.code} plan allowance.`,
+  )
+}
+
 export async function assertFeatureAllowed(tenantId: number, featureCode: FeatureCode): Promise<void> {
-  const plan = await getTenantPlan(tenantId)
-  const limits = getPlanLimits(plan)
-  const active = await isSubscriptionActive(tenantId)
-
-  if (!active && plan !== 'starter') {
-    throw new UpgradeRequiredError(plan, featureCode, 'active_subscription',
-      `Subscription must be ACTIVE for ${featureCode}`)
+  const state = await getTenantPlanState(tenantId)
+  if (featureCode === 'AI_ANALYSIS') {
+    requirePlanFeature(state, 'ai', 'basic')
+    return
   }
 
-  if (featureCode === 'AI_ANALYSIS' && limits.ai_enabled === false) {
-    throw new UpgradeRequiredError(plan, featureCode, 'growth_or_higher',
-      'AI analysis is not available on the current plan')
+  if (featureCode === 'ADVANCED_DETECTION') {
+    requirePlanFeature(state, 'detections', 'full')
+    return
   }
 
-  if (featureCode === 'ADVANCED_DETECTION' && (plan === 'starter')) {
-    throw new UpgradeRequiredError(plan, featureCode, 'growth_or_higher',
-      'Advanced detection is not available on Starter')
-  }
-
-  if ((featureCode === 'EXPORT_REPORT' || featureCode === 'THREAT_HUNTING') && (plan === 'starter')) {
-    throw new UpgradeRequiredError(plan, featureCode, 'growth_or_higher',
-      `${featureCode} is not available on Starter`)
+  if (featureCode === 'EXPORT_REPORT' || featureCode === 'THREAT_HUNTING') {
+    requirePlanFeature(state, 'investigation', 'basic')
   }
 }
 
@@ -146,15 +195,6 @@ export async function assertQuota(
   currentValue: number,
   increment = 1,
 ): Promise<void> {
-  const plan = await getTenantPlan(tenantId)
-  const limits = getPlanLimits(plan)
-  const limitKey = metricToLimitKey(metricCode)
-  const limit = limits[limitKey]
-
-  if (limit === 'contracted') return
-
-  if (currentValue + increment > limit) {
-    throw new UpgradeRequiredError(plan, metricCode, limit,
-      `${metricCode} exceeds ${limit} for plan ${plan}`)
-  }
+  const state = await getTenantPlanState(tenantId)
+  requirePlanLimit(state, metricToLimitKey(metricCode), currentValue, increment)
 }

@@ -809,9 +809,22 @@ export const api = {
       apiFetch<PipelineHealth>('/v1/health/pipeline'),
   },
 
+  plans: {
+    list: () => apiFetch<{ items: PlanDefinition[] }>('/v1/plans'),
+    me: () => apiFetch<CurrentPlanResponse>('/v1/me/plan'),
+    limits: () => apiFetch<{ planCode: string; limits: PlanLimits; usage: PlanUsage }>('/v1/plan/limits'),
+    upgrade: (planCode: string) => apiFetch<CurrentPlanResponse>('/v1/plan/upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ planCode }),
+    }),
+    cancel: () => apiFetch<CurrentPlanResponse>('/v1/plan/cancel', {
+      method: 'POST',
+    }),
+  },
+
   // Backward-compatible helper used in billing views.
   getPlans: () =>
-    apiFetch<unknown>('/v1/billing/plans'),
+    apiFetch<{ items: PlanDefinition[] }>('/v1/plans'),
 
   // ── Playbooks ─────────────────────────────
 
@@ -1306,6 +1319,54 @@ export interface UsageSummary {
   usage:    Record<string, { current: number; limit: number | null }>
   features: Record<string, boolean>
   retentionDays: number
+}
+
+export interface PlanLimits {
+  max_connectors: number | null
+  max_identities: number | null
+  events_per_minute: number | null
+  retention_days: number | null
+}
+
+export interface PlanFeatures {
+  detections: 'basic' | 'full'
+  alerts: boolean | 'basic' | 'full'
+  risk: boolean | 'limited' | 'full'
+  investigation: boolean | 'basic' | 'full'
+  ai: boolean
+  sso?: boolean
+  compliance?: boolean
+  sla?: boolean
+  dedicated_support?: boolean
+  full_platform?: boolean
+}
+
+export interface PlanDefinition {
+  id: string
+  code: string
+  name: string
+  priceMonthly: number | null
+  limits: PlanLimits
+  features: PlanFeatures
+  isActive: boolean
+}
+
+export interface PlanUsage {
+  connectors: number
+  identities: number
+  eventsPerMinute: number
+}
+
+export interface CurrentPlanResponse {
+  tenantId: string
+  status: string
+  startedAt: string | null
+  expiresAt: string | null
+  canManageBilling: boolean
+  plan: PlanDefinition
+  limits: PlanLimits
+  features: PlanFeatures
+  usage: PlanUsage
 }
 
 export interface Subscription {
