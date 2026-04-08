@@ -376,6 +376,11 @@ export async function materializeAlertForFinding(findingId: number) {
 
       await client.query('COMMIT');
       await recalculateTenantRiskScores(finding.tenant_id).catch((error) => {
+        console.error('risk_failed', {
+          tenantId: finding.tenant_id,
+          trigger: 'alert_grouped',
+          error: error instanceof Error ? error.message : 'unknown',
+        });
         console.error('risk_score_failed', {
           tenantId: finding.tenant_id,
           trigger: 'alert_grouped',
@@ -483,6 +488,11 @@ export async function materializeAlertForFinding(findingId: number) {
     });
 
     await recalculateTenantRiskScores(finding.tenant_id).catch((error) => {
+      console.error('risk_failed', {
+        tenantId: finding.tenant_id,
+        trigger: 'alert_created',
+        error: error instanceof Error ? error.message : 'unknown',
+      });
       console.error('risk_score_failed', {
         tenantId: finding.tenant_id,
         trigger: 'alert_created',
@@ -563,6 +573,11 @@ export async function updateAlertStatusForTenant(input: {
     });
 
     await recalculateTenantRiskScores(input.tenantId).catch((error) => {
+      console.error('risk_failed', {
+        tenantId: input.tenantId,
+        trigger: 'alert_status_changed',
+        error: error instanceof Error ? error.message : 'unknown',
+      });
       console.error('risk_score_failed', {
         tenantId: input.tenantId,
         trigger: 'alert_status_changed',

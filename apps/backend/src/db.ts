@@ -831,6 +831,24 @@ export async function initDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS risk_factors (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        entity_type VARCHAR(16) NOT NULL,
+        entity_key VARCHAR(512) NOT NULL,
+        factor_key VARCHAR(128) NOT NULL,
+        factor_label VARCHAR(255) NOT NULL,
+        contribution NUMERIC(10,2) NOT NULL,
+        signal_count INTEGER NOT NULL DEFAULT 0,
+        weight NUMERIC(10,2) NOT NULL,
+        last_seen_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(tenant_id, entity_type, entity_key, factor_key)
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS failed_ingestion_events (
         id BIGSERIAL PRIMARY KEY,
         tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -1213,6 +1231,8 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_alert_events_tenant_type ON alert_events(tenant_id, event_type, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_risk_scores_tenant_entity ON risk_scores(tenant_id, entity_type, score DESC, entity_key ASC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_risk_scores_tenant_calculated ON risk_scores(tenant_id, last_calculated_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_risk_factors_tenant_entity ON risk_factors(tenant_id, entity_type, entity_key, contribution DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_risk_factors_tenant_seen ON risk_factors(tenant_id, last_seen_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_tenant ON failed_ingestion_events(tenant_id, failed_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_failed_ingestion_events_source_type ON failed_ingestion_events(source_type, failed_at DESC)`);
 

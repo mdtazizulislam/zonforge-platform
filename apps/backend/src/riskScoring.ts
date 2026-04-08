@@ -56,6 +56,15 @@ type RiskFactor = {
   lastSeenAt: string | null;
 };
 
+type PersistedRiskFactor = {
+  factorKey: string;
+  factorLabel: string;
+  contribution: number;
+  signalCount: number;
+  weight: number;
+  lastSeenAt: string | null;
+};
+
 type EntityAccumulator = {
   entityType: RiskEntityType;
   entityKey: string;
@@ -207,6 +216,17 @@ function normalizeResource(value: string | null | undefined): string | null {
   return normalized.length > 0 ? normalized : null;
 }
 
+function emitRiskLog(eventType: 'risk_calculated' | 'risk_updated' | 'risk_failed', payload: Record<string, unknown>) {
+  if (eventType === 'risk_failed') {
+    console.error(eventType, payload);
+    console.error('risk_score_failed', payload);
+    return;
+  }
+
+  console.info(eventType, payload);
+  console.info(eventType === 'risk_calculated' ? 'risk_score_calculated' : 'risk_score_updated', payload);
+}
+
 function extractFindingUserKey(finding: FindingSignalRow): string | null {
   return normalizeEmail(typeof finding.evidence_json?.actorEmail === 'string' ? finding.evidence_json.actorEmail : null);
 }
@@ -314,6 +334,23 @@ function serializeFactors(accumulator: EntityAccumulator): RiskFactor[] {
       weight: roundContribution(factor.weight),
       lastSeenAt: factor.lastSeenAt,
     }));
+}
+
+function toPersistedFactors(value: Array<Record<string, unknown>> | null | undefined): PersistedRiskFactor[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((factor) => ({
+      factorKey: typeof factor.factorKey === 'string' ? factor.factorKey : '',
+      factorLabel: typeof factor.label === 'string' ? factor.label : 'Security signal activity',
+      contribution: Number(factor.contribution ?? 0),
+      signalCount: Number(factor.signalCount ?? 0),
+      weight: Number(factor.weight ?? 0),
+      lastSeenAt: typeof factor.lastSeenAt === 'string' ? factor.lastSeenAt : null,
+    }))
+    .filter((factor) => factor.factorKey && Number.isFinite(factor.contribution) && factor.contribution > 0);
 }
 
 function alertContribution(alert: AlertSignalRow): number {
@@ -468,6 +505,8 @@ export async function recalculateTenantRiskScores(tenantId: number) {
         await client.query('DELETE FROM risk_scores WHERE tenant_id = $1', [tenantId]);
       }
 
+      await client.query('DELETE FROM risk_factors WHERE tenant_id = $1', [tenantId]);
+
       for (const row of calculated) {
         const existing = await client.query(
           `SELECT id, score, score_band
@@ -517,7 +556,37 @@ export async function recalculateTenantRiskScores(tenantId: number) {
           ],
         );
 
-        console.info('risk_score_calculated', {
+        const factorRows = toPersistedFactors(row.top_factors_json);
+        for (const factor of factorRows) {
+          await client.query(
+            `INSERT INTO risk_factors (
+               tenant_id,
+               entity_type,
+               entity_key,
+               factor_key,
+               factor_label,
+               contribution,
+               signal_count,
+               weight,
+               last_seen_at,
+               created_at,
+               updated_at
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())`,
+            [
+              row.tenant_id,
+              row.entity_type,
+              row.entity_key,
+              factor.factorKey,
+              factor.factorLabel,
+              factor.contribution,
+              factor.signalCount,
+              factor.weight,
+              factor.lastSeenAt,
+            ],
+          );
+        }
+
+        emitRiskLog('risk_calculated', {
           tenantId,
           entityType: row.entity_type,
           entityKey: row.entity_key,
@@ -527,7 +596,7 @@ export async function recalculateTenantRiskScores(tenantId: number) {
         });
 
         if (!prior || prior.score !== row.score || prior.score_band !== row.score_band) {
-          console.info('risk_score_updated', {
+          emitRiskLog('risk_updated', {
             tenantId,
             entityType: row.entity_type,
             entityKey: row.entity_key,
@@ -547,7 +616,7 @@ export async function recalculateTenantRiskScores(tenantId: number) {
       client.release();
     }
   } catch (error) {
-    console.error('risk_score_failed', {
+    emitRiskLog('risk_failed', {
       tenantId,
       error: error instanceof Error ? error.message : 'unknown',
     });

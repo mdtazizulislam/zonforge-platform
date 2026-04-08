@@ -12,6 +12,7 @@
 ### Storage Model
 
 - Add `risk_scores` as the tenant-scoped materialized score table.
+- Add `risk_factors` as the tenant-scoped explanation table keyed by `(tenant_id, entity_type, entity_key, factor_key)`.
 - Keep one row per `(tenant_id, entity_type, entity_key)`.
 - Persist:
   - `tenant_id`
@@ -25,6 +26,7 @@
   - `last_event_at`
   - `last_calculated_at`
 - Keep additive metadata (`created_at`, `updated_at`) for operations and proof.
+- Persist factor rows with contribution, weight, signal count, and last seen timestamp so DB proof can show why a score exists without reading raw event payloads.
 
 ### Calculation Model
 
@@ -67,6 +69,7 @@
 ### API Surface
 
 - Add required entity APIs:
+  - `GET /v1/risk`
   - `GET /v1/risk/org`
   - `GET /v1/risk/users`
   - `GET /v1/risk/assets`
@@ -79,9 +82,10 @@
 - Recalculate scores when risk endpoints are read so the persisted rows always exist for proof.
 - Trigger recalculation after grouped alert creation, grouping, and lifecycle updates so runtime logs show risk updates alongside alert operations.
 - Emit:
-  - `risk_score_calculated`
-  - `risk_score_updated`
-  - `risk_score_failed`
+  - `risk_calculated`
+  - `risk_updated`
+  - `risk_failed`
+- Keep the existing `risk_score_*` log names as compatibility aliases for any existing log consumers.
 
 ### Security Controls
 

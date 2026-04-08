@@ -1,0 +1,81 @@
+SERIAL 14 build and log proof
+Date: 2026-04-08
+
+Build
+-----
+> @zonforge/backend@1.0.0 build
+> tsc
+
+Health
+------
+GET /health -> 200
+{"status":"healthy"}
+
+Risk update logs
+----------------
+risk_calculated {
+  tenantId: 1,
+  entityType: 'org',
+  entityKey: 'org',
+  score: 96,
+  scoreBand: 'critical',
+  signalCount: 6
+}
+risk_updated {
+  tenantId: 1,
+  entityType: 'org',
+  entityKey: 'org',
+  previousScore: 31,
+  nextScore: 96,
+  previousBand: 'low',
+  nextBand: 'critical'
+}
+risk_calculated {
+  tenantId: 1,
+  entityType: 'user',
+  entityKey: 'alice@example.com',
+  score: 89,
+  scoreBand: 'critical',
+  signalCount: 5
+}
+risk_updated {
+  tenantId: 1,
+  entityType: 'user',
+  entityKey: 'alice@example.com',
+  previousScore: 30,
+  nextScore: 89,
+  previousBand: 'low',
+  nextBand: 'critical'
+}
+risk_calculated {
+  tenantId: 1,
+  entityType: 'asset',
+  entityKey: 'iam-admin-role',
+  score: 17,
+  scoreBand: 'low',
+  signalCount: 1
+}
+risk_updated {
+  tenantId: 1,
+  entityType: 'asset',
+  entityKey: 'iam-admin-role',
+  previousScore: null,
+  nextScore: 17,
+  previousBand: null,
+  nextBand: 'low'
+}
+
+API access logs
+---------------
+GET /v1/risk -> 200 (96ms)
+GET /v1/risk/org -> 200 (83ms)
+GET /v1/risk/users -> 200 (61ms)
+GET /v1/risk/assets -> 200 (72ms)
+GET /v1/risk/user/alice%40example.com -> 200
+GET /v1/risk/user/alice%40example.com -> 404
+
+Alert and detection trigger logs
+--------------------------------
+alert_created { alertId: '1', findingId: '1', tenantId: 1, ruleKey: 'suspicious_login', principalKey: 'alice@example.com', severity: 'medium' }
+alert_grouped { alertId: '1', findingId: '2', tenantId: 1, ruleKey: 'suspicious_login', principalKey: 'alice@example.com' }
+alert_created { alertId: '2', findingId: '3', tenantId: 1, ruleKey: 'privilege_escalation', principalKey: 'alice@example.com', severity: 'critical' }

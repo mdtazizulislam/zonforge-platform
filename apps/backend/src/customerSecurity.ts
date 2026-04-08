@@ -2829,6 +2829,34 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     return c.json(await buildRiskSummary(access.tenantId));
   });
 
+  router.get('/v1/risk', async (c) => {
+    const access = await getTenantAccess(c, requireAuthUserId);
+    if (access instanceof Response) return access;
+
+    await ensureTenantRiskScores(access.tenantId);
+    const score = await getRiskScoreForTenant(access.tenantId, 'org', 'org');
+    const summary = await buildTenantRiskSummary(access.tenantId);
+
+    return c.json({
+      entityType: 'org',
+      entityKey: 'org',
+      entityLabel: score?.entity_label ?? 'Organization',
+      score: Number(score?.score ?? 0),
+      scoreBand: score?.score_band ?? 'info',
+      topFactors: score?.top_factors_json ?? [],
+      signalCount: Number(score?.signal_count ?? 0),
+      lastEventAt: toIso(score?.last_event_at),
+      lastCalculatedAt: toIso(score?.last_calculated_at) ?? summary.calculatedAt,
+      postureScore: summary.postureScore,
+      openCriticalAlerts: summary.openCriticalAlerts,
+      openHighAlerts: summary.openHighAlerts,
+      topRiskUserIds: summary.topRiskUserIds,
+      topRiskAssetIds: summary.topRiskAssetIds,
+      connectorHealthScore: summary.connectorHealthScore,
+      mttdP50Minutes: summary.mttdP50Minutes,
+    });
+  });
+
   router.get('/v1/risk/org', async (c) => {
     const access = await getTenantAccess(c, requireAuthUserId);
     if (access instanceof Response) return access;
