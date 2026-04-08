@@ -29,7 +29,7 @@ export default function TopThreatsPanel({
       </div>
 
       {items.length === 0 ? (
-        <div className="zf-panel-empty">No top threats available from the latest alert data.</div>
+        <div className="zf-panel-empty">No priority threats are surfaced right now. This section will highlight the highest-risk items as live alerts arrive.</div>
       ) : (
         <div className="zf-threat-list">
           {items.slice(0, 3).map((item) => (

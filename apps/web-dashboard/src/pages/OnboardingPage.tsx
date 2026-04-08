@@ -4,9 +4,9 @@ import { api, type OnboardingStatusResponse } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 
 const PROVIDERS = [
-  { id: 'aws', label: 'AWS', helper: 'CloudTrail, GuardDuty, IAM, and account posture placeholders.' },
-  { id: 'm365', label: 'M365', helper: 'Identity, email, and Defender placeholders for first setup.' },
-  { id: 'gcp', label: 'GCP', helper: 'Projects, IAM, and security telemetry placeholders.' },
+  { id: 'aws', label: 'AWS', helper: 'Prioritize AWS telemetry first if your cloud estate is anchored in CloudTrail, IAM, and GuardDuty.' },
+  { id: 'm365', label: 'M365', helper: 'Prioritize Microsoft identity and audit coverage if Entra, email, and Defender matter first.' },
+  { id: 'gcp', label: 'GCP', helper: 'Prioritize GCP if your first production signal should come from projects, IAM, and audit logs.' },
 ] as const
 
 export default function OnboardingPage() {
@@ -87,7 +87,7 @@ export default function OnboardingPage() {
       syncAuthStatus(nextStatus)
 
       if (options?.navigateToDashboard && nextStatus.onboardingStatus === 'completed') {
-        navigate('/dashboard', { replace: true })
+        navigate('/customer-dashboard', { replace: true })
       }
     } catch {
       setErrorMessage('Unable to update onboarding right now. Please try again.')
@@ -100,12 +100,12 @@ export default function OnboardingPage() {
     {
       number: '01',
       title: welcomeStep?.title ?? 'Welcome',
-      description: welcomeStep?.description ?? 'Start onboarding for this tenant and capture the first secure session.',
+      description: welcomeStep?.description ?? 'Confirm the workspace is active and move into the live customer setup flow.',
       complete: Boolean(welcomeStep?.isComplete),
       body: (
         <div className="space-y-4">
           <p className="text-sm text-gray-300">
-            Confirm the workspace details, move the tenant from pending to in progress, and record the onboarding start timestamp.
+            Confirm the workspace details, move the tenant from pending to in progress, and unlock the live customer workspace.
           </p>
           <button
             type="button"
@@ -126,7 +126,7 @@ export default function OnboardingPage() {
     {
       number: '02',
       title: connectStep?.title ?? 'Connect your environment',
-      description: connectStep?.description ?? 'Pick the first environment to connect. This remains a placeholder in SERIAL 08.',
+      description: connectStep?.description ?? 'Choose the first production source you plan to connect so the dashboard and connector path stay focused.',
       complete: Boolean(connectStep?.isComplete),
       body: (
         <div className="space-y-4">
@@ -151,24 +151,30 @@ export default function OnboardingPage() {
               status: 'in_progress',
               stepKey: 'connect_environment',
               isComplete: true,
-              payload: { provider: selectedProvider, placeholder: true },
+              payload: { provider: selectedProvider, source: 'onboarding_ui' },
             })}
             className="inline-flex items-center justify-center rounded-xl border border-cyan-300/40 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:border-cyan-200 hover:text-cyan-50 disabled:cursor-not-allowed disabled:border-white/10 disabled:text-gray-500"
           >
-            {connectStep?.isComplete ? 'Environment placeholder saved' : saving ? 'Saving...' : 'Save environment selection'}
+            {connectStep?.isComplete ? 'Preferred source saved' : saving ? 'Saving...' : 'Save preferred source'}
           </button>
+          <Link
+            to="/connectors"
+            className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
+          >
+            Open connectors
+          </Link>
         </div>
       ),
     },
     {
       number: '03',
       title: firstScanStep?.title ?? 'First scan CTA',
-      description: firstScanStep?.description ?? 'Complete onboarding and land in the dashboard ready for first-scan follow-up.',
+      description: firstScanStep?.description ?? 'Complete onboarding and continue into the customer dashboard with billing, alerts, and connector follow-up in view.',
       complete: Boolean(firstScanStep?.isComplete),
       body: (
         <div className="space-y-4">
           <p className="text-sm text-gray-300">
-            This CTA marks onboarding complete, records the completion timestamp, and sends the tenant to the dashboard.
+            Finish onboarding and continue in the live dashboard. You can connect data sources from the connector workspace as the next step.
           </p>
           <button
             type="button"
@@ -177,11 +183,11 @@ export default function OnboardingPage() {
               status: 'completed',
               stepKey: 'first_scan',
               isComplete: true,
-              payload: { cta: 'first_scan', placeholder: true },
+              payload: { cta: 'dashboard_handoff', source: 'onboarding_ui' },
             }, { navigateToDashboard: true })}
             className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-300"
           >
-            {isCompleted ? 'Onboarding complete' : saving ? 'Saving...' : 'Complete onboarding and open dashboard'}
+            {isCompleted ? 'Onboarding complete' : saving ? 'Saving...' : 'Finish onboarding and open dashboard'}
           </button>
         </div>
       ),
@@ -196,7 +202,7 @@ export default function OnboardingPage() {
             <p className="text-sm uppercase tracking-[0.22em] text-cyan-300">Workspace onboarding</p>
             <h1 className="mt-3 text-3xl font-semibold text-white">{workspaceName} is ready.</h1>
             <p className="mt-3 max-w-2xl text-sm text-gray-300">
-              Your customer account, workspace, and owner membership are active. SERIAL 08 turns onboarding into a tracked tenant-scoped flow with a real dashboard handoff.
+              Your customer account, workspace, and owner membership are active. Use this short checklist to confirm the workspace, choose the first source you plan to connect, and continue into the live customer dashboard.
             </p>
           </div>
 
@@ -212,7 +218,7 @@ export default function OnboardingPage() {
           <section className="rounded-2xl border border-white/10 bg-black/20 p-6">
             <h2 className="text-lg font-medium text-white">Onboarding steps</h2>
             <p className="mt-2 text-sm text-gray-400">
-              Move from welcome to first scan with state stored on the tenant record and step progress stored per tenant.
+              Move from workspace activation into the live customer app with state stored on the tenant record and progress tracked per tenant.
             </p>
 
             <div className="mt-5 space-y-4">
@@ -250,13 +256,13 @@ export default function OnboardingPage() {
             <h2 className="text-lg font-medium text-white">Status summary</h2>
             <ul className="mt-4 space-y-3 text-sm text-gray-300">
               <li>Current onboarding state: <span className="font-medium text-cyan-200">{onboardingStatus.replace(/_/g, ' ')}</span>.</li>
-              <li>Selected environment: <span className="font-medium text-cyan-200">{selectedProvider.toUpperCase()}</span>.</li>
-              <li>Completion requires all three onboarding steps to be marked complete.</li>
+              <li>Preferred first source: <span className="font-medium text-cyan-200">{selectedProvider.toUpperCase()}</span>.</li>
+              <li>After onboarding, continue with connectors, billing, and live dashboard review from the customer workspace.</li>
             </ul>
 
             <div className="mt-6 flex flex-col gap-3">
               <Link
-                to="/dashboard"
+                to="/customer-dashboard"
                 className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-cyan-300"
               >
                 Open dashboard
@@ -271,7 +277,7 @@ export default function OnboardingPage() {
 
             {isCompleted ? (
               <div className="mt-6 rounded-2xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-100">
-                Onboarding is complete. The next secure landing page is the dashboard route.
+                Onboarding is complete. The next secure landing page is the customer dashboard, where connector setup and billing remain one click away.
               </div>
             ) : null}
           </aside>

@@ -29,7 +29,7 @@ export default function RecentAlertsTable({
       </div>
 
       {alerts.length === 0 ? (
-        <div className="zf-panel-empty">No recent alerts to display.</div>
+        <div className="zf-panel-empty">No recent alerts are showing yet. Connect a source or revisit later as live detections arrive.</div>
       ) : (
         <div className="zf-table-wrap">
           <table className="zf-alerts-table">

@@ -8,7 +8,9 @@ type CustomerHeaderProps = {
 
 export function CustomerHeader({ title, subtitle }: CustomerHeaderProps) {
   const userName = useAuthStore((state) => state.user?.name) ?? 'Customer Team'
+  const userRole = useAuthStore((state) => state.user?.membership?.role ?? state.user?.role) ?? 'viewer'
   const resolvedTitle = title ?? 'Customer Dashboard'
+  const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1)
 
   return (
     <header className="zf-customer-header">
@@ -28,7 +30,7 @@ export function CustomerHeader({ title, subtitle }: CustomerHeaderProps) {
           <span className="zf-customer-user__avatar">{(userName ?? 'Customer').slice(0, 2).toUpperCase()}</span>
           <div>
             <p className="zf-customer-user__name">{userName ?? 'Customer Team'}</p>
-            <p className="zf-customer-user__role">Workspace Owner</p>
+            <p className="zf-customer-user__role">{roleLabel}</p>
           </div>
         </div>
       </div>

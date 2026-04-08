@@ -21,7 +21,7 @@ export default function ConnectorHealthPanel({
       </div>
 
       {items.length === 0 ? (
-        <div className="zf-panel-empty">No connector telemetry yet.</div>
+        <div className="zf-panel-empty">No connector telemetry is available yet. Connect your first source to start populating system health and detections.</div>
       ) : (
         <div className="zf-connector-list">
           {items.map((item) => (

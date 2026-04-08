@@ -23,7 +23,7 @@ export default function InvestigationPreviewPanel({
       </div>
 
       {!primary ? (
-        <div className="zf-panel-empty">No investigation preview available.</div>
+        <div className="zf-panel-empty">No investigation is active right now. New high-signal findings will appear here when the backend opens an investigation.</div>
       ) : (
         <div className="zf-investigation-panel">
           <div className="zf-investigation-panel__featured">

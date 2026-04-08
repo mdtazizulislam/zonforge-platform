@@ -9,7 +9,7 @@ export default function RecommendedActionsPanel({ actions }: { actions: string[]
       </div>
 
       {actions.length === 0 ? (
-        <div className="zf-panel-empty">No recommended actions yet.</div>
+        <div className="zf-panel-empty">No immediate action is required right now. Review billing, connector coverage, or alert history if you want a broader health check.</div>
       ) : (
         <div className="zf-action-list">
           {actions.slice(0, 5).map((action, index) => (

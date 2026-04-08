@@ -16,7 +16,6 @@ const CustomerDashboardPage = lazy(() => import('@/pages/CustomerDashboardPage')
 const CustomerAlertsPage = lazy(() => import('@/pages/customer/CustomerAlertsPage'))
 const CustomerInvestigationsPage = lazy(() => import('@/pages/customer/CustomerInvestigationsPage'))
 const CustomerAiAssistantPage = lazy(() => import('@/pages/customer/CustomerAiAssistantPage'))
-const CustomerBillingPage = lazy(() => import('@/pages/customer/CustomerBillingPage'))
 const CustomerSettingsPage = lazy(() => import('@/pages/customer/CustomerSettingsPage'))
 const AlertsPage        = lazy(() => import('@/pages/AlertsPage'))
 const AlertDetailPage   = lazy(() => import('@/pages/AlertDetailPage'))
@@ -192,13 +191,7 @@ const router = createBrowserRouter([
   },
   {
     path: '/customer-billing',
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <CustomerBillingPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><Navigate to="/billing" replace /></RequireAuth>,
   },
   {
     path: '/customer-settings',

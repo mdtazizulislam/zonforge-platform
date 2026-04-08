@@ -846,7 +846,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ planCode, billingCycle }),
       }),
-    usage:        () => apiFetch<UsageSummary>('/v1/billing/usage'),
+    plans:        () => apiFetch<BillingPlansResponse>('/v1/billing/plans'),
+    portal:       () => apiFetch<BillingPortalResponse>('/v1/billing/portal', { method: 'POST' }),
+    cancel:       () => apiFetch<BillingCancelResponse>('/v1/billing/cancel', { method: 'POST' }),
+    usage:        () => apiFetch<BillingUsageResponse>('/v1/billing/usage'),
     subscription: () => apiFetch<BillingSubscriptionResponse>('/v1/billing/subscription'),
   },
 
@@ -1383,6 +1386,43 @@ export interface BillingCheckoutResponse {
   url: string | null
 }
 
+export interface BillingPlanCatalogItem {
+  code: string
+  name: string
+  planTier: string
+  displayName: string
+  monthlyPriceCents: number
+  annualPriceCents: number
+  trialDays: number
+  highlighted: boolean
+  limits: {
+    identities: number | 'unlimited'
+    connectors: number | 'unlimited'
+    eventsPerMin: number | 'unlimited'
+    retentionDays: number
+    customRules: string
+  }
+  features: string[]
+}
+
+export interface BillingPlansResponse {
+  plans: BillingPlanCatalogItem[]
+}
+
+export interface BillingPortalResponse {
+  url: string
+}
+
+export interface BillingCancelResponse {
+  billing?: {
+    subscriptionStatus?: string | null
+    billingInterval?: 'monthly' | 'annual' | null
+    currentPeriodEnd?: string | null
+    cancelAtPeriodEnd?: boolean
+  }
+  cancellationScheduled: boolean
+}
+
 export interface BillingSubscriptionResponse {
   subscription: {
     tenantId: string
@@ -1400,6 +1440,28 @@ export interface BillingSubscriptionResponse {
     limits: PlanLimits
   }
   eligible_for_checkout: boolean
+}
+
+export interface BillingUsageResponse {
+  plan: string
+  status: string
+  limits: PlanLimits
+  usage: PlanUsage
+  planTier: string
+  retentionDays: number
+  features: PlanFeatures
+  planLimits: {
+    maxConnectors: number | null
+    maxIdentities: number | null
+    retentionDays: number | null
+    maxCustomRules: number | null
+  }
+  connectorsActive: number
+  identitiesMonitor: number
+  usagePct: {
+    connectors: number
+    identities: number
+  }
 }
 
 export interface Subscription {

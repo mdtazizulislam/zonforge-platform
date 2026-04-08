@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import ConnectorHealthPanel from '@/components/customer/ConnectorHealthPanel'
 import { CustomerLayout } from '@/components/customer/CustomerLayout'
 import InvestigationPreviewPanel from '@/components/customer/InvestigationPreviewPanel'
@@ -10,7 +10,7 @@ import RecommendedActionsPanel from '@/components/customer/RecommendedActionsPan
 import RiskGaugeCard from '@/components/customer/RiskGaugeCard'
 import RiskTrendChart from '@/components/customer/RiskTrendChart'
 import TopThreatsPanel from '@/components/customer/TopThreatsPanel'
-import { api } from '@/lib/api'
+import { api, type BillingSubscriptionResponse } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 
 type DashboardAlert = {
@@ -512,6 +512,48 @@ function buildLoadingCards(): number[] {
   return [0, 1, 2, 3]
 }
 
+function buildPrimaryAction({
+  onboardingStatus,
+  connectors,
+  subscription,
+  canManageBilling,
+}: {
+  onboardingStatus: string | undefined
+  connectors: DashboardConnectorItem[]
+  subscription: BillingSubscriptionResponse['subscription'] | undefined
+  canManageBilling: boolean
+}) {
+  if (onboardingStatus !== 'completed') {
+    return {
+      href: '/onboarding',
+      label: 'Finish onboarding',
+      helper: 'Complete workspace activation and continue into the live customer dashboard.',
+    }
+  }
+
+  if (connectors.length === 0) {
+    return {
+      href: '/connectors',
+      label: 'Connect your first source',
+      helper: 'Add a production connector so alerts, investigations, and posture data can begin flowing.',
+    }
+  }
+
+  if (canManageBilling && subscription && ['starter', 'free'].includes(lower(subscription.planCode))) {
+    return {
+      href: '/billing',
+      label: 'Review upgrade options',
+      helper: 'Compare plans and upgrade when you need more identities, connectors, or retained data.',
+    }
+  }
+
+  return {
+    href: '/customer-alerts',
+    label: 'Review customer alerts',
+    helper: 'Move from posture review into the current alert queue without leaving the customer workspace.',
+  }
+}
+
 function queryKey(suffix: string) {
   return ['customer-dashboard', suffix]
 }
@@ -519,6 +561,7 @@ function queryKey(suffix: string) {
 export default function CustomerDashboardPage() {
   const user = useAuthStore((state) => state.user)
   const [searchValue, setSearchValue] = useState('')
+  const billingCanManage = ['owner', 'admin'].includes(lower(user?.membership?.role ?? user?.role))
 
   const [riskQuery, alertsQuery, investigationsQuery, pipelineQuery] = useQueries({
     queries: [
@@ -541,6 +584,12 @@ export default function CustomerDashboardPage() {
     ],
   })
 
+  const billingQuery = useQuery({
+    queryKey: queryKey('billing-summary'),
+    queryFn: api.billing.subscription,
+    staleTime: 15_000,
+  })
+
   const risk = useMemo(() => normalizeRiskSummary(riskQuery.data), [riskQuery.data])
   const alerts = useMemo(() => normalizeAlerts(alertsQuery.data), [alertsQuery.data])
   const investigations = useMemo(() => normalizeInvestigations(investigationsQuery.data), [investigationsQuery.data])
@@ -560,6 +609,16 @@ export default function CustomerDashboardPage() {
     risk,
     connectorItems,
   }), [connectorItems, risk, searchableAlerts])
+  const primaryAction = useMemo(() => buildPrimaryAction({
+    onboardingStatus: user?.onboardingStatus,
+    connectors: connectorItems,
+    subscription: billingQuery.data?.subscription,
+    canManageBilling: billingCanManage,
+  }), [billingCanManage, billingQuery.data?.subscription, connectorItems, user?.onboardingStatus])
+  const healthyServiceCount = useMemo(
+    () => connectorItems.filter((item) => lower(item.status) === 'healthy').length,
+    [connectorItems],
+  )
 
   const isInitialLoading =
     (riskQuery.isLoading || alertsQuery.isLoading || investigationsQuery.isLoading || pipelineQuery.isLoading) &&
@@ -586,6 +645,53 @@ export default function CustomerDashboardPage() {
             </div>
 
             <div className="zf-grid zf-grid-2">
+              <section className="zf-card zf-card--wide">
+                <div className="zf-card-head">
+                  <h2 className="zf-card-title">What ZonForge is doing for this workspace</h2>
+                  <p className="zf-card-subtitle">ZonForge brings connected security signals into one customer-safe view so you can understand posture, see active threats, and decide what to do next.</p>
+                </div>
+
+                <div className="zf-customer-shell-detail-grid">
+                  <div className="zf-customer-shell-detail">
+                    <span>Primary next action</span>
+                    <strong>{primaryAction.label}</strong>
+                  </div>
+                  <div className="zf-customer-shell-detail">
+                    <span>Billing status</span>
+                    <strong>
+                      {billingQuery.data?.subscription
+                        ? `${billingQuery.data.subscription.planName} • ${formatLabel(billingQuery.data.subscription.status, 'Unknown')}`
+                        : 'Loading billing status'}
+                    </strong>
+                  </div>
+                  <div className="zf-customer-shell-detail">
+                    <span>System status</span>
+                    <strong>
+                      {connectorItems.length > 0
+                        ? `${healthyServiceCount}/${connectorItems.length} core services healthy`
+                        : 'Awaiting connector telemetry'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Link
+                    to={primaryAction.href}
+                    className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-cyan-300"
+                  >
+                    {primaryAction.label}
+                  </Link>
+                  <Link
+                    to="/billing"
+                    className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
+                  >
+                    Open billing
+                  </Link>
+                </div>
+
+                <p className="mt-4 text-sm text-gray-400">{primaryAction.helper}</p>
+              </section>
+
               <section className="zf-card zf-card--wide">
                 <div className="zf-card-head">
                   <h2 className="zf-card-title">Search the executive view</h2>
@@ -676,19 +782,19 @@ export default function CustomerDashboardPage() {
 
               {isEmptyState ? (
                 <div className="zf-customer-empty">
-                  <div>The dashboard is live, but the current APIs did not return customer dashboard data yet.</div>
+                  <div>Your workspace is ready, but live security data has not arrived yet. Connect a source, review billing, or return after telemetry starts flowing.</div>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <Link
-                      to="/onboarding"
+                      to={primaryAction.href}
                       className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-cyan-300"
                     >
-                      {user?.onboardingStatus === 'completed' ? 'Review onboarding' : 'Continue onboarding'}
+                      {primaryAction.label}
                     </Link>
                     <Link
-                      to="/connectors"
+                      to="/billing"
                       className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
                     >
-                      Open connectors
+                      Open billing
                     </Link>
                   </div>
                 </div>

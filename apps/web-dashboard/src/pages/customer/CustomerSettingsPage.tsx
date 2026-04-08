@@ -173,12 +173,26 @@ export default function CustomerSettingsPage() {
               <article className="zf-card">
                 <div className="zf-card-head">
                   <h2 className="zf-card-title">Security Settings</h2>
-                  <p className="zf-card-subtitle">Authentication and workspace protection controls.</p>
+                  <p className="zf-card-subtitle">Authentication posture and workspace protection status without dead-end actions.</p>
                 </div>
 
-                <div className="zf-action-stack">
-                  <button className="zf-btn-primary" type="button">Change Password</button>
-                  <button className="zf-btn-secondary" type="button">Enable MFA</button>
+                <div className="zf-detail-list">
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Sign-in method</span>
+                    <span className="zf-value">Workspace email and password</span>
+                  </div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Invite security</span>
+                    <span className="zf-value">Team access is granted through expiring tenant-scoped invites</span>
+                  </div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Billing authority</span>
+                    <span className="zf-value">Owners and admins manage subscription changes</span>
+                  </div>
+                  <div className="zf-detail-row">
+                    <span className="zf-label">Self-service controls</span>
+                    <span className="zf-value">Only live controls are shown here. Unsupported MFA or password workflows are intentionally hidden.</span>
+                  </div>
                 </div>
               </article>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthShell from '../components/auth/AuthShell'
 import AuthCard from '../components/auth/AuthCard'
 import { api, tokenStorage } from '@/lib/api'
@@ -7,11 +7,28 @@ import { useAuthStore } from '@/stores/auth.store'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const setUser = useAuthStore((state) => state.setUser)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  const requestedPath = typeof location.state === 'object'
+    && location.state
+    && 'from' in location.state
+    && typeof location.state.from === 'object'
+    && location.state.from
+    && 'pathname' in location.state.from
+    && typeof location.state.from.pathname === 'string'
+    ? location.state.from.pathname
+    : null
+
+  const safeRequestedPath = requestedPath
+    && requestedPath.startsWith('/')
+    && !['/login', '/signup', '/invite/accept'].includes(requestedPath)
+    ? requestedPath
+    : null
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -33,7 +50,7 @@ export default function LoginPage() {
       tokenStorage.setRefresh(result.refreshToken)
       setUser(result.user)
 
-      navigate(result.user.onboardingStatus === 'completed' ? '/dashboard' : '/onboarding', { replace: true })
+      navigate(result.user.onboardingStatus === 'completed' ? (safeRequestedPath ?? '/customer-dashboard') : '/onboarding', { replace: true })
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in.')
     } finally {
@@ -85,15 +102,8 @@ export default function LoginPage() {
             {submitting ? 'Signing in...' : 'Sign in'}
           </button>
 
-          <div className="zf-auth-divider">or continue with</div>
-
-          <div className="zf-social-row">
-            <button className="zf-social-btn" type="button" disabled>
-              Google
-            </button>
-            <button className="zf-social-btn" type="button" disabled>
-              Microsoft
-            </button>
+          <div className="zf-helper">
+            Sign in with your workspace email and password. Team members join through secure email invites from a workspace owner or admin.
           </div>
         </form>
 

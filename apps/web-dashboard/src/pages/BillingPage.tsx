@@ -1,409 +1,643 @@
 import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AppShell, PageContent } from '@/components/layout/AppShell'
-import { Badge, Button, Card } from '@/components/shared/ui'
-import { ApiError, api, type CurrentPlanResponse, type PlanDefinition } from '@/lib/api'
 import {
-  ArrowRight,
-  CheckCircle2,
-  ChevronRight,
-  CreditCard,
-  Shield,
-  Star,
-  TrendingUp,
-  Users,
-  Wifi,
-  Zap,
-  Database,
   AlertTriangle,
+  ArrowRight,
+  CalendarClock,
+  CheckCircle2,
+  CreditCard,
   ExternalLink,
+  Gauge,
+  Info,
+  Layers3,
+  ShieldCheck,
+  Sparkles,
+  XCircle,
 } from 'lucide-react'
+import { AppShell, PageContent } from '@/components/layout/AppShell'
+import { BillingConfirmationDialog } from '@/components/billing/BillingConfirmationDialog'
+import { BillingInvoiceHistoryShell } from '@/components/billing/BillingInvoiceHistoryShell'
+import { BillingStatusBadge } from '@/components/billing/BillingStatusBadge'
+import { BillingUsageBar } from '@/components/billing/BillingUsageBar'
+import { Badge, Button, Card, CardHeader, EmptyState, Skeleton } from '@/components/shared/ui'
+import {
+  ApiError,
+  api,
+  type BillingPlanCatalogItem,
+  type BillingSubscriptionResponse,
+} from '@/lib/api'
+import { useAuthStore } from '@/stores/auth.store'
+
+type NoticeTone = 'success' | 'error' | 'info'
 
 type NoticeState = {
-  tone: 'success' | 'error'
+  tone: NoticeTone
   message: string
 }
 
-function widthBucketClass(pct: number) {
-  if (pct >= 100) return 'w-full'
-  if (pct >= 90) return 'w-11/12'
-  if (pct >= 80) return 'w-10/12'
-  if (pct >= 75) return 'w-9/12'
-  if (pct >= 66) return 'w-8/12'
-  if (pct >= 58) return 'w-7/12'
-  if (pct >= 50) return 'w-6/12'
-  if (pct >= 42) return 'w-5/12'
-  if (pct >= 33) return 'w-4/12'
-  if (pct >= 25) return 'w-3/12'
-  if (pct >= 16) return 'w-2/12'
-  if (pct > 0) return 'w-1/12'
-  return 'w-0'
+function formatDate(value: string | null) {
+  if (!value) return 'Not available'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Not available'
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function featureLines(plan: PlanDefinition) {
-  const features = plan.features
-  return [
-    `Detections: ${features.detections}`,
-    `Alerts: ${String(features.alerts)}`,
-    `Risk: ${String(features.risk)}`,
-    `Investigations: ${String(features.investigation)}`,
-    `AI: ${features.ai ? 'enabled' : 'not included'}`,
-    plan.code === 'enterprise' ? 'SSO, compliance, SLA, and dedicated support' : null,
-  ].filter(Boolean) as string[]
+function formatMoney(cents: number) {
+  if (cents <= 0) return 'Free'
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cents / 100)
 }
 
-function UsageMeter({
-  label,
-  current,
-  limit,
-  unit = '',
-  warningAt = 80,
-}: {
-  label: string
-  current: number
-  limit: number | string | null
-  unit?: string
-  warningAt?: number
-}) {
-  const isUnlimited = limit == null || limit === 'unlimited'
-  const pct = isUnlimited ? 0 : Math.min(Math.round((current / Number(limit)) * 100), 100)
-  const barColor = pct >= 100 ? 'bg-red-500' : pct >= warningAt ? 'bg-yellow-500' : 'bg-blue-500'
+function formatInterval(interval: 'monthly' | 'annual' | null) {
+  if (interval === 'annual') return 'Annual'
+  if (interval === 'monthly') return 'Monthly'
+  return 'Not set'
+}
 
+function formatPlanCode(code: string) {
+  return code.replace(/_/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase())
+}
+
+function getNoticeClasses(tone: NoticeTone) {
+  if (tone === 'success') return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
+  if (tone === 'error') return 'border-red-500/20 bg-red-500/10 text-red-100'
+  return 'border-cyan-500/20 bg-cyan-500/10 text-cyan-100'
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) return error.message
+  if (error instanceof Error && error.message) return error.message
+  return fallback
+}
+
+function roleCanManageBilling(role: string | null | undefined) {
+  return role === 'owner' || role === 'admin'
+}
+
+function currentStatusMessage(subscription: BillingSubscriptionResponse['subscription']) {
+  const status = String(subscription.status ?? '').toLowerCase()
+
+  if (status === 'checkout_created') {
+    return 'Stripe checkout has been created. Your paid plan activates only after Stripe payment completes and the backend confirms the webhook.'
+  }
+
+  if (status === 'past_due') {
+    return 'Payment is past due. Keep the billing method current to avoid interruption.'
+  }
+
+  if (status === 'trialing' || status === 'trial') {
+    return 'This workspace is currently trialing. Renewal details will continue to update from Stripe-backed billing state.'
+  }
+
+  if (status === 'canceled' || status === 'cancelled') {
+    return 'This subscription is canceled. Upgrade to restart paid billing through the backend checkout flow.'
+  }
+
+  return 'Billing status on this page is synchronized from backend-confirmed Stripe state, never from client-side assumptions.'
+}
+
+function BillingOverviewSkeleton() {
   return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-sm text-gray-400">{label}</span>
-        <span className="text-sm font-medium text-gray-200">
-          {current.toLocaleString()}{unit}
-          {isUnlimited ? <span className="text-gray-600"> / ∞</span> : <span className="text-gray-600"> / {Number(limit).toLocaleString()}{unit}</span>}
-        </span>
+    <div className="space-y-6">
+      <Card className="p-6">
+        <Skeleton className="mb-3 h-6 w-56" />
+        <Skeleton className="h-4 w-96 max-w-full" />
+      </Card>
+      <Card className="p-6">
+        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr_0.9fr]">
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-4 w-72 max-w-full" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+      </Card>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={index} className="p-4">
+            <Skeleton className="mb-3 h-4 w-28" />
+            <Skeleton className="mb-3 h-3 w-full" />
+            <Skeleton className="h-2 w-full" />
+          </Card>
+        ))}
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-gray-800">
-        {isUnlimited ? <div className="h-full w-full bg-green-500/40" /> : <div className={clsx('h-full rounded-full transition-all duration-700', barColor, widthBucketClass(pct))} />}
-      </div>
-      {pct >= warningAt && !isUnlimited && (
-        <p className={clsx('mt-1 text-xs', pct >= 100 ? 'text-red-400' : 'text-yellow-400')}>
-          {pct >= 100 ? 'Limit reached — upgrade to continue' : `${pct}% of limit used`}
-        </p>
-      )}
     </div>
   )
 }
 
-function PlanCard({
+function PlanComparisonCard({
   plan,
-  currentPlanCode,
-  billingCycle,
-  canManageBilling,
-  activePlanCode,
-  onSelect,
+  interval,
+  isCurrent,
+  canChange,
+  isBusy,
+  onChoose,
 }: {
-  plan: PlanDefinition
-  currentPlanCode: string
-  billingCycle: 'monthly' | 'annual'
-  canManageBilling: boolean
-  activePlanCode: string | null
-  onSelect: (planCode: string) => void
+  plan: BillingPlanCatalogItem
+  interval: 'monthly' | 'annual'
+  isCurrent: boolean
+  canChange: boolean
+  isBusy: boolean
+  onChoose: (planCode: string) => void
 }) {
-  const isCurrent = plan.code === currentPlanCode
-  const isFree = plan.priceMonthly === 0
-  const isEnterprise = plan.code === 'enterprise'
-  const isLoading = activePlanCode === plan.code
-  const displayPrice = plan.priceMonthly == null ? 'Custom' : plan.priceMonthly === 0 ? 'Free' : `$${plan.priceMonthly}/mo`
-  const highlighted = plan.code === 'growth'
+  const price = interval === 'annual' ? plan.annualPriceCents : plan.monthlyPriceCents
 
   return (
     <div className={clsx(
-      'relative flex flex-col rounded-2xl border p-6 transition-all',
-      highlighted ? 'border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/10' : isCurrent ? 'border-green-500/40 bg-green-500/5' : 'border-gray-800 bg-gray-900 hover:border-gray-700',
+      'flex h-full flex-col rounded-3xl border p-6 transition-all',
+      isCurrent
+        ? 'border-emerald-500/40 bg-emerald-500/5 shadow-lg shadow-emerald-500/10'
+        : plan.highlighted
+          ? 'border-cyan-500/40 bg-cyan-500/5 shadow-lg shadow-cyan-500/10'
+          : 'border-gray-800 bg-gray-900/90',
     )}>
-      <div className="mb-4 flex items-center gap-2">
-        {highlighted && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500 px-2.5 py-1 text-xs font-bold text-white">
-            <Star className="h-3 w-3" />
-            Most Popular
-          </span>
-        )}
-        {isCurrent && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/20 px-2.5 py-1 text-xs font-bold text-green-400">
-            <CheckCircle2 className="h-3 w-3" />
-            Current Plan
-          </span>
-        )}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-100">{plan.displayName}</h3>
+          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-500">{formatPlanCode(plan.code)}</p>
+        </div>
+        {isCurrent ? (
+          <Badge variant="success" size="sm">Current Plan</Badge>
+        ) : plan.highlighted ? (
+          <Badge variant="warning" size="sm">Recommended</Badge>
+        ) : null}
       </div>
 
-      <h3 className="mb-1 text-lg font-bold text-gray-100">{plan.name}</h3>
-      <p className="mb-4 text-xs text-gray-500">{plan.code === 'free' ? 'For initial onboarding and basic monitoring.' : `Live ${billingCycle} view bound to tenant plan controls.`}</p>
+      <div className="mb-5 rounded-2xl border border-gray-800 bg-gray-950/80 p-4">
+        <p className="text-xs uppercase tracking-[0.18em] text-gray-500">{interval === 'annual' ? 'Annual checkout' : 'Monthly checkout'}</p>
+        <p className="mt-2 text-3xl font-semibold text-gray-100">{formatMoney(price)}</p>
+        <p className="mt-1 text-sm text-gray-400">Backend catalog pricing for the selected billing interval.</p>
+      </div>
 
-      <div className="mb-6">
-        <div className="flex items-end gap-1">
-          <span className="text-3xl font-bold text-gray-100">{displayPrice}</span>
-          {!isFree && !isEnterprise && <span className="mb-1 text-xs text-gray-500">monthly</span>}
+      <div className="mb-5 grid gap-3 text-sm text-gray-300 sm:grid-cols-2">
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Identities</p>
+          <p className="mt-1 font-medium text-gray-100">{plan.limits.identities === 'unlimited' ? 'Unlimited' : plan.limits.identities.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Connectors</p>
+          <p className="mt-1 font-medium text-gray-100">{plan.limits.connectors === 'unlimited' ? 'Unlimited' : plan.limits.connectors.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Events per minute</p>
+          <p className="mt-1 font-medium text-gray-100">{plan.limits.eventsPerMin === 'unlimited' ? 'Unlimited' : plan.limits.eventsPerMin.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Retention</p>
+          <p className="mt-1 font-medium text-gray-100">{plan.limits.retentionDays.toLocaleString()} days</p>
         </div>
       </div>
 
-      <div className="mb-6 space-y-2 border-b border-gray-800 pb-4">
-        {[
-          { label: 'Identities', value: plan.limits.max_identities, icon: Users },
-          { label: 'Connectors', value: plan.limits.max_connectors, icon: Wifi },
-          { label: 'Events/min', value: plan.limits.events_per_minute, icon: Zap },
-          { label: 'Retention', value: plan.limits.retention_days == null ? 'Unlimited' : `${plan.limits.retention_days}d`, icon: Database },
-        ].map(({ label, value, icon: Icon }) => (
-          <div key={label} className="flex items-center gap-2 text-xs">
-            <Icon className="h-3.5 w-3.5 flex-shrink-0 text-gray-600" />
-            <span className="text-gray-500">{label}:</span>
-            <span className={clsx('ml-auto font-medium', value == null ? 'text-green-400' : 'text-gray-300')}>
-              {value == null ? 'Unlimited' : typeof value === 'number' ? value.toLocaleString() : value}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <ul className="mb-6 flex-1 space-y-1.5">
-        {featureLines(plan).map((feature) => (
-          <li key={feature} className="flex items-start gap-2 text-xs">
-            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-green-500/60" />
-            <span className="text-gray-400">{feature}</span>
+      <ul className="mb-6 flex-1 space-y-2">
+        {plan.features.map((feature) => (
+          <li key={feature} className="flex items-start gap-2 text-sm text-gray-300">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-400" />
+            <span>{feature}</span>
           </li>
         ))}
       </ul>
 
-      {isCurrent ? (
-        <div className="rounded-xl border border-green-500/20 py-2.5 text-center text-sm font-medium text-green-400">✓ Active Plan</div>
-      ) : isEnterprise ? (
-        <a href="mailto:sales@zonforge.com" className="flex items-center justify-center gap-2 rounded-xl border border-gray-700 py-2.5 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:text-white">
-          Contact Sales <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-      ) : (
-        <button
-          onClick={() => onSelect(plan.code)}
-          disabled={!canManageBilling || isLoading}
-          className={clsx(
-            'w-full rounded-xl py-2.5 text-sm font-semibold transition-all',
-            highlighted ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/20' : 'border border-gray-700 text-gray-300 hover:border-blue-500 hover:text-blue-400',
-            (!canManageBilling || isLoading) && 'cursor-not-allowed opacity-60',
-          )}
-        >
-          {isLoading ? 'Redirecting…' : !canManageBilling ? 'Owner/Admin required' : isFree ? 'Schedule Free Downgrade' : `Checkout ${plan.name}`}
-        </button>
-      )}
+      <Button
+        variant={isCurrent ? 'outline' : 'primary'}
+        size="md"
+        disabled={isCurrent || !canChange}
+        loading={isBusy}
+        iconRight={ArrowRight}
+        onClick={() => onChoose(plan.code)}
+      >
+        {isCurrent ? 'Already active' : canChange ? `Choose ${plan.displayName}` : 'Owner/Admin required'}
+      </Button>
     </div>
   )
 }
 
 export default function BillingPage() {
-  const [billingCycle, setCycle] = useState<'monthly' | 'annual'>('monthly')
-  const [notice, setNotice] = useState<NoticeState | null>(null)
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'annual' | null>(null)
+  const [notice, setNotice] = useState<NoticeState | null>(null)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const paymentState = params.get('payment')
+  const membershipRole = user?.membership?.role ?? user?.role ?? null
+  const userCanManageBilling = roleCanManageBilling(membershipRole)
 
-    if (paymentState === 'success') {
-      setNotice({ tone: 'success', message: 'Stripe checkout completed. Plan activation follows webhook confirmation after payment succeeds.' })
-      queryClient.invalidateQueries({ queryKey: ['plans'] })
-      queryClient.invalidateQueries({ queryKey: ['billing'] })
-    } else if (paymentState === 'cancelled') {
-      setNotice({ tone: 'error', message: 'Stripe checkout was cancelled before payment completion.' })
-    }
-  }, [queryClient])
+  const subscriptionQuery = useQuery({
+    queryKey: ['billing', 'subscription'],
+    queryFn: api.billing.subscription,
+    staleTime: 15_000,
+  })
+
+  const usageQuery = useQuery({
+    queryKey: ['billing', 'usage'],
+    queryFn: api.billing.usage,
+    staleTime: 30_000,
+  })
 
   const plansQuery = useQuery({
-    queryKey: ['plans', 'catalog'],
-    queryFn: async () => (await api.plans.list()).items,
+    queryKey: ['billing', 'plans'],
+    queryFn: api.billing.plans,
     staleTime: 60 * 60_000,
   })
 
-  const currentPlanQuery = useQuery({
-    queryKey: ['plans', 'current'],
-    queryFn: () => api.plans.me(),
-    staleTime: 60_000,
-  })
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const payment = params.get('payment')
+    if (!payment) return
+
+    if (payment === 'success') {
+      setNotice({ tone: 'success', message: 'Stripe checkout returned successfully. The dashboard will refresh from backend-confirmed billing state.' })
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
+    } else if (payment === 'cancelled') {
+      setNotice({ tone: 'error', message: 'Stripe checkout was cancelled before backend confirmation.' })
+    }
+
+    params.delete('payment')
+    params.delete('session_id')
+    const nextQuery = params.toString()
+    window.history.replaceState({}, document.title, nextQuery ? `${window.location.pathname}?${nextQuery}` : window.location.pathname)
+  }, [queryClient])
 
   const checkoutMutation = useMutation({
-    mutationFn: ({ planCode, nextBillingCycle }: { planCode: string; nextBillingCycle: 'monthly' | 'annual' }) => api.billing.checkout(planCode, nextBillingCycle),
-    onSuccess: (checkout) => {
-      if (!checkout.url) {
-        setNotice({ tone: 'error', message: 'Stripe checkout URL was not returned.' })
+    mutationFn: ({ planCode, nextInterval }: { planCode: string; nextInterval: 'monthly' | 'annual' }) => api.billing.checkout(planCode, nextInterval),
+    onSuccess: (result) => {
+      if (!result.url) {
+        setNotice({ tone: 'error', message: 'Stripe checkout URL was not returned by the backend.' })
         return
       }
 
-      window.location.assign(checkout.url)
+      window.location.assign(result.url)
     },
     onError: (error: unknown) => {
-      setNotice({ tone: 'error', message: error instanceof ApiError ? error.message : 'Unable to start Stripe checkout.' })
+      setNotice({ tone: 'error', message: getErrorMessage(error, 'Unable to start the checkout flow.') })
+    },
+  })
+
+  const portalMutation = useMutation({
+    mutationFn: () => api.billing.portal(),
+    onSuccess: (result) => {
+      window.location.assign(result.url)
+    },
+    onError: (error: unknown) => {
+      setNotice({ tone: 'error', message: getErrorMessage(error, 'Unable to open the billing portal.') })
     },
   })
 
   const cancelMutation = useMutation({
-    mutationFn: () => api.plans.cancel(),
+    mutationFn: () => api.billing.cancel(),
     onSuccess: () => {
-      setNotice({ tone: 'success', message: 'Cancellation scheduled. Your current plan stays active until Stripe confirms the subscription ends.' })
-      queryClient.invalidateQueries({ queryKey: ['plans'] })
+      setCancelDialogOpen(false)
+      setNotice({ tone: 'success', message: 'Cancellation has been scheduled. The current paid plan remains active until Stripe confirms the end of the billing period.' })
       queryClient.invalidateQueries({ queryKey: ['billing'] })
     },
     onError: (error: unknown) => {
-      setNotice({ tone: 'error', message: error instanceof ApiError ? error.message : 'Unable to schedule cancellation.' })
+      setNotice({ tone: 'error', message: getErrorMessage(error, 'Unable to schedule cancellation.') })
     },
   })
 
-  const plans = plansQuery.data ?? []
-  const currentPlan = currentPlanQuery.data
-  const planCode = currentPlan?.plan.code ?? 'free'
+  const subscription = subscriptionQuery.data?.subscription
+  const usage = usageQuery.data
+  const billingInterval = selectedInterval ?? subscription?.billingInterval ?? 'monthly'
+  const allPlans = plansQuery.data?.plans ?? []
+  const comparisonPlans = allPlans.filter((plan) => ['starter', 'growth', 'business'].includes(plan.code))
+  const currentPlan = subscription ? allPlans.find((plan) => plan.code === subscription.planCode) ?? null : null
+  const canOpenPortal = Boolean(userCanManageBilling && subscription?.stripeCustomerId)
+  const canCancel = Boolean(
+    userCanManageBilling
+    && subscription
+    && !subscription.cancelAtPeriodEnd
+    && subscription.planCode !== 'free'
+    && ['active', 'trialing', 'trial', 'past_due', 'incomplete'].includes(String(subscription.status).toLowerCase()),
+  )
+  const checkoutEnabled = Boolean(userCanManageBilling && subscriptionQuery.data?.eligible_for_checkout)
+  const busyPlanCode = checkoutMutation.isPending ? checkoutMutation.variables?.planCode ?? null : null
+  const queryError = subscriptionQuery.error ?? usageQuery.error ?? plansQuery.error
+  const billingRecommendation = usage
+    ? usage.usagePct.connectors >= 80 || usage.usagePct.identities >= 80
+      ? 'You are approaching plan limits. Review the next tier before connectors or identity coverage become constrained.'
+      : usage.status === 'active'
+        ? 'Your current plan still has room. Review higher tiers when you need broader connector coverage, more identities, or longer retention.'
+        : 'Complete billing setup first, then compare plans if you need broader coverage.'
+    : 'Compare plans using the live backend catalog and upgrade only when your current limits no longer fit the workspace.'
 
-  function handleSelect(nextPlanCode: string) {
-    if (nextPlanCode === 'free') {
-      cancelMutation.mutate()
-      return
-    }
+  function scrollToPlans() {
+    document.getElementById('billing-plan-comparison')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
-    checkoutMutation.mutate({ planCode: nextPlanCode, nextBillingCycle: billingCycle })
+  function startCheckout(planCode: string) {
+    checkoutMutation.mutate({ planCode, nextInterval: billingInterval })
   }
 
   return (
-    <AppShell title="Plan & Billing">
-      <PageContent>
+    <AppShell title="Billing & Subscription">
+      <PageContent className="space-y-6">
         {notice && (
-          <div className={clsx('mb-6 rounded-2xl border px-5 py-4 text-sm', notice.tone === 'success' ? 'border-green-500/20 bg-green-500/10 text-green-200' : 'border-red-500/20 bg-red-500/10 text-red-200')}>
+          <div className={clsx('rounded-2xl border px-5 py-4 text-sm', getNoticeClasses(notice.tone))}>
             {notice.message}
           </div>
         )}
 
-        <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-gray-300">Current Plan</h3>
-                  {currentPlan?.status === 'trial' && <Badge variant="warning" size="xs">Trial</Badge>}
-                </div>
-                <p className="text-2xl font-bold capitalize text-gray-100">
-                  {currentPlanQuery.isLoading ? 'Loading…' : currentPlan?.plan.name ?? 'Unknown'}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {currentPlan?.startedAt ? `Active since ${new Date(currentPlan.startedAt).toLocaleDateString()}` : 'Plan assignment pending.'}
-                </p>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-300 md:grid-cols-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Connectors</p>
-                    <p className="mt-1 font-medium">{currentPlan?.usage.connectors ?? 0} / {currentPlan?.limits.max_connectors ?? '∞'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Identities</p>
-                    <p className="mt-1 font-medium">{currentPlan?.usage.identities ?? 0} / {currentPlan?.limits.max_identities ?? '∞'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Risk</p>
-                    <p className="mt-1 font-medium capitalize">{String(currentPlan?.features.risk ?? false)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Investigations</p>
-                    <p className="mt-1 font-medium capitalize">{String(currentPlan?.features.investigation ?? false)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Button variant="outline" size="sm" icon={CreditCard} disabled>
-                  Webhook-authoritative billing
-                </Button>
-                {currentPlan?.canManageBilling && planCode !== 'free' && (
-                  <Button variant="ghost" size="sm" onClick={() => cancelMutation.mutate()} loading={cancelMutation.isPending}>
-                    Schedule Free Downgrade
-                  </Button>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="flex flex-col justify-center gap-2">
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-blue-400" />
-              <span className="text-sm font-semibold text-gray-300">Support</span>
-            </div>
-            <p className="text-lg font-bold text-gray-100">
-              {planCode === 'enterprise' ? 'Dedicated Support' : planCode === 'business' ? 'Priority Support' : 'Standard Support'}
-            </p>
-            <p className="text-xs text-gray-600">
-              {planCode === 'enterprise' ? 'Negotiated SLA, SSO, compliance, and dedicated support.' : planCode === 'business' ? 'Full platform support with AI workflows.' : 'Upgrade to unlock advanced risk, investigations, and AI.'}
-            </p>
-          </Card>
-        </div>
-
-        {currentPlan && (
-          <Card className="mb-8">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-200">Current Usage</h3>
-              <span className="text-xs text-gray-600">Live tenant plan enforcement</span>
-            </div>
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <UsageMeter label="Data Connectors" current={currentPlan.usage.connectors} limit={currentPlan.limits.max_connectors} />
-              <UsageMeter label="Monitored Identities" current={currentPlan.usage.identities} limit={currentPlan.limits.max_identities} />
-              <UsageMeter label="Events per Minute" current={currentPlan.usage.eventsPerMinute} limit={currentPlan.limits.events_per_minute} />
-              <UsageMeter label="Retention" current={currentPlan.limits.retention_days ?? 365} limit={currentPlan.limits.retention_days ?? 'unlimited'} unit=" days" />
-            </div>
-
-            {currentPlan.limits.max_connectors != null && currentPlan.usage.connectors >= currentPlan.limits.max_connectors && (
-              <div className="mt-5 flex items-start gap-3 rounded-xl border border-yellow-500/20 bg-yellow-500/8 p-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-400" />
-                <p className="text-xs text-yellow-300">Your connector allowance is fully used. Upgrade to add another connector.</p>
-                <button onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })} className="ml-auto flex flex-shrink-0 items-center gap-1 text-xs text-yellow-400 hover:underline">
-                  View plans <ChevronRight className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-          </Card>
+        {queryError && (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm text-red-100">
+            Billing data could not be loaded cleanly. {getErrorMessage(queryError, 'Please retry in a moment.')}
+          </div>
         )}
 
-        <div id="plans-section">
-          <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-100">Upgrade Your Plan</h3>
-            <div className="flex items-center gap-1 rounded-xl border border-gray-700 bg-gray-800 p-1">
-              {(['monthly', 'annual'] as const).map((cycle) => (
-                <button
-                  key={cycle}
-                  onClick={() => setCycle(cycle)}
-                  className={clsx('rounded-lg px-4 py-1.5 text-sm font-medium transition-all', billingCycle === cycle ? 'bg-gray-700 text-gray-200 shadow-sm' : 'text-gray-600 hover:text-gray-400')}
-                >
-                  {cycle === 'monthly' ? 'Monthly' : 'Annual'}
-                  {cycle === 'annual' && <span className="ml-1.5 text-xs font-semibold text-green-400">view</span>}
-                </button>
-              ))}
+        <Card className="overflow-hidden border-gray-800 bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.18),_transparent_40%),linear-gradient(135deg,_rgba(15,23,42,1),_rgba(2,6,23,1))] p-6 lg:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-100">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Stripe-synchronized billing
+                </div>
+                {subscription && <BillingStatusBadge status={subscription.status} size="sm" />}
+                {subscription?.cancelAtPeriodEnd && <Badge variant="warning" size="sm">Cancels At Period End</Badge>}
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight text-white lg:text-4xl">Billing & Subscription</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 lg:text-base">
+                Review the current Stripe-backed subscription, compare plans, and manage billing actions from one tenant-scoped dashboard. Billing state always reflects backend-confirmed responses.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Current plan</p>
+                <p className="mt-2 text-xl font-semibold text-white">{subscription?.planName ?? 'Loading...'}</p>
+                <p className="mt-1 text-sm text-slate-300">{subscription ? formatInterval(subscription.billingInterval) : 'Awaiting backend response'}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Renewal / period end</p>
+                <p className="mt-2 text-xl font-semibold text-white">{subscription ? formatDate(subscription.currentPeriodEnd) : 'Loading...'}</p>
+                <p className="mt-1 text-sm text-slate-300">Current billing window from backend state</p>
+              </div>
             </div>
           </div>
+        </Card>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {plans.map((plan) => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                currentPlanCode={planCode}
-                billingCycle={billingCycle}
-                canManageBilling={Boolean(currentPlan?.canManageBilling)}
-                activePlanCode={checkoutMutation.isPending ? checkoutMutation.variables?.planCode ?? null : cancelMutation.isPending ? 'free' : null}
-                onSelect={handleSelect}
+        {subscriptionQuery.isLoading && !subscription ? (
+          <BillingOverviewSkeleton />
+        ) : !subscription ? (
+          <EmptyState
+            icon={XCircle}
+            title="Subscription state unavailable"
+            description="No tenant billing state was returned by the backend. Retry after authentication and tenant initialization are confirmed."
+          />
+        ) : (
+          <>
+            <Card className="border-gray-800 bg-gray-900/95 p-6 lg:p-7">
+              <div className="grid gap-6 lg:grid-cols-[1.45fr_1fr_0.9fr]">
+                <div>
+                  <CardHeader
+                    title="Current plan"
+                    description={currentStatusMessage(subscription)}
+                    icon={CreditCard}
+                    actions={<BillingStatusBadge status={subscription.status} size="sm" />}
+                  />
+
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Plan</p>
+                      <p className="mt-2 text-lg font-semibold text-gray-100">{subscription.planName}</p>
+                      <p className="mt-1 text-sm text-gray-400">{formatPlanCode(subscription.planCode)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Billing interval</p>
+                      <p className="mt-2 text-lg font-semibold text-gray-100">{formatInterval(subscription.billingInterval)}</p>
+                      <p className="mt-1 text-sm text-gray-400">Backend-confirmed interval</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Renewal / end</p>
+                      <p className="mt-2 text-lg font-semibold text-gray-100">{formatDate(subscription.currentPeriodEnd)}</p>
+                      <p className="mt-1 text-sm text-gray-400">{subscription.cancelAtPeriodEnd ? 'Cancellation scheduled' : 'Renews automatically unless canceled'}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Current period start</p>
+                      <p className="mt-2 text-lg font-semibold text-gray-100">{formatDate(subscription.currentPeriodStart)}</p>
+                      <p className="mt-1 text-sm text-gray-400">Stripe-backed billing period anchor</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Checkout eligibility</p>
+                      <p className="mt-2 text-lg font-semibold text-gray-100">{subscriptionQuery.data?.eligible_for_checkout ? 'Eligible' : 'Restricted'}</p>
+                      <p className="mt-1 text-sm text-gray-400">Paid plan changes always begin in backend checkout.</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Admin actions</p>
+                      <p className="mt-2 text-lg font-semibold text-gray-100">{userCanManageBilling ? 'Enabled' : 'Read only'}</p>
+                      <p className="mt-1 text-sm text-gray-400">Owners and admins can initiate billing actions.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <CardHeader
+                    title="Included capabilities"
+                    description="Feature summary for the active plan from the backend billing catalog."
+                    icon={Sparkles}
+                  />
+                  <div className="space-y-2">
+                    {(currentPlan?.features ?? ['Current plan feature catalog is still loading.']).map((feature) => (
+                      <div key={feature} className="flex items-start gap-3 rounded-2xl border border-gray-800 bg-gray-950/70 px-4 py-3 text-sm text-gray-300">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-400" />
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <CardHeader
+                    title="Actions"
+                    description="Every billing action is routed back through the backend."
+                    icon={Layers3}
+                  />
+                  <div className="space-y-3">
+                    <Button variant="primary" size="md" icon={ArrowRight} onClick={scrollToPlans} disabled={!checkoutEnabled}>
+                      Upgrade / Change Plan
+                    </Button>
+                    <Button variant="outline" size="md" icon={ExternalLink} onClick={() => portalMutation.mutate()} disabled={!canOpenPortal} loading={portalMutation.isPending}>
+                      Open Billing Portal
+                    </Button>
+                    <Button variant="danger" size="md" icon={AlertTriangle} onClick={() => setCancelDialogOpen(true)} disabled={!canCancel}>
+                      Cancel Subscription
+                    </Button>
+
+                    {subscription.cancelAtPeriodEnd ? (
+                      <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4 text-sm text-yellow-100">
+                        Cancellation is already scheduled. Resume is not exposed yet because the backend has no resume endpoint.
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4 text-sm text-gray-400">
+                        Cancellation requires explicit confirmation and remains subject to backend-confirmed Stripe state.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="border-gray-800 bg-gray-900/95 p-6 lg:p-7">
+              <CardHeader
+                title="Usage & limits"
+                description="Current usage versus enforced plan limits from the billing backend."
+                icon={Gauge}
+                actions={usage ? <Badge variant="neutral" size="sm">{formatPlanCode(usage.planTier)}</Badge> : undefined}
               />
-            ))}
-          </div>
-        </div>
 
-        <div className="mt-8 rounded-2xl border border-blue-500/15 bg-gradient-to-r from-blue-500/5 to-transparent p-6">
-          <div className="flex items-start gap-4">
-            <div className="rounded-xl bg-blue-500/15 p-3">
-              <TrendingUp className="h-6 w-6 text-blue-400" />
-            </div>
-            <div>
-              <h4 className="mb-1 text-base font-bold text-gray-100">Need a custom solution?</h4>
-              <p className="mb-4 max-w-lg text-sm text-gray-400">For organizations with complex security requirements, compliance needs, or negotiated infrastructure, enterprise remains a custom plan with direct sales engagement.</p>
-              <a href="mailto:sales@zonforge.com" className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-colors hover:bg-blue-500">
-                Talk to Sales
-                <ArrowRight className="h-4 w-4" />
-              </a>
-            </div>
-          </div>
-        </div>
+              {usageQuery.isLoading && !usage ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4">
+                      <Skeleton className="mb-3 h-4 w-28" />
+                      <Skeleton className="mb-3 h-3 w-full" />
+                      <Skeleton className="h-2 w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : usage ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <BillingUsageBar
+                    label="Connectors"
+                    current={usage.usage.connectors}
+                    limit={usage.limits.max_connectors}
+                    helper="Configured data sources using live tenant allowance."
+                  />
+                  <BillingUsageBar
+                    label="Identities"
+                    current={usage.usage.identities}
+                    limit={usage.limits.max_identities}
+                    helper="Monitored identities currently covered by this workspace."
+                  />
+                  <BillingUsageBar
+                    label="Events per minute"
+                    current={usage.usage.eventsPerMinute}
+                    limit={usage.limits.events_per_minute}
+                    helper="Current throughput against the plan throughput ceiling."
+                  />
+                  <BillingUsageBar
+                    label="Retention days"
+                    current={usage.retentionDays}
+                    limit={usage.retentionDays}
+                    unit=" days"
+                    helper="Policy cap currently enforced for retained data."
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-5 text-sm text-gray-400">
+                  Billing usage data is not available yet. This section is integration-ready and will remain empty until the tenant usage response is returned.
+                </div>
+              )}
+            </Card>
+
+            <Card id="billing-plan-comparison" className="border-gray-800 bg-gray-900/95 p-6 lg:p-7">
+              <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <CardHeader
+                  title="Plan comparison"
+                  description="Compare Starter, Growth, and Business using the live backend catalog."
+                  icon={CalendarClock}
+                />
+                <div className="inline-flex rounded-2xl border border-gray-800 bg-gray-950/80 p-1">
+                  {(['monthly', 'annual'] as const).map((interval) => (
+                    <button
+                      key={interval}
+                      type="button"
+                      onClick={() => setSelectedInterval(interval)}
+                      className={clsx(
+                        'rounded-xl px-4 py-2 text-sm font-medium transition-colors',
+                        billingInterval === interval ? 'bg-cyan-500 text-slate-950' : 'text-gray-400 hover:text-gray-100',
+                      )}
+                    >
+                      {interval === 'monthly' ? 'Monthly' : 'Annual'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-6 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-4 text-sm text-cyan-100">
+                {billingRecommendation}
+              </div>
+
+              {plansQuery.isLoading && comparisonPlans.length === 0 ? (
+                <div className="grid gap-4 xl:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="rounded-3xl border border-gray-800 bg-gray-950/70 p-6">
+                      <Skeleton className="mb-3 h-6 w-28" />
+                      <Skeleton className="mb-4 h-4 w-20" />
+                      <Skeleton className="mb-5 h-12 w-28" />
+                      <div className="space-y-3">
+                        {Array.from({ length: 4 }).map((__, inner) => <Skeleton key={inner} className="h-4 w-full" />)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : comparisonPlans.length === 0 ? (
+                <EmptyState
+                  icon={Info}
+                  title="Billing plan catalog unavailable"
+                  description="The backend catalog did not return Starter, Growth, and Business comparison data yet."
+                />
+              ) : (
+                <div className="grid gap-4 xl:grid-cols-3">
+                  {comparisonPlans.map((plan) => (
+                    <PlanComparisonCard
+                      key={plan.code}
+                      plan={plan}
+                      interval={billingInterval}
+                      isCurrent={plan.code === subscription.planCode}
+                      canChange={checkoutEnabled}
+                      isBusy={busyPlanCode === plan.code}
+                      onChoose={startCheckout}
+                    />
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <BillingInvoiceHistoryShell />
+
+            <Card className="border-gray-800 bg-gradient-to-r from-gray-900 via-gray-950 to-gray-900 p-6 lg:p-7">
+              <CardHeader
+                title="Billing policy & safety notice"
+                description="Professional guidance for customer admins managing a Stripe-backed subscription."
+                icon={Info}
+              />
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4 text-sm text-gray-300">
+                  <p className="font-medium text-gray-100">Backend-confirmed state only</p>
+                  <p className="mt-2 text-gray-400">This page never assumes a plan change completed until the backend reflects the Stripe-confirmed result.</p>
+                </div>
+                <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4 text-sm text-gray-300">
+                  <p className="font-medium text-gray-100">Cancellation policy</p>
+                  <p className="mt-2 text-gray-400">Cancellation schedules the end of paid service at the current billing period boundary unless backend state says otherwise.</p>
+                </div>
+                <div className="rounded-2xl border border-gray-800 bg-gray-950/70 p-4 text-sm text-gray-300">
+                  <p className="font-medium text-gray-100">Secure action routing</p>
+                  <p className="mt-2 text-gray-400">Checkout, portal access, and cancellation buttons only call authenticated tenant-scoped backend routes.</p>
+                </div>
+              </div>
+            </Card>
+          </>
+        )}
+
+        <BillingConfirmationDialog
+          open={cancelDialogOpen}
+          title="Schedule subscription cancellation"
+          description="This schedules the Stripe-backed subscription to end at the period boundary. The backend remains the source of truth for the final cancellation state."
+          confirmLabel="Schedule Cancellation"
+          pending={cancelMutation.isPending}
+          onConfirm={() => cancelMutation.mutate()}
+          onClose={() => setCancelDialogOpen(false)}
+        />
       </PageContent>
     </AppShell>
   )
