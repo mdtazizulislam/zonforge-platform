@@ -841,8 +841,13 @@ export const api = {
   // ── Billing ───────────────────────────────
 
   billing: {
+    checkout: (planCode: string, billingCycle: 'monthly' | 'annual') =>
+      apiFetch<BillingCheckoutResponse>('/v1/billing/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ planCode, billingCycle }),
+      }),
     usage:        () => apiFetch<UsageSummary>('/v1/billing/usage'),
-    subscription: () => apiFetch<Subscription>('/v1/billing/subscription'),
+    subscription: () => apiFetch<BillingSubscriptionResponse>('/v1/billing/subscription'),
   },
 
   // ── AI ────────────────────────────────────
@@ -1369,11 +1374,39 @@ export interface CurrentPlanResponse {
   usage: PlanUsage
 }
 
+export interface BillingCheckoutResponse {
+  plan_id: string
+  billing_cycle: 'monthly' | 'annual'
+  session_id: string
+  session_url: string | null
+  sessionId: string
+  url: string | null
+}
+
+export interface BillingSubscriptionResponse {
+  subscription: {
+    tenantId: string
+    planCode: string
+    planName: string
+    planTier: string
+    status: string
+    billingInterval: 'monthly' | 'annual' | null
+    currentPeriodStart: string | null
+    currentPeriodEnd: string | null
+    cancelAtPeriodEnd: boolean
+    stripeCustomerId: string | null
+    stripeSubscriptionId: string | null
+    stripeCheckoutSessionId: string | null
+    limits: PlanLimits
+  }
+  eligible_for_checkout: boolean
+}
+
 export interface Subscription {
   planTier:           string
   status:             string
-  currentPeriodStart: string
-  currentPeriodEnd:   string
+  currentPeriodStart: string | null
+  currentPeriodEnd:   string | null
   trialEndsAt:        string | null
 }
 

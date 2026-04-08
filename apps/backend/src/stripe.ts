@@ -2,12 +2,30 @@ import Stripe from 'stripe';
 import { getPool, getPlanByCode, getTenantSubscription, getTenantById } from './db.js';
 import { sendProductEmail } from './email.js';
 import { trackConversionEvent } from './growth.js';
+import {
+  assignTenantPlan,
+  cancelTenantPlan as cancelTenantPlanState,
+  getTenantPlanState,
+  normalizePlanCode,
+  type LockedPlanCode,
+} from './billing/tenantPlans.js';
 
-type LegacySubscriptionStatus = 'active' | 'past_due' | 'canceled'
+type LegacySubscriptionStatus = 'active' | 'past_due' | 'canceled';
+type BillingInterval = 'monthly' | 'annual';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+let stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16',
 });
+
+function getStripeClient(): Stripe {
+  return stripeClient;
+}
+
+export function setStripeClientForTesting(client: unknown | null) {
+  stripeClient = (client ?? new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2023-10-16',
+  })) as Stripe;
+}
 
 // ─────────────────────────────────────────────
 // TYPE DEFINITIONS
@@ -19,11 +37,13 @@ export interface TenantBillingStatus {
   planCode: string | null;
   planName: string | null;
   subscriptionStatus: string;
+  billingInterval: BillingInterval | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  stripeCheckoutSessionId?: string | null;
   limits: {
     maxUsers: number | null;
     maxConnectors: number | null;
@@ -63,26 +83,65 @@ export function validateStripeEnvOrThrow() {
   // Plan-specific price IDs optional; can fall back to STRIPE_PRICE_ID_* pattern
 }
 
-function getStripePriceIdForPlan(planCode: string, billingInterval: 'monthly' | 'annual' = 'monthly'): string {
-  const normalizedPlanCode = planCode.toUpperCase();
-  const intervalSpecific = process.env[`STRIPE_PRICE_ID_${normalizedPlanCode}_${billingInterval.toUpperCase()}`];
+function normalizeBillingInterval(value: string | null | undefined): BillingInterval {
+  return value === 'annual' ? 'annual' : 'monthly';
+}
+
+function normalizeStripeSubscriptionStatus(status: string | null | undefined): string {
+  return String(status ?? 'unknown').trim().toLowerCase();
+}
+
+function isPaidActivationStatus(status: string | null | undefined): boolean {
+  const normalized = normalizeStripeSubscriptionStatus(status);
+  return normalized === 'active' || normalized === 'trialing';
+}
+
+async function getStripePriceIdForPlan(planCode: string, billingInterval: BillingInterval = 'monthly'): Promise<string> {
+  const normalizedPlanCode = normalizePlanCode(planCode);
+  const plan = await getPlanByCode(normalizedPlanCode);
+  const dbSpecific = billingInterval === 'annual'
+    ? plan?.stripe_annual_price_id
+    : plan?.stripe_monthly_price_id;
+  const envSpecific = process.env[`STRIPE_PRICE_ID_${normalizedPlanCode.toUpperCase()}_${billingInterval.toUpperCase()}`];
   const monthlyFallback = billingInterval === 'monthly'
-    ? process.env[`STRIPE_PRICE_ID_${normalizedPlanCode}`]
+    ? process.env[`STRIPE_PRICE_ID_${normalizedPlanCode.toUpperCase()}`]
     : '';
 
-  if (intervalSpecific) {
-    return intervalSpecific;
+  if (dbSpecific) {
+    return String(dbSpecific);
+  }
+
+  if (envSpecific) {
+    return envSpecific;
   }
 
   if (monthlyFallback) {
     return monthlyFallback;
   }
 
-  if (billingInterval === 'monthly' && planCode === 'growth') {
+  if (billingInterval === 'monthly' && normalizedPlanCode === 'growth') {
     return process.env['STRIPE_PRICE_ID'] || '';
   }
 
   return '';
+}
+
+async function resolvePlanCodeFromPriceId(priceId: string | null | undefined): Promise<LockedPlanCode | null> {
+  if (!priceId) {
+    return null;
+  }
+
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT code
+     FROM plans
+     WHERE stripe_monthly_price_id = $1 OR stripe_annual_price_id = $1
+     LIMIT 1`,
+    [priceId],
+  );
+
+  const code = result.rows[0]?.code;
+  return code ? normalizePlanCode(String(code)) : null;
 }
 
 function withCheckoutSessionId(url: string): string {
@@ -149,36 +208,270 @@ async function writeBillingAuditLog(input: {
   );
 }
 
+function unixToDate(value: number | null | undefined): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  return new Date(value * 1000);
+}
+
+function readPeriodStart(subscription: Stripe.Subscription | null): Date | null {
+  const raw = (subscription as Stripe.Subscription & { current_period_start?: number }).current_period_start;
+  return unixToDate(raw ?? null);
+}
+
+function readPeriodEnd(subscription: Stripe.Subscription | null): Date | null {
+  const raw = (subscription as Stripe.Subscription & { current_period_end?: number }).current_period_end;
+  return unixToDate(raw ?? null);
+}
+
+function readPriceIdFromSubscription(subscription: Stripe.Subscription | null): string | null {
+  return subscription?.items.data[0]?.price?.id ?? null;
+}
+
+function readIntervalFromSubscription(subscription: Stripe.Subscription | null): BillingInterval | null {
+  const interval = subscription?.items.data[0]?.price?.recurring?.interval;
+  if (interval === 'year') {
+    return 'annual';
+  }
+
+  if (interval === 'month') {
+    return 'monthly';
+  }
+
+  return null;
+}
+
+async function getTenantOwnerUserId(tenantId: number): Promise<number> {
+  const tenant = await getTenantById(tenantId);
+  if (!tenant?.user_id) {
+    throw new Error(`Tenant ${tenantId} owner user is missing`);
+  }
+
+  return Number(tenant.user_id);
+}
+
+async function getUserEmail(userId: number): Promise<string | null> {
+  const pool = getPool();
+  const result = await pool.query('SELECT email FROM users WHERE id = $1 LIMIT 1', [userId]);
+  return result.rows[0]?.email ? String(result.rows[0].email) : null;
+}
+
+async function resolveTenantIdFromStripeCustomer(stripeCustomerId: string): Promise<number | null> {
+  const pool = getPool();
+
+  const customerMapping = await pool.query(
+    `SELECT tenant_id
+     FROM stripe_customers
+     WHERE stripe_customer_id = $1
+     LIMIT 1`,
+    [stripeCustomerId],
+  );
+  if (customerMapping.rows[0]?.tenant_id) {
+    return Number(customerMapping.rows[0].tenant_id);
+  }
+
+  const subscriptionMapping = await pool.query(
+    `SELECT tenant_id
+     FROM tenant_subscriptions
+     WHERE stripe_customer_id = $1
+     LIMIT 1`,
+    [stripeCustomerId],
+  );
+
+  return subscriptionMapping.rows[0]?.tenant_id ? Number(subscriptionMapping.rows[0].tenant_id) : null;
+}
+
+async function upsertStripeCustomerMapping(params: {
+  tenantId: number;
+  userId: number;
+  stripeCustomerId: string;
+}) {
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO stripe_customers (tenant_id, user_id, stripe_customer_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (stripe_customer_id)
+     DO UPDATE SET
+       tenant_id = EXCLUDED.tenant_id,
+       user_id = EXCLUDED.user_id,
+       updated_at = NOW()`,
+    [params.tenantId, params.userId, params.stripeCustomerId],
+  );
+}
+
+async function getActivePlanIdForTenant(tenantId: number): Promise<number> {
+  const state = await getTenantPlanState(tenantId);
+  return Number(state.plan.id);
+}
+
+async function upsertInvoiceRecord(params: {
+  tenantId: number | null;
+  invoice: Stripe.Invoice;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string | null;
+  status: string;
+}) {
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO invoices (
+      tenant_id,
+      stripe_invoice_id,
+      stripe_customer_id,
+      stripe_subscription_id,
+      status,
+      amount_due_cents,
+      amount_paid_cents,
+      currency,
+      billing_reason,
+      invoice_pdf_url,
+      paid_at,
+      due_at,
+      payload_json,
+      updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+    ON CONFLICT (stripe_invoice_id)
+    DO UPDATE SET
+      tenant_id = EXCLUDED.tenant_id,
+      stripe_customer_id = EXCLUDED.stripe_customer_id,
+      stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+      status = EXCLUDED.status,
+      amount_due_cents = EXCLUDED.amount_due_cents,
+      amount_paid_cents = EXCLUDED.amount_paid_cents,
+      currency = EXCLUDED.currency,
+      billing_reason = EXCLUDED.billing_reason,
+      invoice_pdf_url = EXCLUDED.invoice_pdf_url,
+      paid_at = EXCLUDED.paid_at,
+      due_at = EXCLUDED.due_at,
+      payload_json = EXCLUDED.payload_json,
+      updated_at = NOW()`,
+    [
+      params.tenantId,
+      params.invoice.id,
+      params.stripeCustomerId,
+      params.stripeSubscriptionId,
+      params.status,
+      params.invoice.amount_due ?? null,
+      params.invoice.amount_paid ?? null,
+      params.invoice.currency ?? null,
+      params.invoice.billing_reason ?? null,
+      params.invoice.invoice_pdf ?? null,
+      params.invoice.status_transitions?.paid_at ? unixToDate(params.invoice.status_transitions.paid_at) : null,
+      params.invoice.due_date ? unixToDate(params.invoice.due_date) : null,
+      JSON.stringify(params.invoice),
+    ],
+  );
+}
+
+async function upsertTenantSubscriptionRecord(params: {
+  tenantId: number;
+  activePlanCode?: string | null;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string | null;
+  stripeCheckoutSessionId: string | null;
+  stripePriceId: string | null;
+  billingInterval?: BillingInterval | null;
+  subscriptionStatus: string;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  lastWebhookEventId?: string | null;
+  lastInvoiceId?: string | null;
+  rawLatestEventJson?: Record<string, unknown> | null;
+}) {
+  const pool = getPool();
+  const activePlanId = params.activePlanCode
+    ? Number((await getPlanByCode(normalizePlanCode(params.activePlanCode)))?.id ?? 0)
+    : await getActivePlanIdForTenant(params.tenantId);
+
+  if (!activePlanId) {
+    throw new Error(`Unable to resolve active plan for tenant ${params.tenantId}`);
+  }
+
+  await pool.query(
+    `INSERT INTO tenant_subscriptions (
+      tenant_id,
+      plan_id,
+      stripe_customer_id,
+      stripe_subscription_id,
+      stripe_checkout_session_id,
+      billing_interval,
+      subscription_status,
+      current_period_start,
+      current_period_end,
+      cancel_at_period_end,
+      last_webhook_event_id,
+      last_invoice_id,
+      stripe_price_id,
+      raw_latest_event_json,
+      updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
+    ON CONFLICT (tenant_id)
+    DO UPDATE SET
+      plan_id = EXCLUDED.plan_id,
+      stripe_customer_id = EXCLUDED.stripe_customer_id,
+      stripe_subscription_id = COALESCE(EXCLUDED.stripe_subscription_id, tenant_subscriptions.stripe_subscription_id),
+      stripe_checkout_session_id = COALESCE(EXCLUDED.stripe_checkout_session_id, tenant_subscriptions.stripe_checkout_session_id),
+      billing_interval = COALESCE(EXCLUDED.billing_interval, tenant_subscriptions.billing_interval),
+      subscription_status = EXCLUDED.subscription_status,
+      current_period_start = COALESCE(EXCLUDED.current_period_start, tenant_subscriptions.current_period_start),
+      current_period_end = COALESCE(EXCLUDED.current_period_end, tenant_subscriptions.current_period_end),
+      cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+      last_webhook_event_id = COALESCE(EXCLUDED.last_webhook_event_id, tenant_subscriptions.last_webhook_event_id),
+      last_invoice_id = COALESCE(EXCLUDED.last_invoice_id, tenant_subscriptions.last_invoice_id),
+      stripe_price_id = COALESCE(EXCLUDED.stripe_price_id, tenant_subscriptions.stripe_price_id),
+      raw_latest_event_json = COALESCE(EXCLUDED.raw_latest_event_json, tenant_subscriptions.raw_latest_event_json),
+      updated_at = NOW()`,
+    [
+      params.tenantId,
+      activePlanId,
+      params.stripeCustomerId,
+      params.stripeSubscriptionId,
+      params.stripeCheckoutSessionId,
+      params.billingInterval,
+      params.subscriptionStatus,
+      params.currentPeriodStart,
+      params.currentPeriodEnd,
+      params.cancelAtPeriodEnd,
+      params.lastWebhookEventId ?? null,
+      params.lastInvoiceId ?? null,
+      params.stripePriceId,
+      params.rawLatestEventJson ? JSON.stringify(params.rawLatestEventJson) : null,
+    ],
+  );
+}
+
 function normalizeLegacySubscriptionStatus(status: string | null | undefined): LegacySubscriptionStatus {
-  const normalized = String(status ?? '').toLowerCase()
+  const normalized = String(status ?? '').toLowerCase();
   if (normalized === 'active' || normalized === 'trialing') {
-    return 'active'
+    return 'active';
   }
   if (normalized === 'past_due' || normalized === 'incomplete' || normalized === 'unpaid') {
-    return 'past_due'
+    return 'past_due';
   }
-  return 'canceled'
+  return 'canceled';
 }
 
 async function ensureTenantForUser(userId: number, email: string) {
-  const pool = getPool()
-  const existingTenant = await pool.query('SELECT id FROM tenants WHERE user_id = $1 LIMIT 1', [userId])
+  const pool = getPool();
+  const existingTenant = await pool.query('SELECT id FROM tenants WHERE user_id = $1 LIMIT 1', [userId]);
   if (existingTenant.rows[0]?.id) {
-    return Number(existingTenant.rows[0].id)
+    return Number(existingTenant.rows[0].id);
   }
 
   const tenantInsert = await pool.query(
     'INSERT INTO tenants (name, plan, user_id) VALUES ($1, $2, $3) RETURNING id',
     [email.split('@')[0] + '-tenant', 'starter', userId],
-  )
-  return Number(tenantInsert.rows[0]?.id)
+  );
+  return Number(tenantInsert.rows[0]?.id);
 }
 
 async function resolveOrCreateUserFromStripe(params: {
   stripeCustomerId: string | null
   email: string | null
 }) {
-  const pool = getPool()
+  const pool = getPool();
 
   if (params.stripeCustomerId) {
     const byCustomer = await pool.query(
@@ -190,7 +483,7 @@ async function resolveOrCreateUserFromStripe(params: {
       return {
         id: Number(byCustomer.rows[0].id),
         email: String(byCustomer.rows[0].email),
-      }
+      };
     }
   }
 
@@ -206,27 +499,27 @@ async function resolveOrCreateUserFromStripe(params: {
           [params.stripeCustomerId, byEmail.rows[0].id],
         )
       }
-      await ensureTenantForUser(Number(byEmail.rows[0].id), String(byEmail.rows[0].email))
+      await ensureTenantForUser(Number(byEmail.rows[0].id), String(byEmail.rows[0].email));
       return {
         id: Number(byEmail.rows[0].id),
         email: String(byEmail.rows[0].email),
-      }
+      };
     }
   }
 
-  const resolvedEmail = params.email ?? `${params.stripeCustomerId ?? 'stripe-user'}@stripe-webhook.local`
+  const resolvedEmail = params.email ?? `${params.stripeCustomerId ?? 'stripe-user'}@stripe-webhook.local`;
   const inserted = await pool.query(
     `INSERT INTO users (email, stripe_customer_id, password_hash)
      VALUES ($1, $2, $3)
      RETURNING id, email`,
     [resolvedEmail, params.stripeCustomerId, 'stripe_webhook_managed_no_login'],
-  )
+  );
 
-  await ensureTenantForUser(Number(inserted.rows[0].id), String(inserted.rows[0].email))
+  await ensureTenantForUser(Number(inserted.rows[0].id), String(inserted.rows[0].email));
   return {
     id: Number(inserted.rows[0].id),
     email: String(inserted.rows[0].email),
-  }
+  };
 }
 
 async function syncLegacySubscriptionForUser(params: {
@@ -237,9 +530,9 @@ async function syncLegacySubscriptionForUser(params: {
   subscriptionStatus: string
   currentPeriodEnd: Date | null
 }) {
-  const pool = getPool()
-  const planCode = params.planCode ?? 'starter'
-  const status = normalizeLegacySubscriptionStatus(params.subscriptionStatus)
+  const pool = getPool();
+  const planCode = params.planCode ?? 'starter';
+  const status = normalizeLegacySubscriptionStatus(params.subscriptionStatus);
 
   const existing = params.stripeSubscriptionId
     ? await pool.query(
@@ -249,7 +542,7 @@ async function syncLegacySubscriptionForUser(params: {
     : await pool.query(
       'SELECT id FROM subscriptions WHERE user_id = $1 ORDER BY updated_at DESC, created_at DESC LIMIT 1',
       [params.userId],
-    )
+    );
 
   if (existing.rows[0]?.id) {
     await pool.query(
@@ -270,7 +563,7 @@ async function syncLegacySubscriptionForUser(params: {
         existing.rows[0].id,
       ],
     )
-    return
+    return;
   }
 
   await pool.query(
@@ -292,7 +585,7 @@ async function syncLegacySubscriptionForUser(params: {
       params.currentPeriodEnd,
       params.userId,
     ],
-  )
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -305,7 +598,8 @@ export async function createCheckoutSessionForTenant(
   options: CheckoutSessionOptions = {},
 ): Promise<CheckoutSessionResponse> {
   const pool = getPool();
-  const billingInterval = options.billingInterval ?? 'monthly';
+  const billingInterval = normalizeBillingInterval(options.billingInterval ?? 'monthly');
+  const nextPlanCode = normalizePlanCode(planCode);
 
   // Verify tenant exists
   const tenant = await getTenantById(tenantId);
@@ -314,37 +608,57 @@ export async function createCheckoutSessionForTenant(
   }
 
   // Verify plan exists
-  const plan = await getPlanByCode(planCode);
+  const plan = await getPlanByCode(nextPlanCode);
   if (!plan) {
-    throw new Error(`Plan not found: ${planCode}`);
+    throw new Error(`Plan not found: ${nextPlanCode}`);
   }
+
+  if (nextPlanCode === 'free') {
+    throw new Error('Free plan does not require checkout');
+  }
+
+  if (nextPlanCode === 'enterprise') {
+    throw new Error('Enterprise plan requires sales assistance');
+  }
+
+  const currentState = await getTenantPlanState(tenantId);
+  const tenantOwnerUserId = Number(tenant.user_id);
 
   // Get or create Stripe customer
   const existing = await getTenantSubscription(tenantId);
   let stripeCustomerId = existing?.stripe_customer_id || null;
 
   if (!stripeCustomerId) {
-    const customer = await stripe.customers.create({
+    const ownerEmail = await getUserEmail(tenantOwnerUserId);
+    const customer = await getStripeClient().customers.create({
       name: tenant.name,
+      email: ownerEmail ?? undefined,
       metadata: {
         tenantId: String(tenantId),
         tenantName: tenant.name,
+        ownerUserId: String(tenantOwnerUserId),
       },
     });
     stripeCustomerId = customer.id;
   }
 
+  await upsertStripeCustomerMapping({
+    tenantId,
+    userId: tenantOwnerUserId,
+    stripeCustomerId,
+  });
+
   // Get Stripe price ID for the plan
-  const stripePriceId = getStripePriceIdForPlan(planCode, billingInterval);
+  const stripePriceId = await getStripePriceIdForPlan(nextPlanCode, billingInterval);
   if (!stripePriceId) {
-    throw new Error(`No Stripe price configured for plan: ${planCode} (${billingInterval})`);
+    throw new Error(`No Stripe price configured for plan: ${nextPlanCode} (${billingInterval})`);
   }
 
   const successUrl = options.successUrl || process.env.STRIPE_SUCCESS_URL || 'https://zonforge.com/dashboard?payment=success';
   const cancelUrl = options.cancelUrl || process.env.STRIPE_CANCEL_URL || 'https://zonforge.com/pricing?payment=cancelled';
 
   // Create checkout session
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripeClient().checkout.sessions.create({
     mode: 'subscription',
     customer: stripeCustomerId,
     line_items: [
@@ -358,59 +672,58 @@ export async function createCheckoutSessionForTenant(
     client_reference_id: String(tenantId),
     metadata: {
       tenantId: String(tenantId),
-      planCode,
+      planCode: nextPlanCode,
       billingInterval,
-      userId: String(tenant.user_id),
+      userId: String(tenantOwnerUserId),
+      currentPlanCode: currentState.plan.code,
       environment: process.env.NODE_ENV ?? 'production',
     },
     subscription_data: {
       metadata: {
         tenantId: String(tenantId),
-        planCode,
+        planCode: nextPlanCode,
         billingInterval,
-        userId: String(tenant.user_id),
+        userId: String(tenantOwnerUserId),
       },
+    },
+    allow_promotion_codes: true,
+    billing_address_collection: 'auto',
+  });
+
+  // Upsert tenant subscription record
+  await upsertTenantSubscriptionRecord({
+    tenantId,
+    activePlanCode: currentState.plan.code,
+    stripeCustomerId,
+    stripeSubscriptionId: null,
+    stripeCheckoutSessionId: session.id,
+    stripePriceId,
+    billingInterval,
+    subscriptionStatus: 'checkout_created',
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    rawLatestEventJson: {
+      source: 'checkout_created',
+      pendingPlanCode: nextPlanCode,
+      pendingBillingInterval: billingInterval,
+      sessionId: session.id,
     },
   });
 
-  // Record stripe_customer → tenant mapping (idempotent)
   await pool.query(
-    `INSERT INTO stripe_customers (tenant_id, user_id, stripe_customer_id)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (stripe_customer_id) DO UPDATE SET
-       tenant_id = EXCLUDED.tenant_id,
-       user_id = EXCLUDED.user_id,
-       updated_at = NOW()`,
-    [tenantId, tenant.user_id, stripeCustomerId],
-  );
-
-  // Upsert tenant subscription record
-  await pool.query(
-    `INSERT INTO tenant_subscriptions (
-      tenant_id,
-      plan_id,
-      stripe_customer_id,
-      stripe_checkout_session_id,
-      billing_interval,
-      subscription_status,
-      updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-    ON CONFLICT (tenant_id)
-    DO UPDATE SET
-      plan_id = EXCLUDED.plan_id,
-      stripe_customer_id = EXCLUDED.stripe_customer_id,
-      stripe_checkout_session_id = EXCLUDED.stripe_checkout_session_id,
-      billing_interval = EXCLUDED.billing_interval,
-      subscription_status = EXCLUDED.subscription_status,
-      updated_at = NOW()`,
-    [tenantId, plan.id, stripeCustomerId, session.id, billingInterval, 'checkout_created']
+    `UPDATE users
+     SET stripe_customer_id = COALESCE(stripe_customer_id, $1),
+         updated_at = NOW()
+     WHERE id = $2`,
+    [stripeCustomerId, tenantOwnerUserId],
   );
 
   console.log(JSON.stringify({
     event: 'billing_checkout_created',
     sessionId: session.id,
     tenantId,
-    planCode,
+    planCode: nextPlanCode,
     billingInterval,
     environment: process.env.NODE_ENV ?? 'production',
     timestamp: Date.now(),
@@ -418,17 +731,17 @@ export async function createCheckoutSessionForTenant(
 
   await writeBillingAuditLog({
     tenantId,
-    userId: options.actorUserId ?? tenant.user_id,
+    userId: options.actorUserId ?? tenantOwnerUserId,
     eventType: 'billing.checkout_created',
-    planCode,
+    planCode: nextPlanCode,
     billingInterval,
     stripeCustomerId,
     stripeCheckoutSessionId: session.id,
     source: options.source ?? 'backend',
-    message: `Checkout created for ${planCode} (${billingInterval})`,
+    message: `Checkout created for ${nextPlanCode} (${billingInterval})`,
     payload: {
       tenantId,
-      planCode,
+      planCode: nextPlanCode,
       billingInterval,
       successUrl,
       cancelUrl,
@@ -448,20 +761,23 @@ export async function getTenantBillingStatus(tenantId: number): Promise<TenantBi
     return null;
   }
 
+  const state = await getTenantPlanState(tenantId);
   const subscription = await getTenantSubscription(tenantId);
 
   if (!subscription) {
     return {
       tenantId,
       tenantName: tenant.name,
-      planCode: null,
-      planName: null,
-      subscriptionStatus: 'none',
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
+      planCode: state.plan.code,
+      planName: state.plan.name,
+      subscriptionStatus: state.status,
+      billingInterval: null,
+      currentPeriodStart: state.startedAt,
+      currentPeriodEnd: state.expiresAt,
       cancelAtPeriodEnd: false,
       stripeCustomerId: null,
       stripeSubscriptionId: null,
+      stripeCheckoutSessionId: null,
       limits: null,
     };
   }
@@ -469,19 +785,21 @@ export async function getTenantBillingStatus(tenantId: number): Promise<TenantBi
   return {
     tenantId,
     tenantName: tenant.name,
-    planCode: subscription.plan_code,
-    planName: subscription.plan_name,
+    planCode: state.plan.code,
+    planName: state.plan.name,
     subscriptionStatus: subscription.subscription_status,
-    currentPeriodStart: subscription.current_period_start,
-    currentPeriodEnd: subscription.current_period_end,
+    billingInterval: normalizeBillingInterval(subscription.billing_interval),
+    currentPeriodStart: subscription.current_period_start ?? state.startedAt,
+    currentPeriodEnd: subscription.current_period_end ?? state.expiresAt,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     stripeCustomerId: subscription.stripe_customer_id,
     stripeSubscriptionId: subscription.stripe_subscription_id,
+    stripeCheckoutSessionId: subscription.stripe_checkout_session_id,
     limits: {
-      maxUsers: subscription.max_users,
-      maxConnectors: subscription.max_connectors,
-      maxEventsPerMonth: subscription.max_events_per_month,
-      retentionDays: subscription.retention_days,
+      maxUsers: subscription.max_users ?? null,
+      maxConnectors: state.limits.max_connectors,
+      maxEventsPerMonth: subscription.max_events_per_month ?? null,
+      retentionDays: state.limits.retention_days,
     },
   };
 }
@@ -492,54 +810,18 @@ export async function createBillingPortalSession(tenantId: number): Promise<{ ur
     throw new Error('No active Stripe customer for tenant');
   }
 
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripeClient().billingPortal.sessions.create({
     customer: subscription.stripe_customer_id,
-    return_url: requiredEnv('STRIPE_SUCCESS_URL'),
+    return_url: process.env.STRIPE_SUCCESS_URL || 'https://app.zonforge.com/billing',
   });
 
   return { url: session.url };
 }
 
 export async function changeTenantPlan(tenantId: number, newPlanCode: string): Promise<TenantBillingStatus | null> {
-  const pool = getPool();
-
-  const subscription = await getTenantSubscription(tenantId);
-  if (!subscription || !subscription.stripe_subscription_id) {
-    throw new Error('No active subscription for tenant');
-  }
-
-  const newPlan = await getPlanByCode(newPlanCode);
-  if (!newPlan) {
-    throw new Error(`Plan not found: ${newPlanCode}`);
-  }
-
-  const stripePriceId = getStripePriceIdForPlan(newPlanCode);
-  if (!stripePriceId) {
-    throw new Error(`No Stripe price configured for plan: ${newPlanCode}`);
-  }
-
-  // Update Stripe subscription
-  const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id);
-  
-  await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-    items: [
-      {
-        id: stripeSubscription.items.data[0]!.id,
-        price: stripePriceId,
-      },
-    ],
-    proration_behavior: 'create_prorations',
-  });
-
-  // Update local DB
-  await pool.query(
-    `UPDATE tenant_subscriptions
-     SET plan_id = $1, updated_at = NOW()
-     WHERE tenant_id = $2`,
-    [newPlan.id, tenantId]
-  );
-
-  return getTenantBillingStatus(tenantId);
+  void tenantId;
+  void newPlanCode;
+  throw new Error('Direct plan changes are disabled. Use checkout and wait for Stripe webhook confirmation.');
 }
 
 export async function cancelTenantSubscription(tenantId: number): Promise<TenantBillingStatus | null> {
@@ -551,17 +833,37 @@ export async function cancelTenantSubscription(tenantId: number): Promise<Tenant
   }
 
   // Mark for cancellation at period end
-  await stripe.subscriptions.update(subscription.stripe_subscription_id, {
+  await getStripeClient().subscriptions.update(subscription.stripe_subscription_id, {
     cancel_at_period_end: true,
   });
 
   // Update local DB
   await pool.query(
     `UPDATE tenant_subscriptions
-     SET cancel_at_period_end = true, updated_at = NOW()
+     SET cancel_at_period_end = true,
+         subscription_status = CASE
+           WHEN LOWER(COALESCE(subscription_status, '')) IN ('active', 'trialing') THEN subscription_status
+           ELSE 'cancel_scheduled'
+         END,
+         updated_at = NOW()
      WHERE tenant_id = $1`,
     [tenantId]
   );
+
+  const actorUserId = await getTenantOwnerUserId(tenantId);
+  await writeBillingAuditLog({
+    tenantId,
+    userId: actorUserId,
+    eventType: 'billing.cancel_requested',
+    planCode: (await getTenantPlanState(tenantId)).plan.code,
+    stripeCustomerId: subscription.stripe_customer_id,
+    stripeSubscriptionId: subscription.stripe_subscription_id,
+    source: 'billing_api',
+    message: 'Subscription set to cancel at period end',
+    payload: {
+      cancelAtPeriodEnd: true,
+    },
+  });
 
   return getTenantBillingStatus(tenantId);
 }
@@ -572,7 +874,7 @@ export async function cancelTenantSubscription(tenantId: number): Promise<Tenant
 
 export function verifyWebhookSignature(body: string, signature: string): any {
   try {
-    return stripe.webhooks.constructEvent(
+    return getStripeClient().webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET || ''
@@ -581,251 +883,108 @@ export function verifyWebhookSignature(body: string, signature: string): any {
     throw new Error('Invalid webhook signature');
   }
 }
-
-function unixToDate(value: number | null | undefined): Date | null {
-  if (!value) {
-    return null;
-  }
-  return new Date(value * 1000);
-}
-
-async function upsertTenantSubscriptionFromStripe(params: {
-  tenantId: number | null;
-  planCode?: string | null;
-  stripeCustomerId: string;
-  stripeSubscriptionId: string | null;
-  stripeCheckoutSessionId: string | null;
-  stripePriceId: string | null;
-  subscriptionStatus: string;
-  currentPeriodStart: Date | null;
-  currentPeriodEnd: Date | null;
-  cancelAtPeriodEnd: boolean;
-  eventId: string;
-  rawEventJson?: Record<string, unknown>;
-}) {
-  const pool = getPool();
-
-  // Resolve tenant ID from Stripe customer if not provided
-  let tenantId = params.tenantId;
-  if (!tenantId) {
-    const result = await pool.query(
-      'SELECT tenant_id FROM tenant_subscriptions WHERE stripe_customer_id = $1 LIMIT 1',
-      [params.stripeCustomerId]
-    );
-    tenantId = result.rows[0]?.tenant_id;
-  }
-
-  if (!tenantId) {
-    throw new Error(`Cannot resolve tenant for Stripe customer ${params.stripeCustomerId}`);
-  }
-
-  let resolvedPlanCode = params.planCode?.toLowerCase() ?? null;
-  if (!resolvedPlanCode && params.stripePriceId) {
-    const mapping = [
-      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
-      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
-      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
-      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
-    ].find(x => x.env && x.env === params.stripePriceId)
-
-    if (mapping) {
-      resolvedPlanCode = mapping.code
-    }
-  }
-
-  let planId = null;
-  if (resolvedPlanCode) {
-    const planByCode = await pool.query('SELECT id FROM plans WHERE code = $1 LIMIT 1', [resolvedPlanCode]);
-    planId = planByCode.rows[0]?.id ?? null;
-  }
-
-  // Get existing subscription for fallback plan_id
-  const existing = await pool.query(
-    'SELECT plan_id FROM tenant_subscriptions WHERE tenant_id = $1 LIMIT 1',
-    [tenantId]
-  );
-  const existingPlanId = existing.rows[0]?.plan_id ?? null;
-  const finalPlanId = planId ?? existingPlanId;
-
-  if (!finalPlanId) {
-    throw new Error(`Unable to resolve plan_id for tenant ${tenantId}`);
-  }
-
-  await pool.query(
-    `INSERT INTO tenant_subscriptions (
-      tenant_id,
-      plan_id,
-      stripe_customer_id,
-      stripe_subscription_id,
-      stripe_checkout_session_id,
-      subscription_status,
-      current_period_start,
-      current_period_end,
-      cancel_at_period_end,
-      last_webhook_event_id,
-      stripe_price_id,
-      raw_latest_event_json,
-      updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
-    ON CONFLICT (tenant_id)
-    DO UPDATE SET
-      plan_id = EXCLUDED.plan_id,
-      stripe_customer_id = EXCLUDED.stripe_customer_id,
-      stripe_subscription_id = COALESCE(EXCLUDED.stripe_subscription_id, tenant_subscriptions.stripe_subscription_id),
-      stripe_checkout_session_id = COALESCE(EXCLUDED.stripe_checkout_session_id, tenant_subscriptions.stripe_checkout_session_id),
-      subscription_status = EXCLUDED.subscription_status,
-      current_period_start = COALESCE(EXCLUDED.current_period_start, tenant_subscriptions.current_period_start),
-      current_period_end = COALESCE(EXCLUDED.current_period_end, tenant_subscriptions.current_period_end),
-      cancel_at_period_end = EXCLUDED.cancel_at_period_end,
-      last_webhook_event_id = EXCLUDED.last_webhook_event_id,
-      stripe_price_id = COALESCE(EXCLUDED.stripe_price_id, tenant_subscriptions.stripe_price_id),
-      raw_latest_event_json = EXCLUDED.raw_latest_event_json,
-      updated_at = NOW()`,
-    [
-      tenantId,
-      finalPlanId,
-      params.stripeCustomerId,
-      params.stripeSubscriptionId,
-      params.stripeCheckoutSessionId,
-      params.subscriptionStatus,
-      params.currentPeriodStart,
-      params.currentPeriodEnd,
-      params.cancelAtPeriodEnd,
-      params.eventId,
-      params.stripePriceId,
-      params.rawEventJson ? JSON.stringify(params.rawEventJson) : null,
-    ]
-  );
-
-  // ─── PLAN ACTIVATION LOGIC (09.5) ───
-  // Mirror subscription status into tenants.plan for fast plan-based queries
-  const upperStatus = params.subscriptionStatus.toUpperCase();
-  if ((upperStatus === 'ACTIVE' || upperStatus === 'TRIALING') && resolvedPlanCode) {
-    await pool.query('UPDATE tenants SET plan = $1 WHERE id = $2', [resolvedPlanCode, tenantId]);
-    console.log(JSON.stringify({
-      event: 'plan_activated',
-      tenantId,
-      planCode: resolvedPlanCode,
-      status: params.subscriptionStatus,
-      timestamp: Date.now(),
-    }));
-    await writeBillingAuditLog({
-      tenantId,
-      eventType: 'billing.plan_activated',
-      planCode: resolvedPlanCode,
-      stripeCustomerId: params.stripeCustomerId,
-      stripeSubscriptionId: params.stripeSubscriptionId,
-      stripeCheckoutSessionId: params.stripeCheckoutSessionId,
-      source: 'stripe_webhook',
-      message: `Plan activated: ${resolvedPlanCode}`,
-      payload: {
-        eventId: params.eventId,
-        status: params.subscriptionStatus,
-      },
-    });
-  } else if (upperStatus === 'CANCELED') {
-    await pool.query('UPDATE tenants SET plan = $1 WHERE id = $2', ['starter', tenantId]);
-    console.log(JSON.stringify({
-      event: 'plan_downgraded',
-      tenantId,
-      reason: 'subscription_canceled',
-      downgradedTo: 'starter',
-      timestamp: Date.now(),
-    }));
-    await writeBillingAuditLog({
-      tenantId,
-      eventType: 'billing.plan_downgraded',
-      planCode: 'starter',
-      stripeCustomerId: params.stripeCustomerId,
-      stripeSubscriptionId: params.stripeSubscriptionId,
-      stripeCheckoutSessionId: params.stripeCheckoutSessionId,
-      source: 'stripe_webhook',
-      message: 'Subscription canceled; tenant downgraded to starter',
-      payload: {
-        eventId: params.eventId,
-        status: params.subscriptionStatus,
-      },
-    });
-  }
-  // PAST_DUE: keep existing plan — grace period (no downgrade)
-}
-
 async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout.Session, rawEvent?: Stripe.Event) {
   if (!session.customer || typeof session.customer !== 'string') {
     throw new Error('Missing Stripe customer in checkout session');
   }
 
-  const tenantId = session.client_reference_id ? parseInt(session.client_reference_id, 10) : null;
+  const tenantId = session.client_reference_id
+    ? parseInt(session.client_reference_id, 10)
+    : session.metadata?.tenantId
+      ? parseInt(session.metadata.tenantId, 10)
+      : null;
   const subscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
-
-  let currentPeriodStart: Date | null = null;
-  let currentPeriodEnd: Date | null = null;
-  let cancelAtPeriodEnd = false;
-
-  if (subscriptionId) {
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    currentPeriodStart = unixToDate(subscription.current_period_start);
-    currentPeriodEnd = unixToDate(subscription.current_period_end);
-    cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end);
+  const activeTenantId = tenantId ?? await resolveTenantIdFromStripeCustomer(session.customer);
+  if (!activeTenantId) {
+    throw new Error(`Cannot resolve tenant for checkout customer ${session.customer}`);
   }
 
-  await upsertTenantSubscriptionFromStripe({
-    tenantId,
-    planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
+  const ownerUserId = await getTenantOwnerUserId(activeTenantId);
+  const currentState = await getTenantPlanState(activeTenantId);
+
+  let subscription: Stripe.Subscription | null = null;
+  if (subscriptionId) {
+    subscription = await getStripeClient().subscriptions.retrieve(subscriptionId);
+  }
+
+  const stripePriceId = readPriceIdFromSubscription(subscription);
+  const billingInterval = normalizeBillingInterval(
+    typeof session.metadata?.billingInterval === 'string'
+      ? session.metadata.billingInterval
+      : readIntervalFromSubscription(subscription) ?? 'monthly',
+  );
+
+  await upsertStripeCustomerMapping({
+    tenantId: activeTenantId,
+    userId: ownerUserId,
+    stripeCustomerId: session.customer,
+  });
+
+  await upsertTenantSubscriptionRecord({
+    tenantId: activeTenantId,
+    activePlanCode: currentState.plan.code,
     stripeCustomerId: session.customer,
     stripeSubscriptionId: subscriptionId,
     stripeCheckoutSessionId: session.id,
-    stripePriceId: session.line_items?.data[0]?.price?.id || null,
-    subscriptionStatus: 'ACTIVE',
-    currentPeriodStart,
-    currentPeriodEnd,
-    cancelAtPeriodEnd,
-    eventId,
-    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
+    stripePriceId,
+    billingInterval,
+    subscriptionStatus: subscription ? normalizeStripeSubscriptionStatus(subscription.status) : 'checkout_completed',
+    currentPeriodStart: readPeriodStart(subscription),
+    currentPeriodEnd: readPeriodEnd(subscription),
+    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
+    lastWebhookEventId: eventId,
+    rawLatestEventJson: {
+      eventType: rawEvent?.type ?? 'checkout.session.completed',
+      pendingPlanCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
+      pendingBillingInterval: billingInterval,
+    },
   });
 
   console.log(JSON.stringify({
     event: 'webhook_checkout_completed',
     sessionId: session.id,
-    tenantId,
+    tenantId: activeTenantId,
     timestamp: Date.now(),
   }));
 
   await writeBillingAuditLog({
-    tenantId,
+    tenantId: activeTenantId,
     eventType: 'billing.checkout_completed',
     planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
-    billingInterval: typeof session.metadata?.billingInterval === 'string' ? session.metadata.billingInterval : null,
+    billingInterval,
     stripeCustomerId: session.customer,
     stripeSubscriptionId: subscriptionId,
     stripeCheckoutSessionId: session.id,
     source: 'stripe_webhook',
-    message: 'Stripe checkout session completed',
-    payload: rawEvent as unknown as Record<string, unknown> | null,
+    message: 'Stripe checkout session completed; awaiting payment confirmation',
+    payload: {
+      eventId,
+      status: subscription ? normalizeStripeSubscriptionStatus(subscription.status) : 'checkout_completed',
+    },
   });
 
   const user = await resolveOrCreateUserFromStripe({
     stripeCustomerId: session.customer,
     email: typeof session.customer_email === 'string' ? session.customer_email : null,
-  })
+  });
 
   await syncLegacySubscriptionForUser({
     userId: user.id,
     stripeCustomerId: session.customer,
     stripeSubscriptionId: subscriptionId,
-    planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
-    subscriptionStatus: 'active',
-    currentPeriodEnd,
-  })
+    planCode: currentState.plan.code,
+    subscriptionStatus: subscription ? normalizeStripeSubscriptionStatus(subscription.status) : 'incomplete',
+    currentPeriodEnd: readPeriodEnd(subscription),
+  });
 
   if (typeof session.customer_email === 'string' && session.customer_email) {
     await sendProductEmail({
       toEmail: session.customer_email,
       emailType: 'payment_success',
-      subject: 'Payment successful - ZonForge subscription is active',
+      subject: 'Stripe checkout completed - payment confirmation pending',
       payload: {
         planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
-        billingInterval: typeof session.metadata?.billingInterval === 'string' ? session.metadata.billingInterval : null,
+        billingInterval,
         sessionId: session.id,
       },
     });
@@ -834,12 +993,12 @@ async function handleCheckoutCompleted(eventId: string, session: Stripe.Checkout
   await trackConversionEvent({
     eventName: 'checkout_completed',
     userId: user.id,
-    tenantId,
+    tenantId: activeTenantId,
     sessionId: session.id,
     source: 'stripe_webhook',
     metadata: {
       planCode: typeof session.metadata?.planCode === 'string' ? session.metadata.planCode : null,
-      billingInterval: typeof session.metadata?.billingInterval === 'string' ? session.metadata.billingInterval : null,
+      billingInterval,
     },
   });
 }
@@ -849,67 +1008,117 @@ async function handleSubscriptionEvent(eventId: string, subscription: Stripe.Sub
     throw new Error('Missing Stripe customer in subscription event');
   }
 
-  const user = await resolveOrCreateUserFromStripe({
-    stripeCustomerId: subscription.customer,
-    email: null,
-  })
-
-  let planCode: string | null = null
-  const priceId = subscription.items.data[0]?.price?.id ?? null
-  if (priceId) {
-    const mapping = [
-      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
-      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
-      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
-      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
-    ].find(x => x.env && x.env === priceId)
-    planCode = mapping?.code ?? null
+  const tenantId = subscription.metadata?.tenantId
+    ? parseInt(subscription.metadata.tenantId, 10)
+    : await resolveTenantIdFromStripeCustomer(subscription.customer);
+  if (!tenantId) {
+    throw new Error(`Cannot resolve tenant for Stripe customer ${subscription.customer}`);
   }
 
-  const subStatus = subscription.status === 'active' ? 'ACTIVE' : subscription.status.toUpperCase();
+  const ownerUserId = await getTenantOwnerUserId(tenantId);
+  const activeState = await getTenantPlanState(tenantId);
+  const priceId = readPriceIdFromSubscription(subscription);
+  const planCode = normalizePlanCode(
+    subscription.metadata?.planCode
+      ?? (await resolvePlanCodeFromPriceId(priceId))
+      ?? activeState.plan.code,
+  );
+  const subscriptionStatus = normalizeStripeSubscriptionStatus(subscription.status);
 
-  await upsertTenantSubscriptionFromStripe({
-    tenantId: null,
-    planCode: null,
+  await upsertStripeCustomerMapping({
+    tenantId,
+    userId: ownerUserId,
+    stripeCustomerId: subscription.customer,
+  });
+
+  await upsertTenantSubscriptionRecord({
+    tenantId,
+    activePlanCode: activeState.plan.code,
     stripeCustomerId: subscription.customer,
     stripeSubscriptionId: subscription.id,
     stripeCheckoutSessionId: null,
-    stripePriceId: subscription.items.data[0]?.price?.id || null,
-    subscriptionStatus: subStatus,
-    currentPeriodStart: unixToDate(subscription.current_period_start),
-    currentPeriodEnd: unixToDate(subscription.current_period_end),
+    stripePriceId: priceId,
+    billingInterval: readIntervalFromSubscription(subscription),
+    subscriptionStatus,
+    currentPeriodStart: readPeriodStart(subscription),
+    currentPeriodEnd: readPeriodEnd(subscription),
     cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-    eventId,
-    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
+    lastWebhookEventId: eventId,
+    rawLatestEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
   });
 
   console.log(JSON.stringify({
     event: 'webhook_subscription_updated',
     subscriptionId: subscription.id,
-    status: subStatus,
+    status: subscriptionStatus,
     planCode,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     timestamp: Date.now(),
   }));
 
   await writeBillingAuditLog({
+    tenantId,
     eventType: 'billing.subscription_updated',
     planCode,
     stripeCustomerId: subscription.customer,
     stripeSubscriptionId: subscription.id,
+    billingInterval: readIntervalFromSubscription(subscription),
     source: 'stripe_webhook',
-    message: `Subscription updated: ${subStatus}`,
-    payload: rawEvent as unknown as Record<string, unknown> | null,
+    message: `Subscription updated: ${subscriptionStatus}`,
+    payload: {
+      eventId,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    },
+  });
+
+  if (rawEvent?.type === 'customer.subscription.deleted') {
+    await cancelTenantPlanState({
+      tenantId,
+      actorUserId: ownerUserId,
+      requestId: eventId,
+    });
+    await upsertTenantSubscriptionRecord({
+      tenantId,
+      activePlanCode: 'free',
+      stripeCustomerId: subscription.customer,
+      stripeSubscriptionId: subscription.id,
+      stripeCheckoutSessionId: null,
+      stripePriceId: priceId,
+      billingInterval: readIntervalFromSubscription(subscription),
+      subscriptionStatus,
+      currentPeriodStart: readPeriodStart(subscription),
+      currentPeriodEnd: readPeriodEnd(subscription),
+      cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
+      lastWebhookEventId: eventId,
+      rawLatestEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
+    });
+
+    await writeBillingAuditLog({
+      tenantId,
+      userId: ownerUserId,
+      eventType: 'billing.plan_downgraded',
+      planCode: 'free',
+      stripeCustomerId: subscription.customer,
+      stripeSubscriptionId: subscription.id,
+      source: 'stripe_webhook',
+      message: 'Subscription deleted; tenant downgraded to free',
+      payload: { eventId },
+    });
+  }
+
+  const user = await resolveOrCreateUserFromStripe({
+    stripeCustomerId: subscription.customer,
+    email: null,
   });
 
   await syncLegacySubscriptionForUser({
     userId: user.id,
     stripeCustomerId: subscription.customer,
     stripeSubscriptionId: subscription.id,
-    planCode,
-    subscriptionStatus: subscription.status,
-    currentPeriodEnd: unixToDate(subscription.current_period_end),
-  })
+    planCode: rawEvent?.type === 'customer.subscription.deleted' ? 'free' : activeState.plan.code,
+    subscriptionStatus,
+    currentPeriodEnd: readPeriodEnd(subscription),
+  });
 }
 
 async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice, rawEvent?: Stripe.Event) {
@@ -917,67 +1126,131 @@ async function handleInvoicePaid(eventId: string, invoice: Stripe.Invoice, rawEv
     throw new Error('Missing Stripe customer in invoice.paid event');
   }
 
-  const user = await resolveOrCreateUserFromStripe({
-    stripeCustomerId: invoice.customer,
-    email: typeof invoice.customer_email === 'string' ? invoice.customer_email : null,
-  })
-
-  let planCode: string | null = null
-  const priceId = invoice.lines.data[0]?.price?.id ?? null
-  if (priceId) {
-    const mapping = [
-      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
-      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
-      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
-      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
-    ].find(x => x.env && x.env === priceId)
-    planCode = mapping?.code ?? null
+  const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
+  const subscription = stripeSubscriptionId
+    ? await getStripeClient().subscriptions.retrieve(stripeSubscriptionId)
+    : null;
+  const tenantId = subscription?.metadata?.tenantId
+    ? parseInt(subscription.metadata.tenantId, 10)
+    : await resolveTenantIdFromStripeCustomer(invoice.customer);
+  if (!tenantId) {
+    throw new Error(`Cannot resolve tenant for Stripe customer ${invoice.customer}`);
   }
 
-  const currentPeriodEnd = invoice.lines.data[0]?.period?.end
-    ? unixToDate(invoice.lines.data[0]?.period?.end)
-    : null
+  const ownerUserId = await getTenantOwnerUserId(tenantId);
+  const priceId = invoice.lines.data[0]?.price?.id ?? readPriceIdFromSubscription(subscription);
+  const planCode = normalizePlanCode(
+    subscription?.metadata?.planCode
+      ?? (await resolvePlanCodeFromPriceId(priceId))
+      ?? (await getTenantPlanState(tenantId)).plan.code,
+  );
+  const subscriptionStatus = subscription ? normalizeStripeSubscriptionStatus(subscription.status) : 'active';
+  const billingInterval = readIntervalFromSubscription(subscription);
 
-  await upsertTenantSubscriptionFromStripe({
-    tenantId: null,
-    planCode: null,
+  await upsertStripeCustomerMapping({
+    tenantId,
+    userId: ownerUserId,
     stripeCustomerId: invoice.customer,
-    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+  });
+
+  await upsertInvoiceRecord({
+    tenantId,
+    invoice,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId,
+    status: 'paid',
+  });
+
+  await assignTenantPlan({
+    tenantId,
+    planCode,
+    actorUserId: ownerUserId,
+    requestId: eventId,
+  });
+
+  await upsertTenantSubscriptionRecord({
+    tenantId,
+    activePlanCode: planCode,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId,
     stripeCheckoutSessionId: null,
-    stripePriceId: invoice.lines.data[0]?.price?.id || null,
-    subscriptionStatus: 'ACTIVE',
-    currentPeriodStart: null,
-    currentPeriodEnd: null,
-    cancelAtPeriodEnd: false,
-    eventId,
-    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
+    stripePriceId: priceId,
+    billingInterval,
+    subscriptionStatus,
+    currentPeriodStart: readPeriodStart(subscription),
+    currentPeriodEnd: readPeriodEnd(subscription),
+    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
+    lastWebhookEventId: eventId,
+    lastInvoiceId: invoice.id,
+    rawLatestEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
   });
 
   console.log(JSON.stringify({
-    event: 'webhook_invoice_paid',
+    event: 'webhook_invoice_payment_succeeded',
     invoiceId: invoice.id,
+    tenantId,
     planCode,
     timestamp: Date.now(),
   }));
 
   await writeBillingAuditLog({
-    eventType: 'billing.invoice_paid',
+    tenantId,
+    userId: ownerUserId,
+    eventType: 'billing.invoice_payment_succeeded',
     planCode,
     stripeCustomerId: invoice.customer,
-    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    stripeSubscriptionId,
+    billingInterval,
     source: 'stripe_webhook',
-    message: 'Invoice paid',
-    payload: rawEvent as unknown as Record<string, unknown> | null,
+    message: 'Invoice payment succeeded; plan synchronized from webhook',
+    payload: {
+      eventId,
+      invoiceId: invoice.id,
+      amountPaid: invoice.amount_paid,
+    },
+  });
+
+  await writeBillingAuditLog({
+    tenantId,
+    userId: ownerUserId,
+    eventType: 'billing.plan_activated',
+    planCode,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId,
+    billingInterval,
+    source: 'stripe_webhook',
+    message: `Plan activated after payment: ${planCode}`,
+    payload: {
+      eventId,
+      invoiceId: invoice.id,
+    },
+  });
+
+  const user = await resolveOrCreateUserFromStripe({
+    stripeCustomerId: invoice.customer,
+    email: typeof invoice.customer_email === 'string' ? invoice.customer_email : null,
   });
 
   await syncLegacySubscriptionForUser({
     userId: user.id,
     stripeCustomerId: invoice.customer,
-    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    stripeSubscriptionId,
     planCode,
     subscriptionStatus: 'active',
-    currentPeriodEnd,
-  })
+    currentPeriodEnd: readPeriodEnd(subscription),
+  });
+
+  await trackConversionEvent({
+    eventName: 'checkout_completed',
+    userId: user.id,
+    tenantId,
+    source: 'stripe_webhook',
+    metadata: {
+      invoiceId: invoice.id,
+      planCode,
+      billingInterval,
+    },
+  });
 }
 
 async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice, rawEvent?: Stripe.Event) {
@@ -985,64 +1258,91 @@ async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice, raw
     throw new Error('Missing Stripe customer in invoice.payment_failed event');
   }
 
-  const user = await resolveOrCreateUserFromStripe({
-    stripeCustomerId: invoice.customer,
-    email: typeof invoice.customer_email === 'string' ? invoice.customer_email : null,
-  })
-
-  let planCode: string | null = null
-  const priceId = invoice.lines.data[0]?.price?.id ?? null
-  if (priceId) {
-    const mapping = [
-      { code: 'starter', env: process.env['STRIPE_PRICE_ID_STARTER'] },
-      { code: 'growth', env: process.env['STRIPE_PRICE_ID_GROWTH'] },
-      { code: 'business', env: process.env['STRIPE_PRICE_ID_BUSINESS'] },
-      { code: 'enterprise', env: process.env['STRIPE_PRICE_ID_ENTERPRISE'] },
-    ].find(x => x.env && x.env === priceId)
-    planCode = mapping?.code ?? null
+  const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
+  const subscription = stripeSubscriptionId
+    ? await getStripeClient().subscriptions.retrieve(stripeSubscriptionId)
+    : null;
+  const tenantId = subscription?.metadata?.tenantId
+    ? parseInt(subscription.metadata.tenantId, 10)
+    : await resolveTenantIdFromStripeCustomer(invoice.customer);
+  if (!tenantId) {
+    throw new Error(`Cannot resolve tenant for Stripe customer ${invoice.customer}`);
   }
 
-  await upsertTenantSubscriptionFromStripe({
-    tenantId: null,
-    planCode: null,
+  const ownerUserId = await getTenantOwnerUserId(tenantId);
+  const currentState = await getTenantPlanState(tenantId);
+  const priceId = invoice.lines.data[0]?.price?.id ?? readPriceIdFromSubscription(subscription);
+  const billingInterval = readIntervalFromSubscription(subscription);
+
+  await upsertStripeCustomerMapping({
+    tenantId,
+    userId: ownerUserId,
     stripeCustomerId: invoice.customer,
-    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+  });
+
+  await upsertInvoiceRecord({
+    tenantId,
+    invoice,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId,
+    status: 'payment_failed',
+  });
+
+  await upsertTenantSubscriptionRecord({
+    tenantId,
+    activePlanCode: currentState.plan.code,
+    stripeCustomerId: invoice.customer,
+    stripeSubscriptionId,
     stripeCheckoutSessionId: null,
-    stripePriceId: invoice.lines.data[0]?.price?.id || null,
-    subscriptionStatus: 'PAST_DUE',
-    currentPeriodStart: null,
-    currentPeriodEnd: null,
-    cancelAtPeriodEnd: false,
-    eventId,
-    rawEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
+    stripePriceId: priceId,
+    billingInterval,
+    subscriptionStatus: 'past_due',
+    currentPeriodStart: readPeriodStart(subscription),
+    currentPeriodEnd: readPeriodEnd(subscription),
+    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
+    lastWebhookEventId: eventId,
+    lastInvoiceId: invoice.id,
+    rawLatestEventJson: rawEvent as unknown as Record<string, unknown> | undefined,
   });
 
   console.log(JSON.stringify({
     event: 'webhook_invoice_payment_failed',
     invoiceId: invoice.id,
-    planCode,
+    tenantId,
+    planCode: currentState.plan.code,
     gracePeriod: true,
     timestamp: Date.now(),
   }));
 
   await writeBillingAuditLog({
+    tenantId,
+    userId: ownerUserId,
     eventType: 'billing.payment_failed',
-    planCode,
+    planCode: currentState.plan.code,
     stripeCustomerId: invoice.customer,
-    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    stripeSubscriptionId,
+    billingInterval,
     source: 'stripe_webhook',
-    message: 'Invoice payment failed',
-    payload: rawEvent as unknown as Record<string, unknown> | null,
+    message: 'Invoice payment failed; active plan unchanged',
+    payload: {
+      eventId,
+      invoiceId: invoice.id,
+    },
+  });
+
+  const user = await resolveOrCreateUserFromStripe({
+    stripeCustomerId: invoice.customer,
+    email: typeof invoice.customer_email === 'string' ? invoice.customer_email : null,
   });
 
   await syncLegacySubscriptionForUser({
     userId: user.id,
     stripeCustomerId: invoice.customer,
-    stripeSubscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
-    planCode,
+    stripeSubscriptionId,
+    planCode: currentState.plan.code,
     subscriptionStatus: 'past_due',
     currentPeriodEnd: null,
-  })
+  });
 
   if (typeof invoice.customer_email === 'string' && invoice.customer_email) {
     await sendProductEmail({
@@ -1051,7 +1351,7 @@ async function handleInvoiceFailed(eventId: string, invoice: Stripe.Invoice, raw
       subject: 'Payment failed - action required',
       payload: {
         invoiceId: invoice.id,
-        planCode,
+        planCode: currentState.plan.code,
         stripeCustomerId: invoice.customer,
       },
     });
@@ -1065,8 +1365,8 @@ export async function processStripeWebhookEvent(event: Stripe.Event) {
   try {
     await client.query('BEGIN');
     const insertEvent = await client.query(
-      `INSERT INTO billing_webhook_events (event_id, event_type, status, processed_at, payload_json)
-       VALUES ($1, $2, 'processed', NOW(), $3)
+      `INSERT INTO billing_webhook_events (event_id, event_type, status, payload_json)
+       VALUES ($1, $2, 'processing', $3)
        ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
       [event.id, event.type, JSON.stringify(event)]
     );
@@ -1105,6 +1405,20 @@ export async function processStripeWebhookEvent(event: Stripe.Event) {
       default:
         console.log(JSON.stringify({ event: 'webhook_event_ignored', type: event.type, timestamp: Date.now() }));
         break;
+    }
+
+    const processedClient = await pool.connect();
+    try {
+      await processedClient.query(
+        `UPDATE billing_webhook_events
+         SET status = 'processed',
+             processed_at = NOW(),
+             error_message = NULL
+         WHERE event_id = $1`,
+        [event.id],
+      );
+    } finally {
+      processedClient.release();
     }
 
     return { processed: true, duplicate: false };

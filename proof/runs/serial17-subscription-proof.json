@@ -1,0 +1,99 @@
+{
+  "serial": 17,
+  "timestamp": "2026-04-08T14:16:46.076Z",
+  "proofMode": "pg-mem authenticated route proof",
+  "assertions": {
+    "checkoutSessionCreated": true,
+    "stripeUrlReturned": true,
+    "webhookReceived": true,
+    "signatureVerified": true,
+    "planUpdatedAfterPayment": true,
+    "failedPaymentDidNotUpdatePlan": true,
+    "dbSubscriptionRowExists": true,
+    "billingLogsRecorded": true,
+    "buildPassed": true
+  },
+  "checkout": {
+    "status": 200,
+    "plan_id": "growth",
+    "billing_cycle": "monthly",
+    "session_id": "cs_serial17_proof",
+    "url": "https://checkout.stripe.test/session/cs_serial17_proof"
+  },
+  "signatureChecks": {
+    "invalidSignatureStatus": 400,
+    "validWebhookStatus": 200
+  },
+  "planSnapshots": {
+    "afterPayment": "growth",
+    "afterFailedPayment": "growth",
+    "afterSubscriptionDeleted": "free"
+  },
+  "subscriptionRow": {
+    "tenant_id": 1,
+    "stripe_customer_id": "cus_serial17_proof",
+    "stripe_subscription_id": "sub_serial17_proof",
+    "stripe_checkout_session_id": "cs_serial17_proof",
+    "subscription_status": "past_due",
+    "billing_interval": "monthly",
+    "cancel_at_period_end": true
+  },
+  "invoices": [
+    {
+      "stripe_invoice_id": "in_serial17_paid",
+      "status": "paid",
+      "amount_paid_cents": 19900,
+      "amount_due_cents": 19900
+    },
+    {
+      "stripe_invoice_id": "in_serial17_failed",
+      "status": "payment_failed",
+      "amount_paid_cents": 0,
+      "amount_due_cents": 49900
+    }
+  ],
+  "webhookEvents": [
+    {
+      "event_id": "evt_serial17_checkout_completed",
+      "event_type": "checkout.session.completed",
+      "status": "processed"
+    },
+    {
+      "event_id": "evt_serial17_invoice_paid",
+      "event_type": "invoice.payment_succeeded",
+      "status": "processed"
+    },
+    {
+      "event_id": "evt_serial17_subscription_updated",
+      "event_type": "customer.subscription.updated",
+      "status": "processed"
+    },
+    {
+      "event_id": "evt_serial17_invoice_failed",
+      "event_type": "invoice.payment_failed",
+      "status": "processed"
+    },
+    {
+      "event_id": "evt_serial17_subscription_deleted",
+      "event_type": "customer.subscription.deleted",
+      "status": "processed"
+    }
+  ],
+  "auditLogEvents": [
+    "plan_assigned",
+    "billing.checkout_created",
+    "billing.checkout_completed",
+    "plan_upgraded",
+    "billing.invoice_payment_succeeded",
+    "billing.plan_activated",
+    "billing.subscription_updated",
+    "billing.payment_failed",
+    "plan_downgraded",
+    "plan_canceled",
+    "billing.plan_downgraded"
+  ],
+  "build": {
+    "backend": "npm --prefix apps/backend run build -> passed",
+    "webDashboard": "npm --prefix apps/web-dashboard run build -> passed"
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AppShell, PageContent } from '@/components/layout/AppShell'
@@ -185,7 +185,7 @@ function PlanCard({
             (!canManageBilling || isLoading) && 'cursor-not-allowed opacity-60',
           )}
         >
-          {isLoading ? 'Applying plan…' : !canManageBilling ? 'Owner/Admin required' : isFree ? 'Downgrade to Free' : `Upgrade to ${plan.name}`}
+          {isLoading ? 'Redirecting…' : !canManageBilling ? 'Owner/Admin required' : isFree ? 'Schedule Free Downgrade' : `Checkout ${plan.name}`}
         </button>
       )}
     </div>
@@ -196,6 +196,19 @@ export default function BillingPage() {
   const [billingCycle, setCycle] = useState<'monthly' | 'annual'>('monthly')
   const [notice, setNotice] = useState<NoticeState | null>(null)
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const paymentState = params.get('payment')
+
+    if (paymentState === 'success') {
+      setNotice({ tone: 'success', message: 'Stripe checkout completed. Plan activation follows webhook confirmation after payment succeeds.' })
+      queryClient.invalidateQueries({ queryKey: ['plans'] })
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
+    } else if (paymentState === 'cancelled') {
+      setNotice({ tone: 'error', message: 'Stripe checkout was cancelled before payment completion.' })
+    }
+  }, [queryClient])
 
   const plansQuery = useQuery({
     queryKey: ['plans', 'catalog'],
@@ -209,27 +222,30 @@ export default function BillingPage() {
     staleTime: 60_000,
   })
 
-  const upgradeMutation = useMutation({
-    mutationFn: (planCode: string) => api.plans.upgrade(planCode),
-    onSuccess: (state) => {
-      setNotice({ tone: 'success', message: `Plan updated to ${state.plan.name}.` })
-      queryClient.invalidateQueries({ queryKey: ['plans'] })
-      queryClient.invalidateQueries({ queryKey: ['billing'] })
+  const checkoutMutation = useMutation({
+    mutationFn: ({ planCode, nextBillingCycle }: { planCode: string; nextBillingCycle: 'monthly' | 'annual' }) => api.billing.checkout(planCode, nextBillingCycle),
+    onSuccess: (checkout) => {
+      if (!checkout.url) {
+        setNotice({ tone: 'error', message: 'Stripe checkout URL was not returned.' })
+        return
+      }
+
+      window.location.assign(checkout.url)
     },
     onError: (error: unknown) => {
-      setNotice({ tone: 'error', message: error instanceof ApiError ? error.message : 'Unable to update the plan.' })
+      setNotice({ tone: 'error', message: error instanceof ApiError ? error.message : 'Unable to start Stripe checkout.' })
     },
   })
 
   const cancelMutation = useMutation({
     mutationFn: () => api.plans.cancel(),
     onSuccess: () => {
-      setNotice({ tone: 'success', message: 'Plan downgraded to Free.' })
+      setNotice({ tone: 'success', message: 'Cancellation scheduled. Your current plan stays active until Stripe confirms the subscription ends.' })
       queryClient.invalidateQueries({ queryKey: ['plans'] })
       queryClient.invalidateQueries({ queryKey: ['billing'] })
     },
     onError: (error: unknown) => {
-      setNotice({ tone: 'error', message: error instanceof ApiError ? error.message : 'Unable to downgrade the plan.' })
+      setNotice({ tone: 'error', message: error instanceof ApiError ? error.message : 'Unable to schedule cancellation.' })
     },
   })
 
@@ -243,7 +259,7 @@ export default function BillingPage() {
       return
     }
 
-    upgradeMutation.mutate(nextPlanCode)
+    checkoutMutation.mutate({ planCode: nextPlanCode, nextBillingCycle: billingCycle })
   }
 
   return (
@@ -291,11 +307,11 @@ export default function BillingPage() {
 
               <div className="flex flex-col gap-2">
                 <Button variant="outline" size="sm" icon={CreditCard} disabled>
-                  Backend-bound plan state
+                  Webhook-authoritative billing
                 </Button>
                 {currentPlan?.canManageBilling && planCode !== 'free' && (
                   <Button variant="ghost" size="sm" onClick={() => cancelMutation.mutate()} loading={cancelMutation.isPending}>
-                    Downgrade to Free
+                    Schedule Free Downgrade
                   </Button>
                 )}
               </div>
@@ -366,7 +382,7 @@ export default function BillingPage() {
                 currentPlanCode={planCode}
                 billingCycle={billingCycle}
                 canManageBilling={Boolean(currentPlan?.canManageBilling)}
-                activePlanCode={upgradeMutation.isPending ? upgradeMutation.variables ?? null : cancelMutation.isPending ? 'free' : null}
+                activePlanCode={checkoutMutation.isPending ? checkoutMutation.variables?.planCode ?? null : cancelMutation.isPending ? 'free' : null}
                 onSelect={handleSelect}
               />
             ))}

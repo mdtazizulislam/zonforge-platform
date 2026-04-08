@@ -1,8 +1,34 @@
-import { Pool, Client } from 'pg';
+import { Pool as PgPool, Client as PgClient } from 'pg';
+import { newDb, DataType } from 'pg-mem';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+type PoolLike = InstanceType<typeof PgPool>;
+type ClientLike = InstanceType<typeof PgClient>;
+
+const usePgMem = process.env.ZONFORGE_USE_PGMEM === '1';
+
+let pool: PoolLike;
+let createClient: () => ClientLike;
+
+if (usePgMem) {
+  const memoryDb = newDb({ autoCreateForeignKeyIndices: true });
+  memoryDb.public.registerFunction({
+    name: 'nullif',
+    args: [DataType.text, DataType.text],
+    returns: DataType.text,
+    implementation: (left: string | null, right: string | null) => (left === right ? null : left),
+  });
+  const adapter = memoryDb.adapters.createPg();
+
+  pool = new adapter.Pool() as PoolLike;
+  createClient = () => new adapter.Client() as ClientLike;
+} else {
+  pool = new PgPool({
+    connectionString: process.env.DATABASE_URL,
+  });
+  createClient = () => new PgClient({
+    connectionString: process.env.DATABASE_URL,
+  });
+}
 
 export type UserWorkspaceContext = {
   user: {
@@ -28,9 +54,7 @@ export type UserWorkspaceContext = {
 };
 
 export async function initDatabase() {
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-  });
+  const client = createClient();
 
   try {
     await client.connect();
@@ -143,15 +167,36 @@ export async function initDatabase() {
       ALTER COLUMN plan SET DEFAULT 'free'
     `);
 
-    await client.query(`
-      UPDATE tenants
-      SET slug = CONCAT(
-        TRIM(BOTH '-' FROM REGEXP_REPLACE(LOWER(COALESCE(name, 'workspace')), '[^a-z0-9]+', '-', 'g')),
-        '-',
-        id
-      )
-      WHERE slug IS NULL OR slug = ''
-    `);
+    if (usePgMem) {
+      const tenantRows = await client.query(
+        `SELECT id, name
+         FROM tenants
+         WHERE slug IS NULL OR slug = ''`,
+      );
+
+      for (const row of tenantRows.rows) {
+        const baseName = String(row.name ?? 'workspace')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '') || 'workspace';
+        await client.query(
+          `UPDATE tenants
+           SET slug = $1
+           WHERE id = $2`,
+          [`${baseName}-${row.id}`, row.id],
+        );
+      }
+    } else {
+      await client.query(`
+        UPDATE tenants
+        SET slug = CONCAT(
+          TRIM(BOTH '-' FROM REGEXP_REPLACE(LOWER(COALESCE(name, 'workspace')), '[^a-z0-9]+', '-', 'g')),
+          '-',
+          id
+        )
+        WHERE slug IS NULL OR slug = ''
+      `);
+    }
 
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS ux_tenants_slug
@@ -381,6 +426,27 @@ export async function initDatabase() {
         message TEXT,
         payload_json JSONB,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id BIGSERIAL PRIMARY KEY,
+        tenant_id INTEGER REFERENCES tenants(id) ON DELETE SET NULL,
+        stripe_invoice_id VARCHAR(255) NOT NULL UNIQUE,
+        stripe_customer_id VARCHAR(255),
+        stripe_subscription_id VARCHAR(255),
+        status VARCHAR(64) NOT NULL,
+        amount_due_cents INTEGER,
+        amount_paid_cents INTEGER,
+        currency VARCHAR(16),
+        billing_reason VARCHAR(64),
+        invoice_pdf_url TEXT,
+        paid_at TIMESTAMPTZ,
+        due_at TIMESTAMPTZ,
+        payload_json JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
 
@@ -1411,6 +1477,9 @@ export async function initDatabase() {
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_webhook_events_type ON billing_webhook_events(event_type)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_tenant ON billing_audit_logs(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_billing_audit_logs_event_type ON billing_audit_logs(event_type, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_invoices_tenant ON invoices(tenant_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_invoices_subscription ON invoices(stripe_subscription_id, created_at DESC)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS ix_invoices_status ON invoices(status, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_user_sessions_user ON user_sessions(user_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_user_sessions_tenant ON user_sessions(tenant_id, created_at DESC)`);
     await client.query(`CREATE INDEX IF NOT EXISTS ix_user_sessions_active ON user_sessions(user_id, tenant_id, revoked_at)`);
@@ -1592,60 +1661,151 @@ export async function initDatabase() {
       );
     }
 
-    await client.query(`
-      UPDATE tenants t
-      SET current_plan_id = COALESCE(
-            t.current_plan_id,
-            (SELECT ts.plan_id FROM tenant_subscriptions ts WHERE ts.tenant_id = t.id LIMIT 1),
-            (SELECT p.id FROM plans p WHERE p.code = LOWER(COALESCE(t.plan, '')) LIMIT 1),
-            (SELECT p.id FROM plans p WHERE p.code = 'free' LIMIT 1)
-          ),
-          plan = COALESCE(
-            (SELECT p.code FROM plans p WHERE p.id = COALESCE(
-              t.current_plan_id,
-              (SELECT ts.plan_id FROM tenant_subscriptions ts WHERE ts.tenant_id = t.id LIMIT 1)
-            ) LIMIT 1),
-            (SELECT p.code FROM plans p WHERE p.code = LOWER(COALESCE(t.plan, '')) LIMIT 1),
-            'free'
-          ),
-          updated_at = NOW()
-      WHERE t.current_plan_id IS NULL
-         OR t.plan IS NULL
-         OR t.plan = ''
-         OR t.plan = 'starter'
-    `);
+    if (usePgMem) {
+      const freePlan = await client.query(`SELECT id, code FROM plans WHERE code = 'free' LIMIT 1`);
+      const tenants = await client.query(
+        `SELECT id, plan, current_plan_id
+         FROM tenants`,
+      );
 
-    await client.query(`
-      INSERT INTO tenant_plans (
-        tenant_id,
-        plan_id,
-        status,
-        started_at,
-        created_at,
-        updated_at
-      )
-      SELECT
-        t.id,
-        COALESCE(t.current_plan_id, free_plan.id),
-        CASE
-          WHEN LOWER(COALESCE(ts.subscription_status, '')) = 'trialing' THEN 'trial'
-          WHEN LOWER(COALESCE(ts.subscription_status, '')) IN ('canceled', 'cancelled') THEN 'canceled'
-          ELSE 'active'
-        END,
-        COALESCE(ts.current_period_start, t.created_at, NOW()),
-        NOW(),
-        NOW()
-      FROM tenants t
-      JOIN plans free_plan ON free_plan.code = 'free'
-      LEFT JOIN tenant_subscriptions ts ON ts.tenant_id = t.id
-      LEFT JOIN LATERAL (
-        SELECT tp.id
-        FROM tenant_plans tp
-        WHERE tp.tenant_id = t.id
-        LIMIT 1
-      ) existing ON TRUE
-      WHERE existing.id IS NULL
-    `);
+      for (const tenantRow of tenants.rows) {
+        const subscriptionPlan = await client.query(
+          `SELECT plan_id
+           FROM tenant_subscriptions
+           WHERE tenant_id = $1
+           LIMIT 1`,
+          [tenantRow.id],
+        );
+        const planByCode = await client.query(
+          `SELECT id, code
+           FROM plans
+           WHERE code = $1
+           LIMIT 1`,
+          [String(tenantRow.plan ?? '').toLowerCase()],
+        );
+        const nextPlanId = tenantRow.current_plan_id
+          ?? subscriptionPlan.rows[0]?.plan_id
+          ?? planByCode.rows[0]?.id
+          ?? freePlan.rows[0]?.id;
+        const nextPlanCode = planByCode.rows[0]?.code ?? freePlan.rows[0]?.code ?? 'free';
+
+        await client.query(
+          `UPDATE tenants
+           SET current_plan_id = $1,
+               plan = $2,
+               updated_at = NOW()
+           WHERE id = $3`,
+          [nextPlanId, nextPlanCode, tenantRow.id],
+        );
+      }
+    } else {
+      await client.query(`
+        UPDATE tenants t
+        SET current_plan_id = COALESCE(
+              t.current_plan_id,
+              (SELECT ts.plan_id FROM tenant_subscriptions ts WHERE ts.tenant_id = t.id LIMIT 1),
+              (SELECT p.id FROM plans p WHERE p.code = LOWER(COALESCE(t.plan, '')) LIMIT 1),
+              (SELECT p.id FROM plans p WHERE p.code = 'free' LIMIT 1)
+            ),
+            plan = COALESCE(
+              (SELECT p.code FROM plans p WHERE p.id = COALESCE(
+                t.current_plan_id,
+                (SELECT ts.plan_id FROM tenant_subscriptions ts WHERE ts.tenant_id = t.id LIMIT 1)
+              ) LIMIT 1),
+              (SELECT p.code FROM plans p WHERE p.code = LOWER(COALESCE(t.plan, '')) LIMIT 1),
+              'free'
+            ),
+            updated_at = NOW()
+        WHERE t.current_plan_id IS NULL
+           OR t.plan IS NULL
+           OR t.plan = ''
+           OR t.plan = 'starter'
+      `);
+    }
+
+    if (usePgMem) {
+      const freePlan = await client.query(`SELECT id FROM plans WHERE code = 'free' LIMIT 1`);
+      const tenants = await client.query(
+        `SELECT id, current_plan_id, created_at
+         FROM tenants`,
+      );
+
+      for (const tenantRow of tenants.rows) {
+        const existingPlan = await client.query(
+          `SELECT id
+           FROM tenant_plans
+           WHERE tenant_id = $1
+           LIMIT 1`,
+          [tenantRow.id],
+        );
+        if (existingPlan.rows[0]?.id) {
+          continue;
+        }
+
+        const subscription = await client.query(
+          `SELECT subscription_status, current_period_start
+           FROM tenant_subscriptions
+           WHERE tenant_id = $1
+           LIMIT 1`,
+          [tenantRow.id],
+        );
+        const subscriptionStatus = String(subscription.rows[0]?.subscription_status ?? '').toLowerCase();
+        const nextStatus = subscriptionStatus === 'trialing'
+          ? 'trial'
+          : subscriptionStatus === 'canceled' || subscriptionStatus === 'cancelled'
+            ? 'canceled'
+            : 'active';
+
+        await client.query(
+          `INSERT INTO tenant_plans (
+            tenant_id,
+            plan_id,
+            status,
+            started_at,
+            created_at,
+            updated_at
+          ) VALUES ($1,$2,$3,$4,NOW(),NOW())`,
+          [
+            tenantRow.id,
+            tenantRow.current_plan_id ?? freePlan.rows[0]?.id,
+            nextStatus,
+            subscription.rows[0]?.current_period_start ?? tenantRow.created_at ?? new Date(),
+          ],
+        );
+      }
+    } else {
+      await client.query(`
+        INSERT INTO tenant_plans (
+          tenant_id,
+          plan_id,
+          status,
+          started_at,
+          created_at,
+          updated_at
+        )
+        SELECT
+          t.id,
+          COALESCE(t.current_plan_id, free_plan.id),
+          CASE
+            WHEN LOWER(COALESCE(ts.subscription_status, '')) = 'trialing' THEN 'trial'
+            WHEN LOWER(COALESCE(ts.subscription_status, '')) IN ('canceled', 'cancelled') THEN 'canceled'
+            ELSE 'active'
+          END,
+          COALESCE(ts.current_period_start, t.created_at, NOW()),
+          NOW(),
+          NOW()
+        FROM tenants t
+        JOIN plans free_plan ON free_plan.code = 'free'
+        LEFT JOIN tenant_subscriptions ts ON ts.tenant_id = t.id
+        LEFT JOIN LATERAL (
+          SELECT tp.id
+          FROM tenant_plans tp
+          WHERE tp.tenant_id = t.id
+          LIMIT 1
+        ) existing ON TRUE
+        WHERE existing.id IS NULL
+      `);
+    }
 
     console.log('✓ Default plans seeded.');
     await client.end();
@@ -1700,6 +1860,95 @@ export async function getTenantById(tenantId: number) {
 }
 
 export async function getUserWorkspaceContext(userId: number): Promise<UserWorkspaceContext | null> {
+  if (process.env.ZONFORGE_USE_PGMEM === '1') {
+    const membershipResult = await pool.query(
+      `SELECT
+         u.id AS user_id,
+         u.email,
+         u.full_name,
+         u.status AS user_status,
+         COALESCE(u.email_verified, u.email_verified_at IS NOT NULL, false) AS email_verified,
+         t.id AS tenant_id,
+         t.name AS tenant_name,
+         t.slug AS tenant_slug,
+         cp.code AS current_plan_code,
+         t.plan AS tenant_plan,
+         t.onboarding_status,
+         t.onboarding_started_at,
+         t.onboarding_completed_at,
+         tm.id AS membership_id,
+         tm.role AS membership_role
+       FROM users u
+       JOIN tenant_memberships tm ON tm.user_id = u.id
+       JOIN tenants t ON t.id = tm.tenant_id
+       LEFT JOIN plans cp ON cp.id = t.current_plan_id
+       WHERE u.id = $1
+       ORDER BY tm.created_at ASC, tm.id ASC
+       LIMIT 1`,
+      [userId],
+    );
+
+    const membershipRow = membershipResult.rows[0] as {
+      user_id?: number;
+      email?: string;
+      full_name?: string | null;
+      user_status?: string | null;
+      email_verified?: boolean;
+      tenant_id?: number;
+      tenant_name?: string;
+      tenant_slug?: string | null;
+      current_plan_code?: string | null;
+      tenant_plan?: string | null;
+      onboarding_status?: string | null;
+      onboarding_started_at?: string | Date | null;
+      onboarding_completed_at?: string | Date | null;
+      membership_id?: number;
+      membership_role?: string | null;
+    } | undefined;
+
+    if (!membershipRow?.tenant_id || !membershipRow.email || !membershipRow.tenant_name) {
+      return null;
+    }
+
+    const fallbackPlan = await pool.query(
+      `SELECT p.code
+       FROM tenant_plans tp
+       JOIN plans p ON p.id = tp.plan_id
+       WHERE tp.tenant_id = $1
+       ORDER BY
+         CASE tp.status WHEN 'active' THEN 0 WHEN 'trial' THEN 1 ELSE 2 END,
+         tp.started_at DESC,
+         tp.id DESC
+       LIMIT 1`,
+      [membershipRow.tenant_id],
+    );
+
+    return {
+      user: {
+        id: Number(membershipRow.user_id),
+        email: membershipRow.email,
+        fullName: membershipRow.full_name ?? null,
+        status: membershipRow.user_status ?? null,
+        emailVerified: Boolean(membershipRow.email_verified),
+      },
+      tenant: {
+        id: Number(membershipRow.tenant_id),
+        name: membershipRow.tenant_name,
+        slug: membershipRow.tenant_slug ?? null,
+        plan: membershipRow.current_plan_code ?? fallbackPlan.rows[0]?.code ?? membershipRow.tenant_plan ?? 'free',
+        onboardingStatus: membershipRow.onboarding_status ?? null,
+        onboardingStartedAt: membershipRow.onboarding_started_at ?? null,
+        onboardingCompletedAt: membershipRow.onboarding_completed_at ?? null,
+      },
+      membership: membershipRow.membership_id
+        ? {
+            id: Number(membershipRow.membership_id),
+            role: membershipRow.membership_role ?? 'member',
+          }
+        : null,
+    };
+  }
+
   const membershipResult = await pool.query(
     `SELECT
        u.id AS user_id,

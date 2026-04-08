@@ -49,6 +49,7 @@ import {
   type TenantPlanState,
 } from './billing/tenantPlans.js';
 import { requirePlanFeature, requirePlanLimit, UpgradeRequiredError } from './billing/enforcement.js';
+import { cancelTenantSubscription } from './stripe.js';
 
 type OnboardingStepDefinition = {
   stepKey: 'welcome' | 'connect_environment' | 'first_scan';
@@ -2184,14 +2185,16 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
       return sendError(c, 400, 'invalid_plan_code', 'planCode must be starter, growth, business, or enterprise');
     }
 
-    const state = await assignTenantPlan({
-      tenantId: access.tenantId,
-      planCode: nextCode,
-      actorUserId: access.userId,
-      requestId: getRequestId(c),
-    });
-
-    return c.json(serializePlanState(state, access.membershipRole));
+    return sendError(
+      c,
+      409,
+      'billing_checkout_required',
+      'Direct plan upgrades are disabled. Use POST /v1/billing/checkout and wait for Stripe webhook confirmation.',
+      {
+        checkout_path: '/v1/billing/checkout',
+        requested_plan: nextCode,
+      },
+    );
   });
 
   router.post('/v1/plan/cancel', async (c) => {
@@ -2201,13 +2204,18 @@ export function createCustomerSecurityRouter(requireAuthUserId?: (c: any) => Pro
     const denied = await requireRole(c, access, TEAM_MANAGERS, 'Only owners and admins can cancel paid plans.', 'plan.cancel');
     if (denied) return denied;
 
-    const state = await cancelTenantPlan({
-      tenantId: access.tenantId,
-      actorUserId: access.userId,
-      requestId: getRequestId(c),
-    });
+    const currentState = await getTenantPlanState(access.tenantId);
+    if (currentState.plan.code === 'free') {
+      return c.json(serializePlanState(currentState, access.membershipRole));
+    }
 
-    return c.json(serializePlanState(state, access.membershipRole));
+    const billing = await cancelTenantSubscription(access.tenantId);
+    return c.json({
+      ...serializePlanState(currentState, access.membershipRole),
+      cancellationScheduled: true,
+      subscriptionStatus: billing?.subscriptionStatus ?? 'cancel_scheduled',
+      cancelAtPeriodEnd: billing?.cancelAtPeriodEnd ?? true,
+    });
   });
 
   router.get('/v1/team/members', async (c) => {

@@ -363,6 +363,78 @@ async function upsertLegacyTenantSubscription(clientLike: { query: typeof getPoo
 
 async function queryTenantPlanRow(tenantId: number): Promise<TenantPlanRow | null> {
   const pool = getPool();
+
+  if (process.env.ZONFORGE_USE_PGMEM === '1') {
+    const tenantResult = await pool.query(
+      `SELECT id, current_plan_id
+       FROM tenants
+       WHERE id = $1
+       LIMIT 1`,
+      [tenantId],
+    );
+    const tenantRow = tenantResult.rows[0];
+    if (!tenantRow) {
+      return null;
+    }
+
+    const planStateResult = await pool.query(
+      `SELECT plan_id, status, started_at, expires_at
+       FROM tenant_plans
+       WHERE tenant_id = $1
+       ORDER BY
+         CASE status WHEN 'active' THEN 0 WHEN 'trial' THEN 1 ELSE 2 END,
+         started_at DESC,
+         id DESC
+       LIMIT 1`,
+      [tenantId],
+    );
+    const activePlan = planStateResult.rows[0];
+    const planId = tenantRow.current_plan_id ?? activePlan?.plan_id ?? null;
+    if (!planId) {
+      return null;
+    }
+
+    const planResult = await pool.query(
+      `SELECT
+         id AS plan_id,
+         code AS plan_code,
+         name AS plan_name,
+         price_monthly,
+         max_connectors,
+         max_identities,
+         events_per_minute,
+         retention_days,
+         features_json,
+         is_active
+       FROM plans
+       WHERE id = $1
+       LIMIT 1`,
+      [planId],
+    );
+
+    const plan = planResult.rows[0];
+    if (!plan) {
+      return null;
+    }
+
+    return {
+      tenant_id: tenantId,
+      plan_status: activePlan?.status ?? 'active',
+      started_at: activePlan?.started_at ?? null,
+      expires_at: activePlan?.expires_at ?? null,
+      plan_id: Number(plan.plan_id),
+      plan_code: plan.plan_code,
+      plan_name: plan.plan_name,
+      price_monthly: plan.price_monthly,
+      max_connectors: plan.max_connectors,
+      max_identities: plan.max_identities,
+      events_per_minute: plan.events_per_minute,
+      retention_days: plan.retention_days,
+      features_json: plan.features_json,
+      is_active: plan.is_active,
+    } as TenantPlanRow;
+  }
+
   const result = await pool.query(
     `SELECT
        t.id AS tenant_id,

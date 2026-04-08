@@ -23,7 +23,6 @@ import {
   createCheckoutSessionForTenant,
   getTenantBillingStatus,
   createBillingPortalSession,
-  changeTenantPlan,
   cancelTenantSubscription,
   processStripeWebhookEvent,
   validateStripeEnvOrThrow,
@@ -376,7 +375,7 @@ async function handleCheckoutRequest(c: any) {
   assertCheckoutNotSpam(userId, `${planId}:${billingCycle}`);
 
   if (planId === 'starter') {
-    return sendError(c, 400, 'starter_checkout_forbidden', 'Starter plan does not require checkout');
+    // Starter is a paid plan and must go through Stripe checkout.
   }
 
   if (planId === 'enterprise' || planId === 'mssp') {
@@ -386,8 +385,8 @@ async function handleCheckoutRequest(c: any) {
   const origin = resolveFrontendOrigin(c);
   const checkout = await createCheckoutSessionForTenant(tenantId, planId, {
     billingInterval: billingCycle,
-    successUrl: `${origin}/dashboard?payment=success`,
-    cancelUrl: `${origin}/pricing?payment=cancelled`,
+    successUrl: `${origin}/billing?payment=success`,
+    cancelUrl: `${origin}/billing?payment=cancelled`,
     actorUserId: userId,
     source: 'api_checkout',
   });
@@ -1157,16 +1156,21 @@ app.get(`${API_PREFIX}/billing/subscription`, async (c) => {
     const tenantId = await getTenantIdForUser(userId);
     if (!tenantId) return sendError(c, 400, 'tenant_missing', 'User has no associated tenant');
     const state = await getTenantPlanState(tenantId);
+    const billing = await getTenantBillingStatus(tenantId);
     return c.json({
       subscription: {
         tenantId: String(state.tenantId),
         planCode: state.plan.code,
         planName: state.plan.name,
         planTier: state.plan.code,
-        status: state.status,
-        currentPeriodStart: state.startedAt,
-        currentPeriodEnd: state.expiresAt,
-        cancelAtPeriodEnd: false,
+        status: billing?.subscriptionStatus ?? state.status,
+        billingInterval: billing?.billingInterval ?? null,
+        currentPeriodStart: billing?.currentPeriodStart ?? state.startedAt,
+        currentPeriodEnd: billing?.currentPeriodEnd ?? state.expiresAt,
+        cancelAtPeriodEnd: billing?.cancelAtPeriodEnd ?? false,
+        stripeCustomerId: billing?.stripeCustomerId ?? null,
+        stripeSubscriptionId: billing?.stripeSubscriptionId ?? null,
+        stripeCheckoutSessionId: billing?.stripeCheckoutSessionId ?? null,
         limits: state.limits,
       },
       eligible_for_checkout: state.plan.code !== 'enterprise',
@@ -1271,20 +1275,12 @@ app.post(`${API_PREFIX}/billing/portal`, async (c) => {
 
 app.post(`${API_PREFIX}/billing/change-plan`, async (c) => {
   try {
-    const access = await requireTenantContext(c);
-    if (access instanceof Response) return access;
-    if (access.membershipRole !== 'owner' && access.membershipRole !== 'admin') {
-      return sendError(c, 403, 'forbidden', 'Only owners and admins can change plans.');
-    }
-
-    const body = await c.req.json();
-    const planCode = typeof body.planCode === 'string' ? body.planCode : body.plan_id;
-    const updated = await assignTenantPlan({
-      tenantId: access.tenantId,
-      planCode,
-      actorUserId: access.userId,
-    });
-    return c.json({ billing: updated });
+    return sendError(
+      c,
+      409,
+      'billing_checkout_required',
+      'Direct plan changes are disabled. Use POST /v1/billing/checkout and wait for Stripe webhook confirmation.',
+    );
   } catch (error) {
     const normalized = normalizeAppError(error);
     return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
@@ -1299,11 +1295,8 @@ app.post(`${API_PREFIX}/billing/cancel`, async (c) => {
       return sendError(c, 403, 'forbidden', 'Only owners and admins can cancel paid plans.');
     }
 
-    const cancelled = await cancelTenantPlanState({
-      tenantId: access.tenantId,
-      actorUserId: access.userId,
-    });
-    return c.json({ billing: cancelled });
+    const cancelled = await cancelTenantSubscription(access.tenantId);
+    return c.json({ billing: cancelled, cancellationScheduled: true });
   } catch (error) {
     const normalized = normalizeAppError(error);
     return sendError(c, normalized.status, normalized.code, normalized.message, normalized.details);
@@ -1397,7 +1390,7 @@ app.post(`${API_PREFIX}/reports/export`, async (c) => {
 });
 
 // Initialize and start
-async function start() {
+export async function start() {
   try {
     await initDatabase();
     await eventPipelineRuntime.start();
@@ -1447,7 +1440,9 @@ export default app;
 export const handler = app.fetch;
 
 // Start server
-start().catch((error) => {
-  console.error('✗ Server failed to start:', error);
-  process.exit(1);
-});
+if (process.env.ZONFORGE_SKIP_SERVER_START !== '1') {
+  start().catch((error) => {
+    console.error('✗ Server failed to start:', error);
+    process.exit(1);
+  });
+}
