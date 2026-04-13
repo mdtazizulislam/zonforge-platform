@@ -1,0 +1,20 @@
+name: ZonForge Auth Setup
+on:
+  workflow_dispatch:
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Auth System
+        run: |
+          mkdir -p packages/auth-utils/src apps/api-gateway/src/{middleware,routes/auth,db} apps/web-dashboard/src/{store,api,router,layouts,pages/auth}
+          echo "Setup started"
+      - name: Commit
+        run: |
+          git config user.name "ZonForge Bot"
+          git config user.email "bot@zonforge.dev"
+          git add . && git commit -m "test: workflow active" || echo "Nothing to commit"
+          git push origin main
