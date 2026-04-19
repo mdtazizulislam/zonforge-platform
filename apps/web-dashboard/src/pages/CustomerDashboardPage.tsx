@@ -655,7 +655,7 @@ export default function CustomerDashboardPage() {
                     <span>Billing status</span>
                     <strong>
                       {billingQuery.data?.subscription
-                        ? `${billingQuery.data.subscription.planName} • ${formatLabel(billingQuery.data.subscription.status, 'Unknown')}`
+                        ? `${billingQuery.data.subscription.planName ?? billingQuery.data.subscription.planTier ?? 'No active plan'} • ${formatLabel(billingQuery.data.subscription.status, 'Unknown')}`
                         : 'Loading billing status'}
                     </strong>
                   </div>
