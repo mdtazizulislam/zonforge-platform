@@ -532,7 +532,7 @@ function buildPrimaryAction({
 
   if (connectors.length === 0) {
     return {
-      href: '/connectors',
+      href: '/app/connectors',
       label: 'Connect your first source',
       helper: 'Add a production connector so alerts, investigations, and posture data can begin flowing.',
     }
@@ -540,14 +540,14 @@ function buildPrimaryAction({
 
   if (canManageBilling && subscription && ['starter', 'free'].includes(lower(subscription.planCode))) {
     return {
-      href: '/billing',
+      href: '/app/billing',
       label: 'Review upgrade options',
       helper: 'Compare plans and upgrade when you need more identities, connectors, or retained data.',
     }
   }
 
   return {
-    href: '/customer-alerts',
+    href: '/app/customer-alerts',
     label: 'Review customer alerts',
     helper: 'Move from posture review into the current alert queue without leaving the customer workspace.',
   }
@@ -677,7 +677,7 @@ export default function CustomerDashboardPage() {
                     {primaryAction.label}
                   </Link>
                   <Link
-                    to="/billing"
+                    to="/app/billing"
                     className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
                   >
                     Open billing
@@ -786,7 +786,7 @@ export default function CustomerDashboardPage() {
                       {primaryAction.label}
                     </Link>
                     <Link
-                      to="/billing"
+                      to="/app/billing"
                       className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
                     >
                       Open billing

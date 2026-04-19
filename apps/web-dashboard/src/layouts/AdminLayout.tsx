@@ -1,5 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { apiClient } from "../api/client";
 
@@ -24,93 +23,88 @@ const navItems = [
 export default function AdminLayout() {
   const { user, clearAuth } = useAuthStore();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const location = useLocation();
+
+  const currentSection = [...navItems]
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((item) => ((item as any).end ? location.pathname === item.path : location.pathname.startsWith(item.path)))?.label ?? "Admin Workspace";
+
+  const initials = (user?.name ?? "Admin User")
+    .split(" ")
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const handleLogout = async () => {
-    await apiClient.post("/auth/logout");
-    clearAuth();
-    navigate("/login");
+    try {
+      await apiClient.post("/auth/logout");
+    } finally {
+      clearAuth();
+      navigate("/login");
+    }
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-white overflow-hidden">
-      <aside className={`${sidebarOpen ? "w-64" : "w-16"} transition-all duration-300 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0`}>
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800 min-h-[64px]">
-          <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg shadow-teal-600/30">
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          {sidebarOpen && (
-            <div className="overflow-hidden">
-              <p className="font-bold text-white text-sm">Admin Panel</p>
-              <p className="text-teal-400 text-xs truncate">{user?.email}</p>
+    <div className="zf-customer-page">
+      <aside className="zf-customer-sidebar">
+        <div>
+          <div className="zf-customer-sidebar__brand">
+            <div className="zf-customer-sidebar__logo">ZA</div>
+            <div>
+              <p className="zf-customer-sidebar__eyebrow">Tenant Admin</p>
+              <p className="zf-customer-sidebar__title">Admin Workspace</p>
             </div>
-          )}
+          </div>
+
+          <nav className="zf-customer-sidebar__nav">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={(item as any).end}
+                className={({ isActive }) => `zf-customer-navlink${isActive ? " is-active" : ""}`}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" style={{ flexShrink: 0 }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={item.icon} />
+                </svg>
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
         </div>
 
-        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={(item as any).end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium ${
-                  isActive
-                    ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                }`
-              }
-            >
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-              </svg>
-              {sidebarOpen && <span className="truncate">{item.label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="p-3 border-t border-slate-800">
-          {sidebarOpen && (
-            <>
-              <div className="flex items-center gap-3 px-2 py-2 mb-1">
-                <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-                  {user?.name?.charAt(0).toUpperCase() ?? "A"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-                  <p className="text-xs text-slate-400">Tenant Admin</p>
-                </div>
-              </div>
-              <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-900/30 rounded-lg transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Sign out
-              </button>
-            </>
-          )}
+        <div className="zf-customer-sidebar__footer">
+          <p className="zf-customer-sidebar__footnote">{user?.name ?? "Admin User"}</p>
+          <p className="zf-customer-sidebar__subnote">{user?.email ?? "tenant-admin@zonforge.com"}</p>
+          <button type="button" onClick={handleLogout} className="zf-btn-secondary" style={{ width: "100%", marginTop: "12px" }}>
+            Sign out
+          </button>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-shrink-0">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-slate-400 hover:text-white transition-colors"
-            aria-label="Toggle admin navigation"
-            title="Toggle admin navigation"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <span className="text-xs bg-teal-900/50 text-teal-300 px-2.5 py-1 rounded-full font-medium border border-teal-800/50">
-            TENANT ADMIN
-          </span>
+      <div className="zf-customer-main">
+        <header className="zf-customer-header">
+          <div>
+            <p className="zf-customer-header__eyebrow">Tenant Administration</p>
+            <h1 className="zf-customer-header__title">{currentSection}</h1>
+            <p className="zf-customer-header__subtitle">
+              Manage users, connector health, maintenance windows, and workspace operations from one dashboard.
+            </p>
+          </div>
+
+          <div className="zf-customer-header__actions">
+            <div className="zf-customer-user">
+              <div className="zf-customer-user__avatar">{initials}</div>
+              <div>
+                <p className="zf-customer-user__name">{user?.name ?? "Admin User"}</p>
+                <p className="zf-customer-user__role">{user?.email ?? "tenant-admin@zonforge.com"}</p>
+              </div>
+            </div>
+          </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
+
+        <main className="zf-customer-content">
           <Outlet />
         </main>
       </div>

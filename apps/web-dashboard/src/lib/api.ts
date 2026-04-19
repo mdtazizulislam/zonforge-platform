@@ -832,7 +832,7 @@ export const api = {
         ...normalized,
         user,
         invite: payload.invite ? normalizeInvitePreview(payload.invite) : undefined,
-        redirectUrl: String(payload.redirectUrl ?? payload.redirect_url ?? '/customer-dashboard'),
+        redirectUrl: String(payload.redirectUrl ?? payload.redirect_url ?? '/app/customer-dashboard'),
       }
     },
   },

@@ -639,7 +639,7 @@ export default function ConnectorsPage() {
         setNotice({
           tone: 'error',
           text: error.message,
-          upgradeHref: '/billing',
+          upgradeHref: '/app/billing',
         })
       }
       throw error

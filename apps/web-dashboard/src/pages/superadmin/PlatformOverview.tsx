@@ -1,36 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 
-const mockData = {
-  total_tenants: 47,
-  active_tenants: 42,
-  trial_tenants: 8,
-  total_users: 1284,
-  events_today: 2847293,
-  alerts_today: 183,
-  mrr: 38450,
-  arr: 461400,
-  new_this_month: 6,
-  churn_rate: 2.1,
-  pipeline_health: { ingestion_lag_ms: 340, detection_lag_ms: 1820, queue_depth: 142, error_rate: 0.003 },
-  tenants_by_plan: [
-    { plan: "Starter", count: 18, color: "#3b82f6" },
-    { plan: "Growth", count: 14, color: "#0d9488" },
-    { plan: "Business", count: 11, color: "#8b5cf6" },
-    { plan: "Enterprise", count: 4, color: "#f59e0b" },
-  ],
-  recent_tenants: [
-    { id: "1", name: "Acme Corp", plan: "Business", status: "active", created_at: new Date(Date.now() - 86400000).toISOString() },
-    { id: "2", name: "FinTech Labs", plan: "Growth", status: "trial", created_at: new Date(Date.now() - 172800000).toISOString() },
-    { id: "3", name: "HealthCo", plan: "Starter", status: "active", created_at: new Date(Date.now() - 259200000).toISOString() },
-  ],
+const emptyOverview = {
+  total_tenants: 0,
+  active_tenants: 0,
+  trial_tenants: 0,
+  total_users: 0,
+  events_today: 0,
+  alerts_today: 0,
+  mrr: 0,
+  arr: 0,
+  new_this_month: 0,
+  churn_rate: 0,
+  pipeline_health: { ingestion_lag_ms: 0, detection_lag_ms: 0, queue_depth: 0, error_rate: 0 },
+  tenants_by_plan: [],
+  recent_tenants: [],
 };
 
 const healthColor = (val: number, warn: number, crit: number) =>
   val >= crit ? "text-red-400" : val >= warn ? "text-yellow-400" : "text-green-400";
 
 export default function PlatformOverview() {
-  const { data = mockData } = useQuery({
+  const { data = emptyOverview } = useQuery({
     queryKey: ["platform-overview"],
     queryFn: async () => {
       const res = await apiClient.get("/superadmin/overview");
@@ -139,7 +130,7 @@ export default function PlatformOverview() {
         <div className="bg-slate-900 rounded-xl border border-slate-800">
           <div className="p-4 border-b border-slate-800 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-white">Recent Tenants</h2>
-            <a href="/superadmin/tenants" className="text-xs text-red-400 hover:text-red-300">View all →</a>
+            <a href="/app/superadmin/tenants" className="text-xs text-red-400 hover:text-red-300">View all →</a>
           </div>
           <div className="divide-y divide-slate-800">
             {data.recent_tenants.map((t: any) => (

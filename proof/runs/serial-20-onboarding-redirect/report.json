@@ -1,0 +1,52 @@
+{
+  "generatedAt": "2026-04-18T20:27:29.240Z",
+  "baseUrl": "http://localhost:5173/app",
+  "passed": true,
+  "results": [
+    {
+      "scenario": "login-redirect-analyst",
+      "startPath": "/login",
+      "expectedFinalPath": "/app/customer-dashboard",
+      "finalPath": "/app/customer-dashboard",
+      "passed": true,
+      "consoleErrors": [],
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-20-onboarding-redirect\\login-redirect-analyst.png"
+    },
+    {
+      "scenario": "onboarding-completed-analyst",
+      "startPath": "/onboarding",
+      "expectedFinalPath": "/app/customer-dashboard",
+      "finalPath": "/app/customer-dashboard",
+      "passed": true,
+      "consoleErrors": [],
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-20-onboarding-redirect\\onboarding-completed-analyst.png"
+    },
+    {
+      "scenario": "onboarding-completed-admin",
+      "startPath": "/onboarding",
+      "expectedFinalPath": "/app/admin",
+      "finalPath": "/app/admin",
+      "passed": true,
+      "consoleErrors": [],
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-20-onboarding-redirect\\onboarding-completed-admin.png"
+    },
+    {
+      "scenario": "onboarding-completed-superadmin",
+      "startPath": "/onboarding",
+      "expectedFinalPath": "/app/superadmin",
+      "finalPath": "/app/superadmin",
+      "passed": true,
+      "consoleErrors": [],
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-20-onboarding-redirect\\onboarding-completed-superadmin.png"
+    },
+    {
+      "scenario": "pending-onboarding-stays-visible",
+      "startPath": "/onboarding",
+      "expectedFinalPath": "/app/onboarding",
+      "finalPath": "/app/onboarding",
+      "passed": true,
+      "consoleErrors": [],
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-20-onboarding-redirect\\pending-onboarding-stays-visible.png"
+    }
+  ]
+}

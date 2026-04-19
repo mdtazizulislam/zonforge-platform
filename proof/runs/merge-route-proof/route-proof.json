@@ -1,0 +1,87 @@
+{
+  "baseUrl": "http://127.0.0.1:4173",
+  "checkedAt": "2026-04-18T19:02:01.362Z",
+  "runtimeErrorCount": 0,
+  "results": [
+    {
+      "name": "login-redirect",
+      "startPath": "/app/dashboard",
+      "finalUrl": "http://127.0.0.1:4173/app/login",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\01-login.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "customer-dashboard",
+      "startPath": "/app/customer-dashboard",
+      "finalUrl": "http://127.0.0.1:4173/app/customer-dashboard",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\02-customer-dashboard.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "admin-route",
+      "startPath": "/app/admin",
+      "finalUrl": "http://127.0.0.1:4173/app/admin",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\03-admin.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "superadmin-route",
+      "startPath": "/app/superadmin",
+      "finalUrl": "http://127.0.0.1:4173/app/superadmin",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\04-superadmin.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "billing-route",
+      "startPath": "/app/billing",
+      "finalUrl": "http://127.0.0.1:4173/app/billing",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\05-billing.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "forbidden-route",
+      "startPath": "/app/superadmin",
+      "finalUrl": "http://127.0.0.1:4173/app/403",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\06-403.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "not-found-route",
+      "startPath": "/app/does-not-exist",
+      "finalUrl": "http://127.0.0.1:4173/app/404",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\07-404.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "onboarding-redirect",
+      "startPath": "/app/dashboard",
+      "finalUrl": "http://127.0.0.1:4173/app/onboarding",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\merge-route-proof\\08-onboarding.png",
+      "status": "passed",
+      "failure": null,
+      "consoleErrors": [],
+      "pageErrors": []
+    }
+  ]
+}

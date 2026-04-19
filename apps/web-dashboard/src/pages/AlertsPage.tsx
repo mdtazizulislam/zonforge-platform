@@ -50,7 +50,7 @@ export default function AlertsPage() {
       <header className="flex-shrink-0 flex items-center justify-between
                          px-4 py-2.5 border-b border-gray-800 bg-gray-950/95 backdrop-blur z-10">
         <div className="flex items-center gap-3">
-          <Link to="/dashboard"
+          <Link to="/app/customer-dashboard"
             className="p-1.5 rounded hover:bg-gray-800 text-gray-500 hover:text-gray-300 transition-colors">
             <ChevronLeft className="h-4 w-4" />
           </Link>

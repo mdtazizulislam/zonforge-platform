@@ -1364,20 +1364,19 @@ export async function processStripeWebhookEvent(event: Stripe.Event) {
 
   try {
     await client.query('BEGIN');
-    const insertEvent = await client.query(
+    await client.query(
       `INSERT INTO billing_webhook_events (event_id, event_type, status, payload_json)
-       VALUES ($1, $2, 'processing', $3)
-       ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
+       VALUES ($1, $2, 'processing', $3)`,
       [event.id, event.type, JSON.stringify(event)]
     );
-    if (insertEvent.rows.length === 0) {
-      await client.query('ROLLBACK');
-      console.log(JSON.stringify({ event: 'webhook_duplicate_ignored', eventId: event.id, type: event.type, timestamp: Date.now() }));
-      return { processed: false, duplicate: true };
-    }
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
+    const pgError = error as { code?: string };
+    if (pgError.code === '23505') {
+      console.log(JSON.stringify({ event: 'webhook_duplicate_ignored', eventId: event.id, type: event.type, timestamp: Date.now() }));
+      return { processed: false, duplicate: true };
+    }
     throw error;
   } finally {
     client.release();

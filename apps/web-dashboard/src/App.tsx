@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouterProvider, Navigate, useLocation, Link } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Suspense, lazy } from 'react'
-import CustomerLayout from '@/components/customer/CustomerLayout'
+import CustomerLayout from '@/layouts/CustomerLayout'
 import AdminLayout from '@/layouts/AdminLayout'
 import SuperAdminLayout from '@/layouts/SuperAdminLayout'
 import { APP_ROOT_ROUTE, DEFAULT_AUTHENTICATED_ROUTE, FORBIDDEN_ROUTE, NOT_FOUND_ROUTE, ONBOARDING_ROUTE, resolvePostLoginRedirect, resolveProtectedRouteRedirect } from '@/lib/auth-routing'
@@ -15,7 +15,6 @@ const LoginPage         = lazy(() => import('@/pages/LoginPage'))
 const SignupPage        = lazy(() => import('@/pages/SignupPage'))
 const InviteAcceptPage  = lazy(() => import('@/pages/InviteAcceptPage'))
 const OnboardingPage    = lazy(() => import('@/pages/OnboardingPage'))
-const DashboardPage     = lazy(() => import('@/pages/DashboardPage'))
 const CustomerDashboardPage = lazy(() => import('@/pages/CustomerDashboardPage'))
 const CustomerAlertsPage = lazy(() => import('@/pages/customer/CustomerAlertsPage'))
 const CustomerInvestigationsPage = lazy(() => import('@/pages/customer/CustomerInvestigationsPage'))
@@ -57,29 +56,8 @@ const TenantHealthScoringPage = lazy(() => import('@/pages/superadmin/TenantHeal
 const TenantImpersonationPage = lazy(() => import('@/pages/superadmin/TenantImpersonation'))
 const WarRoomPage = lazy(() => import('@/pages/superadmin/WarRoom'))
 const WhiteLabelPage = lazy(() => import('@/pages/superadmin/WhiteLabel'))
-const AlertsPage        = lazy(() => import('@/pages/AlertsPage'))
-const AlertDetailPage   = lazy(() => import('@/pages/AlertDetailPage'))
-const RiskPage          = lazy(() => import('@/pages/RiskPage'))
 const ConnectorsPage    = lazy(() => import('@/pages/ConnectorsPage'))
-const EventsPage        = lazy(() => import('@/pages/EventsPage'))
-const CompliancePage    = lazy(() => import('@/pages/CompliancePage'))
-const PlaybooksPage     = lazy(() => import('@/pages/PlaybooksPage'))
-const AuditLogPage      = lazy(() => import('@/pages/AuditLogPage'))
-const SettingsPage      = lazy(() => import('@/pages/SettingsPage'))
 const BillingPage       = lazy(() => import('@/pages/BillingPage'))
-const MsspPage          = lazy(() => import('@/pages/MsspPage'))
-const ThreatHuntingPage    = lazy(() => import('@/pages/ThreatHuntingPage'))
-const ComplianceReportsPage = lazy(() => import('@/pages/ComplianceReportsPage'))
-const SecurityValidationPage = lazy(() => import('@/pages/SecurityValidationPage'))
-const AiSocAnalystPage       = lazy(() => import('@/pages/AiSocAnalystPage'))
-const SupplyChainPage        = lazy(() => import('@/pages/SupplyChainPage'))
-const EnterpriseCapabilitiesPage = lazy(() => import('@/pages/EnterpriseCapabilitiesPage'))
-const AiCapabilitiesPage          = lazy(() => import('@/pages/AiCapabilitiesPage'))
-const AiIntelligencePage         = lazy(() => import('@/pages/AiIntelligencePage'))
-const EnterpriseSetupPage        = lazy(() => import('@/pages/EnterpriseSetupPage'))
-const EnterpriseSalesPage        = lazy(() => import('@/pages/EnterpriseSalesPage'))
-const AiAssistantPage            = lazy(() => import('@/pages/AiAssistantPage'))
-const InvestigationsPage         = lazy(() => import('@/pages/InvestigationsPage'))
 
 // ─────────────────────────────────────────────
 // AUTH GUARD
@@ -135,95 +113,6 @@ function RoleHomeRedirect() {
   const user = useAuthStore(s => s.user)
   return <Navigate to={resolvePostLoginRedirect({ subject: user })} replace />
 }
-
-function LegacyPathRedirect() {
-  const location = useLocation()
-  const user = useAuthStore(s => s.user)
-
-  return (
-    <Navigate
-      to={resolvePostLoginRedirect({
-        requestedPath: location.pathname,
-        subject: user,
-      })}
-      replace
-    />
-  )
-}
-
-const legacyInternalRoutes = [
-  '/dashboard',
-  '/customer-dashboard',
-  '/customer-dashboard/*',
-  '/customer-alerts',
-  '/customer-alerts/*',
-  '/customer-investigations',
-  '/customer-investigations/*',
-  '/customer-ai-assistant',
-  '/customer-ai-assistant/*',
-  '/customer-billing',
-  '/customer-billing/*',
-  '/customer-settings',
-  '/customer-settings/*',
-  '/customer',
-  '/customer/*',
-  '/billing',
-  '/billing/*',
-  '/risk/*',
-  '/reports',
-  '/incidents/*',
-  '/compliance-posture',
-  '/connectors',
-  '/connectors/*',
-  '/admin',
-  '/admin/*',
-  '/superadmin',
-  '/superadmin/*',
-  '/alerts',
-  '/alerts/*',
-  '/events',
-  '/compliance',
-  '/compliance/*',
-  '/playbooks',
-  '/playbooks/*',
-  '/audit',
-  '/audit/*',
-  '/settings',
-  '/settings/*',
-  '/enterprise-sales',
-  '/enterprise-sales/*',
-  '/enterprise-setup',
-  '/enterprise-setup/*',
-  '/ai-intelligence',
-  '/ai-intelligence/*',
-  '/ai-capabilities',
-  '/ai-capabilities/*',
-  '/enterprise',
-  '/enterprise/*',
-  '/supply-chain',
-  '/supply-chain/*',
-  '/ai-soc-analyst',
-  '/ai-soc-analyst/*',
-  '/ai-assistant',
-  '/ai-assistant/*',
-  '/investigations',
-  '/investigations/*',
-  '/security-validation',
-  '/security-validation/*',
-  '/compliance-reports',
-  '/compliance-reports/*',
-  '/threat-hunting',
-  '/threat-hunting/*',
-  '/mssp',
-  '/mssp/*',
-].map((path) => ({
-  path,
-  element: (
-    <RequireAuth>
-      <LegacyPathRedirect />
-    </RequireAuth>
-  ),
-}))
 
 // ─────────────────────────────────────────────
 // LOADING FALLBACK
@@ -314,13 +203,7 @@ const router = createBrowserRouter([
   },
   {
     path: `${APP_ROOT_ROUTE}/dashboard`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <DashboardPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/customer-dashboard`} replace /></RequireAuth>,
   },
 
   {
@@ -497,170 +380,68 @@ const router = createBrowserRouter([
     ],
   },
   {
-    path: '/customer',
-    element: <RequireAuth><Navigate to={DEFAULT_AUTHENTICATED_ROUTE} replace /></RequireAuth>,
-  },
-  {
-    path: '/customer-billing',
-    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/billing`} replace /></RequireAuth>,
-  },
-  {
-    // Both /alerts and /alerts/:id render the 3-pane center
-    // The center panel shows "select an alert" when no id is in URL
     path: `${APP_ROOT_ROUTE}/alerts`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <AlertsPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/customer-alerts`} replace /></RequireAuth>,
   },
   {
     path: `${APP_ROOT_ROUTE}/alerts/:id`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <AlertsPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/customer-alerts`} replace /></RequireAuth>,
   },
   {
     path: `${APP_ROOT_ROUTE}/risk`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <RiskPage />
-        </Suspense>
-      </RequireAuth>
-    ),
-  },
-
-  {
-    path: `${APP_ROOT_ROUTE}/events`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <EventsPage />
-        </Suspense>
-      </RequireAuth>
-    ),
-  },
-  {
-    path: `${APP_ROOT_ROUTE}/compliance`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <CompliancePage />
-        </Suspense>
-      </RequireAuth>
-    ),
-  },
-  {
-    path: `${APP_ROOT_ROUTE}/playbooks`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <PlaybooksPage />
-        </Suspense>
-      </RequireAuth>
-    ),
-  },
-  {
-    path: `${APP_ROOT_ROUTE}/audit`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <AuditLogPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/risk/users`} replace /></RequireAuth>,
   },
   {
     path: `${APP_ROOT_ROUTE}/settings`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <SettingsPage />
-        </Suspense>
-      </RequireAuth>
-    ),
-  },
-  { path: `${APP_ROOT_ROUTE}/enterprise-sales`, element: (<RequireAuth><Suspense fallback={<PageLoader />}><EnterpriseSalesPage /></Suspense></RequireAuth>) },
-  { path: `${APP_ROOT_ROUTE}/enterprise-setup`, element: (<RequireAuth><Suspense fallback={<PageLoader />}><EnterpriseSetupPage /></Suspense></RequireAuth>) },
-  { path: `${APP_ROOT_ROUTE}/ai-intelligence`, element: (<RequireAuth><Suspense fallback={<PageLoader />}><AiIntelligencePage /></Suspense></RequireAuth>) },
-  { path: `${APP_ROOT_ROUTE}/ai-capabilities`, element: (<RequireAuth><Suspense fallback={<PageLoader />}><AiCapabilitiesPage /></Suspense></RequireAuth>) },
-  { path: `${APP_ROOT_ROUTE}/enterprise`, element: (<RequireAuth><Suspense fallback={<PageLoader />}><EnterpriseCapabilitiesPage /></Suspense></RequireAuth>) },
-  { path: `${APP_ROOT_ROUTE}/supply-chain`, element: (<RequireAuth><Suspense fallback={<PageLoader />}><SupplyChainPage /></Suspense></RequireAuth>) },
-  { path: `${APP_ROOT_ROUTE}/ai-soc-analyst`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <AiSocAnalystPage />
-        </Suspense>
-      </RequireAuth>
-    ),
-  },
-  { path: `${APP_ROOT_ROUTE}/ai-assistant`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <AiAssistantPage />
-        </Suspense>
-      </RequireAuth>
-    ),
-  },
-  { path: `${APP_ROOT_ROUTE}/investigations`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <InvestigationsPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/customer-settings`} replace /></RequireAuth>,
   },
   {
+    path: `${APP_ROOT_ROUTE}/compliance`,
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/compliance-posture`} replace /></RequireAuth>,
+  },
+  {
+    path: `${APP_ROOT_ROUTE}/ai-assistant`,
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/customer-ai-assistant`} replace /></RequireAuth>,
+  },
+  {
+    path: `${APP_ROOT_ROUTE}/investigations`,
+    element: <RequireAuth><Navigate to={`${APP_ROOT_ROUTE}/customer-investigations`} replace /></RequireAuth>,
+  },
+  {
+    path: `${APP_ROOT_ROUTE}/events`,
+    element: <RequireAuth><RoleHomeRedirect /></RequireAuth>,
+  },
+  {
+    path: `${APP_ROOT_ROUTE}/playbooks`,
+    element: <RequireAuth><RoleHomeRedirect /></RequireAuth>,
+  },
+  {
+    path: `${APP_ROOT_ROUTE}/audit`,
+    element: <RequireAuth><RoleHomeRedirect /></RequireAuth>,
+  },
+  { path: `${APP_ROOT_ROUTE}/enterprise-sales`, element: <RequireAuth><RoleHomeRedirect /></RequireAuth> },
+  { path: `${APP_ROOT_ROUTE}/enterprise-setup`, element: <RequireAuth><RoleHomeRedirect /></RequireAuth> },
+  { path: `${APP_ROOT_ROUTE}/ai-intelligence`, element: <RequireAuth><RoleHomeRedirect /></RequireAuth> },
+  { path: `${APP_ROOT_ROUTE}/ai-capabilities`, element: <RequireAuth><RoleHomeRedirect /></RequireAuth> },
+  { path: `${APP_ROOT_ROUTE}/enterprise`, element: <RequireAuth><RoleHomeRedirect /></RequireAuth> },
+  { path: `${APP_ROOT_ROUTE}/supply-chain`, element: <RequireAuth><RoleHomeRedirect /></RequireAuth> },
+  { path: `${APP_ROOT_ROUTE}/ai-soc-analyst`, element: <RequireAuth><RoleHomeRedirect /></RequireAuth> },
+  {
     path: `${APP_ROOT_ROUTE}/security-validation`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <SecurityValidationPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><RoleHomeRedirect /></RequireAuth>,
   },
   {
     path: `${APP_ROOT_ROUTE}/compliance-reports`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <ComplianceReportsPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><RoleHomeRedirect /></RequireAuth>,
   },
   {
     path: `${APP_ROOT_ROUTE}/threat-hunting`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <ThreatHuntingPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><RoleHomeRedirect /></RequireAuth>,
   },
   {
     path: `${APP_ROOT_ROUTE}/mssp`,
-    element: (
-      <RequireAuth>
-        <Suspense fallback={<PageLoader />}>
-          <MsspPage />
-        </Suspense>
-      </RequireAuth>
-    ),
+    element: <RequireAuth><RoleHomeRedirect /></RequireAuth>,
   },
-  ...legacyInternalRoutes,
   {
     path: FORBIDDEN_ROUTE,
     element: (

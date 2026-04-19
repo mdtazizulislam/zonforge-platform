@@ -17,45 +17,6 @@ const PUBLIC_AUTH_ROUTES = new Set([
   '/invite/accept',
 ])
 
-const LEGACY_INTERNAL_PREFIXES = [
-  '/dashboard',
-  '/customer-dashboard',
-  '/customer-alerts',
-  '/customer-investigations',
-  '/customer-ai-assistant',
-  '/customer-billing',
-  '/customer-settings',
-  '/risk',
-  '/reports',
-  '/incidents',
-  '/compliance-posture',
-  '/connectors',
-  '/admin',
-  '/superadmin',
-  '/alerts',
-  '/events',
-  '/compliance',
-  '/playbooks',
-  '/audit',
-  '/settings',
-  '/billing',
-  '/mssp',
-  '/security-validation',
-  '/compliance-reports',
-  '/threat-hunting',
-  '/ai-soc-analyst',
-  '/ai-assistant',
-  '/investigations',
-  '/ai-intelligence',
-  '/ai-capabilities',
-  '/enterprise',
-  '/enterprise-sales',
-  '/enterprise-setup',
-  '/supply-chain',
-  '/403',
-  '/404',
-]
-
 type RoleContext = Pick<MembershipContext, 'role'> | {
   role?: string | null
 } | null | undefined
@@ -69,7 +30,7 @@ type OnboardingSubject = Pick<CurrentUser, 'onboardingStatus' | 'tenant' | 'role
 
 type CanonicalRole = 'super_admin' | 'tenant_admin' | 'security_analyst' | 'read_only' | 'unknown'
 
-function canonicalizeInternalPath(pathname: string): string {
+function canonicalizeInternalPath(pathname: string): string | null {
   if (pathname === APP_ROOT_ROUTE || pathname === `${APP_ROOT_ROUTE}/`) {
     return DEFAULT_AUTHENTICATED_ROUTE
   }
@@ -78,11 +39,7 @@ function canonicalizeInternalPath(pathname: string): string {
     return pathname
   }
 
-  const isLegacyInternalRoute = LEGACY_INTERNAL_PREFIXES.some((prefix) => (
-    pathname === prefix || pathname.startsWith(`${prefix}/`)
-  ))
-
-  return isLegacyInternalRoute ? `${APP_ROOT_ROUTE}${pathname}` : pathname
+  return null
 }
 
 function normalizeInternalPath(path: string | null | undefined): string | null {
@@ -141,7 +98,7 @@ function resolveRestrictedRouteRedirect(pathname: string, subject: OnboardingSub
     return null
   }
 
-  if (pathname === SUPER_ADMIN_ROUTE || pathname.startsWith(`${SUPER_ADMIN_ROUTE}/`) || pathname === '/mssp') {
+  if (pathname === SUPER_ADMIN_ROUTE || pathname.startsWith(`${SUPER_ADMIN_ROUTE}/`)) {
     return role === 'super_admin' ? null : FORBIDDEN_ROUTE
   }
 

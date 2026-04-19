@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Verify dashboard cutover",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build:dashboard"
+			],
+			"isBackground": false
+		}
+	]
+}

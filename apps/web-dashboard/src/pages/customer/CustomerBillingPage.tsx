@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { CustomerLayout } from '@/components/customer/CustomerLayout'
+import { CustomerLayout } from '@/layouts/CustomerLayout'
 import { useUsage } from '@/hooks/queries'
 import { api } from '@/lib/api'
 

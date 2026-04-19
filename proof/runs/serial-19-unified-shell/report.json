@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-04-18T20:11:55.643Z",
+  "baseUrl": "http://localhost:5173/app",
+  "consoleErrors": [],
+  "pages": {
+    "dashboard": {
+      "routePath": "/customer-dashboard",
+      "finalPath": "/app/customer-dashboard",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-19-unified-shell\\dashboard.png",
+      "matchedExpectations": [
+        "Security Dashboard",
+        "Alerts",
+        "Billing",
+        "Settings"
+      ]
+    },
+    "billing": {
+      "routePath": "/billing",
+      "finalPath": "/app/billing",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-19-unified-shell\\billing.png",
+      "matchedExpectations": [
+        "Billing"
+      ]
+    },
+    "admin": {
+      "routePath": "/admin",
+      "finalPath": "/app/admin",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-19-unified-shell\\admin.png",
+      "matchedExpectations": [
+        "Admin Panel",
+        "Overview",
+        "Users",
+        "Billing"
+      ]
+    },
+    "superadmin": {
+      "routePath": "/superadmin",
+      "finalPath": "/app/superadmin",
+      "screenshot": "c:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-19-unified-shell\\superadmin.png",
+      "matchedExpectations": [
+        "Super Admin",
+        "Platform Overview",
+        "Tenants",
+        "Billing"
+      ]
+    }
+  }
+}

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type WindowStatus = "active" | "upcoming" | "completed" | "cancelled";
 type RecurrenceType = "once" | "weekly" | "monthly";
 
@@ -25,82 +24,16 @@ interface MaintenanceWindow {
   suppressed_count: number;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const now = new Date();
-const mockWindows: MaintenanceWindow[] = [
-  {
-    id: "mw1",
-    name: "Weekly Infrastructure Patching",
-    description: "Automated OS and software patching across production servers every Sunday night",
-    status: "upcoming",
-    start_time: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16),
-    end_time: new Date(Date.now() + 2 * 86400000 + 4 * 3600000).toISOString().slice(0, 16),
-    recurrence: "weekly",
-    days_of_week: [0],
-    suppress_severities: ["low", "medium"],
-    suppress_connectors: ["AWS CloudTrail", "WAF Logs"],
-    notify_before_minutes: 30,
-    created_by: "admin@acme.com",
-    created_at: new Date(Date.now() - 14 * 86400000).toISOString(),
-    next_occurrence: new Date(Date.now() + 2 * 86400000).toISOString(),
-    suppressed_count: 847,
-  },
-  {
-    id: "mw2",
-    name: "Database Backup Window",
-    description: "Monthly full database backup — elevated I/O will trigger false storage anomaly alerts",
-    status: "upcoming",
-    start_time: new Date(Date.now() + 17 * 86400000).toISOString().slice(0, 16),
-    end_time: new Date(Date.now() + 17 * 86400000 + 3 * 3600000).toISOString().slice(0, 16),
-    recurrence: "monthly",
-    day_of_month: 1,
-    suppress_severities: ["low", "medium", "high"],
-    suppress_connectors: ["AWS CloudTrail"],
-    notify_before_minutes: 60,
-    created_by: "devops@acme.com",
-    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-    next_occurrence: new Date(Date.now() + 17 * 86400000).toISOString(),
-    suppressed_count: 234,
-  },
-  {
-    id: "mw3",
-    name: "Emergency DR Failover Test",
-    description: "One-time disaster recovery failover test — will cause connectivity anomalies",
-    status: "completed",
-    start_time: new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 16),
-    end_time: new Date(Date.now() - 5 * 86400000 + 6 * 3600000).toISOString().slice(0, 16),
-    recurrence: "once",
-    suppress_severities: ["low", "medium", "high", "critical"],
-    suppress_connectors: [],
-    notify_before_minutes: 120,
-    created_by: "admin@acme.com",
-    created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
-    suppressed_count: 1293,
-  },
-];
+const emptyWindows: MaintenanceWindow[] = [];
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ALL_CONNECTORS = ["Microsoft 365", "AWS CloudTrail", "Google Workspace", "WAF Logs", "Firewall"];
 
-const statusStyle: Record<WindowStatus, string> = {
-  active: "text-green-400 bg-green-500/10 border-green-500/30",
-  upcoming: "text-blue-400 bg-blue-500/10 border-blue-500/30",
-  completed: "text-slate-400 bg-slate-500/10 border-slate-500/30",
-  cancelled: "text-red-400 bg-red-500/10 border-red-500/30",
-};
-
-const statusDot: Record<WindowStatus, string> = {
-  active: "bg-green-500 animate-pulse",
-  upcoming: "bg-blue-500",
-  completed: "bg-slate-500",
-  cancelled: "bg-red-500",
-};
-
-const sevColors: Record<string, string> = {
-  critical: "bg-red-600 text-white",
-  high: "bg-orange-500 text-white",
-  medium: "bg-yellow-500 text-black",
-  low: "bg-green-600 text-white",
+const severityTone: Record<string, React.CSSProperties> = {
+  critical: { background: "rgba(255, 93, 122, .18)", color: "#ffb7c5", border: "1px solid rgba(255, 93, 122, .28)" },
+  high: { background: "rgba(255, 181, 71, .18)", color: "#ffd89b", border: "1px solid rgba(255, 181, 71, .28)" },
+  medium: { background: "rgba(33, 212, 253, .14)", color: "#8fe8ff", border: "1px solid rgba(33, 212, 253, .24)" },
+  low: { background: "rgba(31, 210, 134, .14)", color: "#6ff0b2", border: "1px solid rgba(31, 210, 134, .24)" },
 };
 
 function formatDateTime(iso: string) {
@@ -110,62 +43,83 @@ function formatDateTime(iso: string) {
 function timeUntil(iso: string) {
   const ms = new Date(iso).getTime() - Date.now();
   if (ms < 0) return "Now";
-  const h = Math.floor(ms / 3600000);
-  const d = Math.floor(h / 24);
-  if (d > 0) return `in ${d}d ${h % 24}h`;
-  return `in ${h}h ${Math.floor((ms % 3600000) / 60000)}m`;
+  const hours = Math.floor(ms / 3600000);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `in ${days}d ${hours % 24}h`;
+  return `in ${hours}h`;
 }
 
-// ─── Timeline Visual ──────────────────────────────────────────────────────────
-function WindowTimeline({ windows }: { windows: MaintenanceWindow[] }) {
-  const upcoming = windows.filter(w => w.status !== "completed" && w.status !== "cancelled");
-  if (upcoming.length === 0) return null;
+function choiceStyle(selected: boolean): React.CSSProperties {
+  return selected
+    ? {
+        minHeight: "38px",
+        padding: "0 12px",
+        borderRadius: "10px",
+        border: "none",
+        background: "linear-gradient(135deg, #2f7cff, #21d4fd)",
+        color: "#fff",
+        fontWeight: 700,
+        cursor: "pointer",
+      }
+    : {
+        minHeight: "38px",
+        padding: "0 12px",
+        borderRadius: "10px",
+        border: "1px solid rgba(120, 160, 255, .18)",
+        background: "#0b1730",
+        color: "#8fa5c7",
+        fontWeight: 600,
+        cursor: "pointer",
+      };
+}
 
-  const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(Date.now() + i * 86400000);
-    return { label: i === 0 ? "Today" : DAYS[d.getDay()], date: d };
+function WindowTimeline({ windows }: { windows: MaintenanceWindow[] }) {
+  const days = Array.from({ length: 14 }, (_, index) => {
+    const date = new Date(Date.now() + index * 86400000);
+    return { key: index, label: index === 0 ? "Today" : DAYS[date.getDay()], date };
   });
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-800 p-5">
-      <h2 className="text-sm font-semibold text-white mb-4">14-Day Maintenance Calendar</h2>
-      <div className="flex gap-1">
-        {days.map((day, i) => {
-          const dayStart = day.date.setHours(0, 0, 0, 0);
-          const dayEnd = day.date.setHours(23, 59, 59, 999);
-          const hasWindow = upcoming.some(w => {
-            const ws = new Date(w.start_time).getTime();
-            const we = new Date(w.end_time).getTime();
-            return ws <= dayEnd && we >= dayStart;
-          });
-          const windowsOnDay = upcoming.filter(w => {
-            const ws = new Date(w.start_time).getTime();
-            const we = new Date(w.end_time).getTime();
-            return ws <= dayEnd && we >= dayStart;
+    <section className="zf-card zf-card--wide">
+      <div className="zf-card-head">
+        <h3 className="zf-card-title">14-Day Maintenance Calendar</h3>
+        <p className="zf-card-subtitle">Visual timeline of upcoming maintenance activity</p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(14, minmax(0, 1fr))", gap: "8px" }}>
+        {days.map((day) => {
+          const start = new Date(day.date).setHours(0, 0, 0, 0);
+          const end = new Date(day.date).setHours(23, 59, 59, 999);
+          const hasWindow = windows.some((window) => {
+            const windowStart = new Date(window.start_time).getTime();
+            const windowEnd = new Date(window.end_time).getTime();
+            return window.status !== "cancelled" && windowStart <= end && windowEnd >= start;
           });
 
           return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-xs text-slate-400">{day.label}</span>
-              <div className={`w-full h-8 rounded flex items-center justify-center text-xs transition-all ${
-                hasWindow ? "bg-blue-600/70 text-white" : i === 0 ? "bg-slate-700 text-slate-300" : "bg-slate-800 text-slate-600"
-              }`} title={windowsOnDay.map(w => w.name).join(", ")}>
-                {hasWindow ? "🔧" : ""}
+            <div key={day.key} style={{ textAlign: "center" }}>
+              <div className="zf-card-subtitle" style={{ marginBottom: "6px" }}>{day.label}</div>
+              <div
+                style={{
+                  height: "42px",
+                  borderRadius: "12px",
+                  background: hasWindow ? "linear-gradient(135deg, #2f7cff, #21d4fd)" : "rgba(8, 18, 37, .9)",
+                  display: "grid",
+                  placeItems: "center",
+                  color: hasWindow ? "#fff" : "#8fa5c7",
+                  fontWeight: 700,
+                }}
+              >
+                {hasWindow ? "🔧" : new Date(day.date).getDate()}
               </div>
-              <span className="text-xs text-slate-600">{new Date(day.date).getDate()}</span>
             </div>
           );
         })}
       </div>
-      <div className="flex items-center gap-4 mt-3 text-xs text-slate-400">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-600/70"/><span>Maintenance Window</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-slate-800"/><span>Normal</span></div>
-      </div>
-    </div>
+    </section>
   );
 }
 
-// ─── Window Form ──────────────────────────────────────────────────────────────
 function WindowForm({ onClose, existing }: { onClose: () => void; existing?: MaintenanceWindow }) {
   const qc = useQueryClient();
   const [name, setName] = useState(existing?.name ?? "");
@@ -179,176 +133,137 @@ function WindowForm({ onClose, existing }: { onClose: () => void; existing?: Mai
   const [suppressConn, setSuppressConn] = useState<string[]>(existing?.suppress_connectors ?? []);
   const [notifyBefore, setNotifyBefore] = useState(existing?.notify_before_minutes ?? 30);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const toggleDay = (d: number) => setDaysOfWeek(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d]);
-  const toggleSev = (s: string) => setSuppressSev(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
-  const toggleConn = (c: string) => setSuppressConn(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c]);
 
   const durationHours = ((new Date(endTime).getTime() - new Date(startTime).getTime()) / 3600000).toFixed(1);
 
+  const toggleDay = (day: number) => setDaysOfWeek((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day]);
+  const toggleSeverity = (severity: string) => setSuppressSev((current) => current.includes(severity) ? current.filter((item) => item !== severity) : [...current, severity]);
+  const toggleConnector = (connector: string) => setSuppressConn((current) => current.includes(connector) ? current.filter((item) => item !== connector) : [...current, connector]);
+
   const save = async () => {
     setSaving(true);
-    await new Promise(r => setTimeout(r, 900));
+    await new Promise((resolve) => setTimeout(resolve, 900));
     qc.invalidateQueries({ queryKey: ["maintenance-windows"] });
-    setSaving(false); setSaved(true);
-    setTimeout(onClose, 600);
+    setSaving(false);
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between p-5 border-b border-slate-800">
-          <h2 className="text-base font-bold text-white">{existing ? "Edit" : "New"} Maintenance Window</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(2, 6, 23, .78)", display: "grid", placeItems: "center", padding: "16px", zIndex: 50 }}>
+      <div className="zf-card" style={{ width: "100%", maxWidth: "820px", maxHeight: "92vh", overflow: "auto" }}>
+        <div className="zf-card-head">
+          <h3 className="zf-card-title">{existing ? "Edit" : "Create"} Maintenance Window</h3>
+          <p className="zf-card-subtitle">Suppress noisy alerts during planned operational work</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Basic Info */}
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Window Name *</label>
-              <input value={name} onChange={e => setName(e.target.value)}
-                placeholder="e.g. Weekly Infrastructure Patching"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+        <div className="zf-section">
+          <div className="zf-team-grid">
+            <div className="zf-team-form">
+              <div className="zf-team-field">
+                <span>Window Name</span>
+                <input value={name} onChange={(event) => setName(event.target.value)} className="zf-team-input" placeholder="Weekly Infrastructure Patching" />
+              </div>
+              <div className="zf-team-field">
+                <span>Description</span>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  className="zf-team-input"
+                  style={{ paddingTop: "12px", minHeight: "110px" }}
+                  placeholder="Describe what is changing and what alerting should be muted"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Description</label>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
-                placeholder="What maintenance is happening? Why will alerts be suppressed?"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"/>
+
+            <div className="zf-team-note">
+              <span>Window Summary</span>
+              <small>{formatDateTime(startTime)} → {formatDateTime(endTime)}</small>
+              <small>Estimated duration: {durationHours} hours</small>
+              <small>Current recurrence: {recurrence}</small>
             </div>
           </div>
 
-          {/* Schedule */}
-          <div className="bg-slate-800 rounded-xl p-4 space-y-4">
-            <p className="text-xs font-semibold text-white">📅 Schedule</p>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Start Time</label>
-                <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          <div className="zf-grid zf-grid-2">
+            <div className="zf-card">
+              <div className="zf-card-head">
+                <h4 className="zf-card-title">Schedule</h4>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">End Time</label>
-                <input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+              <div className="zf-team-form">
+                <div className="zf-team-field">
+                  <span>Start</span>
+                  <input type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="zf-team-input" />
+                </div>
+                <div className="zf-team-field">
+                  <span>End</span>
+                  <input type="datetime-local" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="zf-team-input" />
+                </div>
+                <div className="zf-row__actions">
+                  {(["once", "weekly", "monthly"] as RecurrenceType[]).map((option) => (
+                    <button key={option} type="button" style={choiceStyle(recurrence === option)} onClick={() => setRecurrence(option)}>
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                {recurrence === "weekly" && (
+                  <div className="zf-row__actions">
+                    {DAYS.map((day, index) => (
+                      <button key={day} type="button" style={choiceStyle(daysOfWeek.includes(index))} onClick={() => toggleDay(index)}>
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {recurrence === "monthly" && (
+                  <div className="zf-team-field">
+                    <span>Day of Month</span>
+                    <select value={dayOfMonth} onChange={(event) => setDayOfMonth(Number(event.target.value))} className="zf-team-select">
+                      {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
+                        <option key={day} value={day}>{day}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
 
-            {startTime && endTime && new Date(endTime) > new Date(startTime) && (
-              <p className="text-xs text-blue-400">Duration: {durationHours} hours</p>
-            )}
-
-            {/* Recurrence */}
-            <div>
-              <label className="block text-xs text-slate-400 mb-2">Recurrence</label>
-              <div className="flex gap-2">
-                {(["once", "weekly", "monthly"] as RecurrenceType[]).map(r => (
-                  <button key={r} onClick={() => setRecurrence(r)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize border transition-colors ${recurrence === r ? "bg-blue-600 text-white border-blue-600" : "bg-slate-700 text-slate-400 border-slate-600 hover:text-white"}`}>
-                    {r === "once" ? "One-time" : r === "weekly" ? "Weekly" : "Monthly"}
-                  </button>
-                ))}
+            <div className="zf-card">
+              <div className="zf-card-head">
+                <h4 className="zf-card-title">Suppression Scope</h4>
               </div>
-            </div>
-
-            {recurrence === "weekly" && (
-              <div>
-                <label className="block text-xs text-slate-400 mb-2">Repeat on</label>
-                <div className="flex gap-1.5">
-                  {DAYS.map((d, i) => (
-                    <button key={d} onClick={() => toggleDay(i)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${daysOfWeek.includes(i) ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-400 hover:text-white"}`}>
-                      {d}
+              <div className="zf-action-stack">
+                <div className="zf-row__actions">
+                  {["critical", "high", "medium", "low"].map((severity) => (
+                    <button key={severity} type="button" style={choiceStyle(suppressSev.includes(severity))} onClick={() => toggleSeverity(severity)}>
+                      {severity}
+                    </button>
+                  ))}
+                </div>
+                <div className="zf-row__actions">
+                  {ALL_CONNECTORS.map((connector) => (
+                    <button key={connector} type="button" style={choiceStyle(suppressConn.includes(connector))} onClick={() => toggleConnector(connector)}>
+                      {connector}
+                    </button>
+                  ))}
+                </div>
+                <div className="zf-row__actions">
+                  {[0, 15, 30, 60, 120].map((value) => (
+                    <button key={value} type="button" style={choiceStyle(notifyBefore === value)} onClick={() => setNotifyBefore(value)}>
+                      {value === 0 ? "No notice" : `${value}m notice`}
                     </button>
                   ))}
                 </div>
               </div>
-            )}
-
-            {recurrence === "monthly" && (
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Day of Month</label>
-                <select value={dayOfMonth} onChange={e => setDayOfMonth(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none">
-                  {Array.from({ length: 28 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* Suppression Rules */}
-          <div className="bg-slate-800 rounded-xl p-4 space-y-4">
-            <p className="text-xs font-semibold text-white">🔕 Suppression Rules</p>
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-2">Suppress Alert Severities</label>
-              <div className="flex gap-2">
-                {["critical", "high", "medium", "low"].map(s => (
-                  <button key={s} onClick={() => toggleSev(s)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium capitalize transition-all border ${
-                      suppressSev.includes(s)
-                        ? `${sevColors[s]} border-transparent`
-                        : "bg-slate-700 text-slate-400 border-slate-600 hover:text-white"
-                    }`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-              {suppressSev.includes("critical") && (
-                <p className="text-xs text-orange-400 mt-2">⚠️ Suppressing critical alerts means P1 incidents may go undetected during this window.</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs text-slate-400 mb-2">Suppress Specific Connectors (optional)</label>
-              <div className="flex flex-wrap gap-2">
-                {ALL_CONNECTORS.map(c => (
-                  <button key={c} onClick={() => toggleConn(c)}
-                    className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${suppressConn.includes(c) ? "bg-teal-600 text-white border-teal-600" : "bg-slate-700 text-slate-400 border-slate-600 hover:text-white"}`}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 mt-1">Leave blank to suppress alerts from all connectors</p>
-            </div>
-          </div>
-
-          {/* Notifications */}
-          <div>
-            <label className="block text-xs text-slate-400 mb-2">Notify Team Before Start</label>
-            <div className="flex gap-2 flex-wrap">
-              {[[0,"No notice"],[15,"15 min"],[30,"30 min"],[60,"1 hour"],[120,"2 hours"]].map(([v,l]) => (
-                <button key={v} onClick={() => setNotifyBefore(Number(v))}
-                  className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${notifyBefore === v ? "bg-blue-600 text-white border-blue-600" : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div className="bg-blue-900/20 border border-blue-800/40 rounded-xl p-4">
-            <p className="text-xs font-semibold text-blue-300 mb-2">📋 Summary</p>
-            <div className="space-y-1 text-xs text-slate-300">
-              <p>• <strong>{name || "Unnamed window"}</strong> — {recurrence === "once" ? "one-time" : recurrence}</p>
-              <p>• Starts {formatDateTime(startTime)} · Duration {durationHours}h</p>
-              <p>• Suppress: <span className="text-orange-300">{suppressSev.join(", ")} severity alerts</span></p>
-              {suppressConn.length > 0 && <p>• Only from: {suppressConn.join(", ")}</p>}
-              {notifyBefore > 0 && <p>• Team notified {notifyBefore} min before</p>}
             </div>
           </div>
         </div>
 
-        <div className="flex gap-3 p-5 border-t border-slate-800">
-          <button onClick={onClose} className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg">Cancel</button>
-          <button onClick={save} disabled={saving || !name}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2">
-            {saving ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"/>Saving...</> : saved ? "✅ Saved!" : (existing ? "Save Changes" : "Create Window")}
+        <div style={{ display: "flex", gap: "12px", marginTop: "18px", flexWrap: "wrap" }}>
+          <button type="button" onClick={onClose} className="zf-btn-secondary" style={{ flex: 1 }}>
+            Cancel
+          </button>
+          <button type="button" onClick={save} disabled={saving || !name} className="zf-btn-primary" style={{ flex: 1, opacity: saving || !name ? 0.65 : 1 }}>
+            {saving ? "Saving…" : existing ? "Save Changes" : "Create Window"}
           </button>
         </div>
       </div>
@@ -356,154 +271,141 @@ function WindowForm({ onClose, existing }: { onClose: () => void; existing?: Mai
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function MaintenanceWindows() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editWindow, setEditWindow] = useState<MaintenanceWindow | undefined>();
   const [statusFilter, setStatusFilter] = useState<WindowStatus | "">("");
 
-  const { data: windows = mockWindows } = useQuery<MaintenanceWindow[]>({
+  const { data: windows = emptyWindows } = useQuery<MaintenanceWindow[]>({
     queryKey: ["maintenance-windows"],
-    queryFn: async () => { const r = await apiClient.get("/admin/maintenance"); return r.data.data; },
+    queryFn: async () => {
+      const response = await apiClient.get("/admin/maintenance");
+      return response.data.data;
+    },
   });
 
   const cancelWindow = useMutation({
-    mutationFn: async (id: string) => { await apiClient.delete(`/admin/maintenance/${id}`); },
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/admin/maintenance/${id}`);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-windows"] }),
   });
 
-  const filtered = windows.filter(w => !statusFilter || w.status === statusFilter);
-
+  const filtered = windows.filter((window) => !statusFilter || window.status === statusFilter);
   const stats = {
-    active: windows.filter(w => w.status === "active").length,
-    upcoming: windows.filter(w => w.status === "upcoming").length,
-    total_suppressed: windows.reduce((s, w) => s + w.suppressed_count, 0),
-    completed: windows.filter(w => w.status === "completed").length,
+    active: windows.filter((window) => window.status === "active").length,
+    upcoming: windows.filter((window) => window.status === "upcoming").length,
+    completed: windows.filter((window) => window.status === "completed").length,
+    suppressed: windows.reduce((sum, window) => sum + window.suppressed_count, 0),
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Maintenance Windows</h1>
-          <p className="text-slate-400 text-sm mt-1">Schedule planned downtime to suppress false-positive alerts</p>
-        </div>
-        <button onClick={() => { setEditWindow(undefined); setShowForm(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
-          New Window
-        </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Active Now", value: stats.active, color: stats.active > 0 ? "text-green-400" : "text-slate-400" },
-          { label: "Upcoming", value: stats.upcoming, color: "text-blue-400" },
-          { label: "Alerts Suppressed", value: stats.total_suppressed.toLocaleString(), color: "text-teal-400" },
-          { label: "Completed", value: stats.completed, color: "text-slate-400" },
-        ].map((c, i) => (
-          <div key={i} className="bg-slate-900 rounded-xl p-4 border border-slate-800">
-            <p className="text-xs text-slate-400 mb-1">{c.label}</p>
-            <p className={`text-2xl font-bold ${c.color}`}>{c.value}</p>
+    <div className="zf-section">
+      <section className="zf-card zf-card--wide">
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "end", flexWrap: "wrap" }}>
+          <div className="zf-section-head">
+            <h2 className="zf-page-title">Maintenance Windows</h2>
+            <p className="zf-page-subtitle">Schedule planned downtime and suppress false-positive alerts during operational work</p>
           </div>
+
+          <button type="button" onClick={() => { setEditWindow(undefined); setShowForm(true); }} className="zf-btn-primary">
+            New Window
+          </button>
+        </div>
+      </section>
+
+      <div className="zf-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        {[
+          { label: "Active Now", value: stats.active, tone: "#6ff0b2" },
+          { label: "Upcoming", value: stats.upcoming, tone: "#8fe8ff" },
+          { label: "Completed", value: stats.completed, tone: "#dbeafe" },
+          { label: "Suppressed Alerts", value: stats.suppressed.toLocaleString(), tone: "#21d4fd" },
+        ].map((stat) => (
+          <section key={stat.label} className="zf-card">
+            <p className="zf-card-subtitle">{stat.label}</p>
+            <p className="zf-value" style={{ textAlign: "left", color: stat.tone, fontSize: "2rem", marginTop: "8px" }}>{stat.value}</p>
+          </section>
         ))}
       </div>
 
-      {/* Calendar Timeline */}
       <WindowTimeline windows={windows} />
 
-      {/* Filter */}
-      <div className="flex gap-2">
-        {([["", "All"], ["active", "Active"], ["upcoming", "Upcoming"], ["completed", "Completed"], ["cancelled", "Cancelled"]] as const).map(([v, l]) => (
-          <button key={v} onClick={() => setStatusFilter(v as any)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${statusFilter === v ? "bg-blue-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800 hover:text-white"}`}>
-            {l}
+      <div className="zf-row__actions">
+        {(["", "active", "upcoming", "completed", "cancelled"] as Array<WindowStatus | "">).map((filter) => (
+          <button key={filter || "all"} type="button" style={choiceStyle(statusFilter === filter)} onClick={() => setStatusFilter(filter)}>
+            {filter || "all"}
           </button>
         ))}
       </div>
 
-      {/* Windows List */}
-      <div className="space-y-3">
-        {filtered.map(win => (
-          <div key={win.id} className={`bg-slate-900 rounded-xl border p-5 transition-all ${
-            win.status === "active" ? "border-green-800/50" :
-            win.status === "upcoming" ? "border-blue-800/40" :
-            "border-slate-800 opacity-70"
-          }`}>
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-start gap-3 flex-1">
-                <div className="text-2xl flex-shrink-0">🔧</div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="text-sm font-bold text-white">{win.name}</h3>
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot[win.status]}`}/>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border ${statusStyle[win.status]}`}>{win.status}</span>
-                    <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded capitalize">{win.recurrence}</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-2">{win.description}</p>
-
-                  {/* Time info */}
-                  <div className="flex flex-wrap gap-3 text-xs text-slate-400 mb-3">
-                    <span>🕐 {formatDateTime(win.start_time)}</span>
-                    <span>→ {formatDateTime(win.end_time)}</span>
-                    {win.status === "upcoming" && win.next_occurrence && (
-                      <span className="text-blue-400">Next: {timeUntil(win.next_occurrence)}</span>
-                    )}
-                    {win.recurrence === "weekly" && win.days_of_week && (
-                      <span>Repeats: {win.days_of_week.map(d => DAYS[d]).join(", ")}</span>
-                    )}
-                    {win.recurrence === "monthly" && (
-                      <span>Repeats: Day {win.day_of_month} of month</span>
-                    )}
-                  </div>
-
-                  {/* Suppression badges */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {win.suppress_severities.map(s => (
-                      <span key={s} className={`text-xs px-2 py-0.5 rounded-full font-medium ${sevColors[s]}`}>
-                        🔕 {s}
-                      </span>
-                    ))}
-                    {win.suppress_connectors.map(c => (
-                      <span key={c} className="text-xs bg-teal-900/40 text-teal-300 border border-teal-800/40 px-2 py-0.5 rounded-full">
-                        {c}
-                      </span>
-                    ))}
-                    {win.suppress_connectors.length === 0 && (
-                      <span className="text-xs text-slate-500">All connectors</span>
-                    )}
-                  </div>
+      <div className="zf-grid" style={{ gridTemplateColumns: "1fr" }}>
+        {filtered.length > 0 ? filtered.map((window) => (
+          <section key={window.id} className="zf-card zf-card--wide">
+            <div className="zf-card-head">
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "start", flexWrap: "wrap" }}>
+                <div>
+                  <h3 className="zf-card-title">{window.name}</h3>
+                  <p className="zf-card-subtitle">{window.description}</p>
                 </div>
-              </div>
-
-              {/* Right side */}
-              <div className="flex flex-col items-end gap-2 flex-shrink-0 ml-4">
-                <div className="text-right">
-                  <p className="text-xs text-slate-400">Total suppressed</p>
-                  <p className="text-xl font-bold text-teal-400">{win.suppressed_count.toLocaleString()}</p>
-                </div>
-                {win.status !== "completed" && win.status !== "cancelled" && (
-                  <div className="flex gap-2">
-                    <button onClick={() => { setEditWindow(win); setShowForm(true); }}
-                      className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-colors">
-                      Edit
-                    </button>
-                    <button onClick={() => cancelWindow.mutate(win.id)}
-                      className="px-3 py-1.5 text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-800/30 rounded-lg transition-colors">
-                      Cancel
-                    </button>
-                  </div>
-                )}
+                <span className={`zf-status-pill ${window.status === "active" ? "is-success" : window.status === "upcoming" ? "is-warning" : window.status === "cancelled" ? "is-danger" : ""}`}>
+                  {window.status}
+                </span>
               </div>
             </div>
 
-            <div className="text-xs text-slate-500">
-              Created by {win.created_by} · {win.notify_before_minutes > 0 ? `Team notified ${win.notify_before_minutes}min before` : "No pre-notification"}
+            <div className="zf-detail-list">
+              <div className="zf-detail-row">
+                <span className="zf-label">Timing</span>
+                <span className="zf-value">{formatDateTime(window.start_time)} → {formatDateTime(window.end_time)}</span>
+              </div>
+              <div className="zf-detail-row">
+                <span className="zf-label">Recurrence</span>
+                <span className="zf-value">
+                  {window.recurrence}
+                  {window.next_occurrence ? ` · ${timeUntil(window.next_occurrence)}` : ""}
+                </span>
+              </div>
+              <div className="zf-detail-row">
+                <span className="zf-label">Suppressed Alerts</span>
+                <span className="zf-value">{window.suppressed_count.toLocaleString()}</span>
+              </div>
             </div>
-          </div>
-        ))}
+
+            <div className="zf-row" style={{ borderBottom: "none", paddingBottom: 0 }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {window.suppress_severities.map((severity) => (
+                  <span key={severity} className="zf-badge" style={severityTone[severity]}>
+                    {severity}
+                  </span>
+                ))}
+                {(window.suppress_connectors.length > 0 ? window.suppress_connectors : ["All connectors"]).map((connector) => (
+                  <span key={connector} className="zf-badge" style={{ background: "rgba(33,212,253,.12)", color: "#8fe8ff", border: "1px solid rgba(33,212,253,.24)" }}>
+                    {connector}
+                  </span>
+                ))}
+              </div>
+
+              {window.status !== "completed" && window.status !== "cancelled" && (
+                <div className="zf-row__actions">
+                  <button type="button" onClick={() => { setEditWindow(window); setShowForm(true); }} className="zf-btn-secondary">
+                    Edit
+                  </button>
+                  <button type="button" onClick={() => cancelWindow.mutate(window.id)} className="zf-btn-secondary">
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )) : (
+          <section className="zf-card zf-card--wide">
+            <div className="zf-card-head">
+              <h3 className="zf-card-title">No maintenance windows scheduled</h3>
+              <p className="zf-card-subtitle">Create a planned downtime window to suppress noisy alerts during patching, backups, or failover testing.</p>
+            </div>
+          </section>
+        )}
       </div>
 
       {showForm && <WindowForm onClose={() => setShowForm(false)} existing={editWindow} />}

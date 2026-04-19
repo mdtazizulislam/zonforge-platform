@@ -221,6 +221,19 @@ function resolveFrontendOrigin(c: any): string {
   return 'https://zonforge.com';
 }
 
+async function requireInternalBillingTenantAccess(c: any, tenantId: number) {
+  const access = await requireTenantContext(c);
+  if (access instanceof Response) {
+    return access;
+  }
+
+  if (access.tenantId !== tenantId) {
+    return sendError(c, 403, 'forbidden', 'Tenant scope mismatch for billing operation.');
+  }
+
+  return access;
+}
+
 function assertValidFullName(value: unknown): string {
   const fullName = typeof value === 'string' ? value.trim() : '';
   if (fullName.length < 2) {
@@ -1317,6 +1330,11 @@ app.post(`${API_PREFIX}/billing/internal/assert-quota`, async (c) => {
       increment?: number
     };
 
+    const access = await requireInternalBillingTenantAccess(c, Number(tenantId));
+    if (access instanceof Response) {
+      return access;
+    }
+
     await assertQuota(Number(tenantId), metricCode, Number(currentValue), Number(increment ?? 1));
     return c.json({ allowed: true });
   } catch (error) {
@@ -1333,6 +1351,12 @@ app.post(`${API_PREFIX}/billing/internal/assert-feature`, async (c) => {
       tenantId: number
       featureCode: 'AI_ANALYSIS' | 'ADVANCED_DETECTION' | 'EXPORT_REPORT' | 'THREAT_HUNTING'
     };
+
+    const access = await requireInternalBillingTenantAccess(c, Number(tenantId));
+    if (access instanceof Response) {
+      return access;
+    }
+
     await assertFeatureAllowed(Number(tenantId), featureCode);
     return c.json({ allowed: true });
   } catch (error) {
@@ -1350,6 +1374,12 @@ app.post(`${API_PREFIX}/billing/internal/increment-usage`, async (c) => {
       metricCode: 'CONNECTORS' | 'IDENTITIES' | 'EVENTS_PER_MIN'
       increment?: number
     };
+
+    const access = await requireInternalBillingTenantAccess(c, Number(tenantId));
+    if (access instanceof Response) {
+      return access;
+    }
+
     const value = await incrementUsage(Number(tenantId), metricCode, Number(increment ?? 1));
     return c.json({ ok: true, value });
   } catch (error) {

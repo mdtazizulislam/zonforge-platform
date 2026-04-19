@@ -130,7 +130,7 @@ export default function AlertDetailPage() {
     <AppShell
       title={`Alert · ${alert.priority}`}
       actions={
-        <Link to="/alerts"
+        <Link to="/app/alerts"
           className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors">
           <ChevronLeft className="h-4 w-4" />
           All Alerts

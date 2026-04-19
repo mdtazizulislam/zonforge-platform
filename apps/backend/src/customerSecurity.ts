@@ -97,17 +97,17 @@ const DEFAULT_ONBOARDING_STEPS: OnboardingStepDefinition[] = [
   {
     stepKey: 'welcome',
     title: 'Welcome',
-    description: 'Review your workspace setup and begin tenant onboarding.',
+    description: 'Confirm the workspace is active and move into the live customer setup flow.',
   },
   {
     stepKey: 'connect_environment',
     title: 'Connect your environment',
-    description: 'Choose the first cloud or identity source to connect. Placeholder flow for AWS, M365, or GCP.',
+    description: 'Choose the first production cloud or identity source you plan to connect so the workspace stays focused.',
   },
   {
     stepKey: 'first_scan',
     title: 'First scan CTA',
-    description: 'Trigger the first guided scan action and land in the dashboard.',
+    description: 'Finish onboarding and continue into the customer dashboard with billing and connector follow-up in view.',
   },
 ];
 

@@ -55,7 +55,7 @@ export default function InviteAcceptPage() {
       tokenStorage.set(result.accessToken)
       tokenStorage.setRefresh(result.refreshToken)
       setUser(result.user)
-      navigate(result.redirectUrl || '/customer-dashboard', { replace: true })
+      navigate(result.redirectUrl || '/app/customer-dashboard', { replace: true })
     },
     onError: (error) => {
       setErrorMessage(mapInviteError(error))

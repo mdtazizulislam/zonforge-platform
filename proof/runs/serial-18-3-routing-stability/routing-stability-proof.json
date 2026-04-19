@@ -1,0 +1,44 @@
+{
+  "baseUrl": "http://localhost:5174/app",
+  "results": [
+    {
+      "caseId": "CASE_A",
+      "startUrl": "http://localhost:5174/app/billing",
+      "finalUrl": "http://localhost:5174/app/onboarding",
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-18-3-routing-stability\\case-a-incomplete-onboarding.png",
+      "consoleMessages": [
+        "debug: [vite] connecting...",
+        "info: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+        "warning: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+        "debug: [vite] connected."
+      ],
+      "pageErrors": []
+    },
+    {
+      "caseId": "CASE_B",
+      "startUrl": "http://localhost:5174/app/onboarding",
+      "finalUrl": "http://localhost:5174/app/customer-dashboard",
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-18-3-routing-stability\\case-b-completed-onboarding.png",
+      "consoleMessages": [
+        "debug: [vite] connecting...",
+        "info: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+        "warning: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+        "debug: [vite] connected."
+      ],
+      "pageErrors": []
+    },
+    {
+      "caseId": "CASE_C",
+      "startUrl": "http://localhost:5174/app/billing",
+      "finalUrl": "http://localhost:5174/app/billing",
+      "screenshot": "C:\\Users\\vitor\\Downloads\\zonforge-sentinel-v4.6.0_1\\zonforge-platform-main-release\\proof\\runs\\serial-18-3-routing-stability\\case-c-direct-billing.png",
+      "consoleMessages": [
+        "debug: [vite] connecting...",
+        "info: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold",
+        "warning: ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.",
+        "debug: [vite] connected."
+      ],
+      "pageErrors": []
+    }
+  ]
+}

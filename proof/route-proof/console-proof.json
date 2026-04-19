@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-04-19T21:34:39.525Z",
+  "baseUrl": "http://localhost:4175",
+  "routeResults": [
+    {
+      "page": "public-landing",
+      "requestedPath": "/",
+      "finalUrl": "http://localhost:4175/",
+      "title": "ZonForge Sentinel — AI-Native Cybersecurity Platform"
+    },
+    {
+      "page": "customer-dashboard",
+      "requestedPath": "/app/customer-dashboard",
+      "finalUrl": "http://localhost:4175/app/customer-dashboard",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "admin-workspace",
+      "requestedPath": "/app/admin",
+      "finalUrl": "http://localhost:4175/app/admin",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "admin-users",
+      "requestedPath": "/app/admin/users",
+      "finalUrl": "http://localhost:4175/app/admin/users",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "admin-connectors",
+      "requestedPath": "/app/admin/connectors",
+      "finalUrl": "http://localhost:4175/app/admin/connectors",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "admin-maintenance",
+      "requestedPath": "/app/admin/maintenance",
+      "finalUrl": "http://localhost:4175/app/admin/maintenance",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "superadmin-workspace",
+      "requestedPath": "/app/superadmin",
+      "finalUrl": "http://localhost:4175/app/superadmin",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "billing-workspace",
+      "requestedPath": "/app/billing",
+      "finalUrl": "http://localhost:4175/app/billing",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "forbidden-page",
+      "requestedPath": "/app/admin",
+      "finalUrl": "http://localhost:4175/app/403",
+      "title": "ZonForge Sentinel"
+    },
+    {
+      "page": "not-found-page",
+      "requestedPath": "/app/route-that-does-not-exist",
+      "finalUrl": "http://localhost:4175/app/404",
+      "title": "ZonForge Sentinel"
+    }
+  ],
+  "consoleEvents": []
+}

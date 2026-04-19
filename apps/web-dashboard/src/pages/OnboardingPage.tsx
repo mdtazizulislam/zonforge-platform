@@ -194,7 +194,7 @@ export default function OnboardingPage() {
             {connectStep?.isComplete ? 'Preferred source saved' : saving ? 'Saving...' : 'Save preferred source'}
           </button>
           <Link
-            to="/connectors"
+            to="/app/connectors"
             className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
           >
             Open connectors
@@ -298,13 +298,13 @@ export default function OnboardingPage() {
 
             <div className="mt-6 flex flex-col gap-3">
               <Link
-                to="/customer-dashboard"
+                to="/app/customer-dashboard"
                 className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-cyan-300"
               >
                 Open dashboard
               </Link>
               <Link
-                to="/customer-settings"
+                to="/app/customer-settings"
                 className="inline-flex items-center justify-center rounded-xl border border-white/10 px-4 py-3 text-sm font-medium text-white transition hover:border-cyan-300/50 hover:text-cyan-200"
               >
                 Open customer settings

@@ -2,17 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
 
-const mockUsers = [
-  { id: "1", name: "John Smith", email: "john.smith@acme.com", role: "SECURITY_ANALYST", status: "active", last_login_at: new Date(Date.now() - 3600000).toISOString() },
-  { id: "2", name: "Jane Doe", email: "jane.doe@acme.com", role: "READ_ONLY", status: "active", last_login_at: new Date(Date.now() - 86400000).toISOString() },
-  { id: "3", name: "Admin User", email: "admin@acme.com", role: "TENANT_ADMIN", status: "active", last_login_at: new Date(Date.now() - 7200000).toISOString() },
-  { id: "4", name: "Bob Wilson", email: "bob@acme.com", role: "SECURITY_ANALYST", status: "suspended", last_login_at: new Date(Date.now() - 2592000000).toISOString() },
-];
-
-const roleColor: Record<string, string> = {
-  TENANT_ADMIN: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  SECURITY_ANALYST: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  READ_ONLY: "bg-slate-500/20 text-slate-400 border-slate-500/30",
+const roleTone: Record<string, React.CSSProperties> = {
+  TENANT_ADMIN: { background: "rgba(47,124,255,.18)", color: "#21d4fd", border: "1px solid rgba(47,124,255,.28)" },
+  SECURITY_ANALYST: { background: "rgba(33,212,253,.14)", color: "#8fe8ff", border: "1px solid rgba(33,212,253,.24)" },
+  READ_ONLY: { background: "rgba(148,163,184,.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,.18)" },
 };
 
 export default function UserManagement() {
@@ -22,7 +15,7 @@ export default function UserManagement() {
   const [inviteRole, setInviteRole] = useState("SECURITY_ANALYST");
   const [search, setSearch] = useState("");
 
-  const { data: users = mockUsers } = useQuery({
+  const { data: users = [] } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
       const res = await apiClient.get("/admin/users");
@@ -51,119 +44,163 @@ export default function UserManagement() {
   const timeAgo = (iso: string) => {
     const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
     const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
-    if (d > 30) return `${d}d ago`;
     if (d > 0) return `${d}d ago`;
     return `${h}h ago`;
   };
 
-  const filtered = users.filter((u: any) =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
+  const filtered = (users as Array<any>).filter((user) =>
+    user.name.toLowerCase().includes(search.toLowerCase()) ||
+    user.email.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">User Management</h1>
-          <p className="text-slate-400 text-sm mt-1">{users.length} users in your organization</p>
+    <div className="zf-section">
+      <section className="zf-card zf-card--wide">
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "end", flexWrap: "wrap" }}>
+          <div className="zf-section-head">
+            <h2 className="zf-page-title">User Management</h2>
+            <p className="zf-page-subtitle">{users.length} users in your organization</p>
+          </div>
+
+          <button type="button" onClick={() => setShowInvite(true)} className="zf-btn-primary">
+            Invite User
+          </button>
         </div>
-        <button onClick={() => setShowInvite(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-lg transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-          </svg>
-          Invite User
-        </button>
-      </div>
 
-      <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search users..."
-          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-      </div>
+        <div style={{ marginTop: "16px" }}>
+          <input
+            type="text"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search users by name or email"
+            className="zf-team-input"
+            style={{ width: "100%" }}
+          />
+        </div>
+      </section>
 
-      <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-800">
-              {["User", "Role", "Status", "Last Login", "Actions"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-400">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {filtered.map((user: any) => (
-              <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-700 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                      {user.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-white">{user.name}</p>
-                      <p className="text-xs text-slate-400">{user.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${roleColor[user.role] ?? "bg-slate-700 text-slate-300"}`}>
-                    {user.role.replace("_", " ")}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${user.status === "active" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-xs text-slate-400">{timeAgo(user.last_login_at)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
-                    <button className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Edit Role</button>
-                    <button
-                      onClick={() => updateUser.mutate({ id: user.id, status: user.status === "active" ? "suspended" : "active" })}
-                      className={`text-xs transition-colors ${user.status === "active" ? "text-red-400 hover:text-red-300" : "text-green-400 hover:text-green-300"}`}>
-                      {user.status === "active" ? "Suspend" : "Activate"}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section className="zf-card zf-card--wide">
+        <div className="zf-card-head">
+          <h3 className="zf-card-title">Workspace Members</h3>
+          <p className="zf-card-subtitle">Active administrators, analysts, and read-only users</p>
+        </div>
 
-      {/* Invite Modal */}
+        {filtered.length > 0 ? (
+          <div className="zf-table-wrap">
+            <table className="zf-alerts-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Last Login</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((user) => (
+                  <tr key={user.id}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div
+                          style={{
+                            width: "34px",
+                            height: "34px",
+                            borderRadius: "999px",
+                            display: "grid",
+                            placeItems: "center",
+                            background: "linear-gradient(135deg, #2f7cff, #21d4fd)",
+                            color: "#fff",
+                            fontSize: ".8rem",
+                            fontWeight: 800,
+                          }}
+                        >
+                          {user.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="zf-alerts-table__title">{user.name}</div>
+                          <div className="zf-card-subtitle">{user.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="zf-badge" style={roleTone[user.role] ?? roleTone.READ_ONLY}>
+                        {user.role.replace(/_/g, " ")}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`zf-status-pill ${user.status === "active" ? "is-success" : "is-danger"}`}>
+                        {user.status}
+                      </span>
+                    </td>
+                    <td>{timeAgo(user.last_login_at)}</td>
+                    <td>
+                      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          onClick={() => updateUser.mutate({ id: user.id, status: user.status === "active" ? "suspended" : "active" })}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            color: user.status === "active" ? "#ff8ea5" : "#6ff0b2",
+                            fontSize: ".85rem",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {user.status === "active" ? "Suspend" : "Activate"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="zf-team-note">
+            <span>No members match the current view</span>
+            <small>Invite your first administrator or analyst to start managing tenant access from this workspace.</small>
+          </div>
+        )}
+      </section>
+
       {showInvite && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 rounded-xl border border-slate-700 p-6 w-full max-w-md">
-            <h2 className="text-lg font-bold text-white mb-4">Invite New User</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Email Address</label>
-                <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  placeholder="user@company.com" />
+        <div style={{ position: "fixed", inset: 0, background: "rgba(2, 6, 23, .78)", display: "grid", placeItems: "center", padding: "16px", zIndex: 50 }}>
+          <div className="zf-card" style={{ width: "100%", maxWidth: "520px" }}>
+            <div className="zf-card-head">
+              <h3 className="zf-card-title">Invite New User</h3>
+              <p className="zf-card-subtitle">Send a secure workspace invitation and assign an initial role</p>
+            </div>
+
+            <div className="zf-team-form">
+              <div className="zf-team-field">
+                <span>Email Address</span>
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(event) => setInviteEmail(event.target.value)}
+                  className="zf-team-input"
+                  placeholder="user@company.com"
+                />
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Role</label>
-                <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+
+              <div className="zf-team-field">
+                <span>Role</span>
+                <select value={inviteRole} onChange={(event) => setInviteRole(event.target.value)} className="zf-team-select">
                   <option value="SECURITY_ANALYST">Security Analyst</option>
-                  <option value="READ_ONLY">Read Only (Executive)</option>
+                  <option value="READ_ONLY">Read Only</option>
                   <option value="TENANT_ADMIN">Tenant Admin</option>
                 </select>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowInvite(false)}
-                className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors">
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "18px", flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setShowInvite(false)} className="zf-btn-secondary" style={{ flex: 1 }}>
                 Cancel
               </button>
-              <button onClick={() => inviteUser.mutate()}
-                disabled={!inviteEmail || inviteUser.isPending}
-                className="flex-1 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
-                {inviteUser.isPending ? "Sending..." : "Send Invite"}
+              <button type="button" onClick={() => inviteUser.mutate()} disabled={!inviteEmail || inviteUser.isPending} className="zf-btn-primary" style={{ flex: 1, opacity: !inviteEmail || inviteUser.isPending ? 0.65 : 1 }}>
+                {inviteUser.isPending ? "Sending…" : "Send Invite"}
               </button>
             </div>
           </div>
