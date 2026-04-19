@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthShell from '../components/auth/AuthShell'
 import AuthCard from '../components/auth/AuthCard'
 import { ApiError, api, tokenStorage } from '@/lib/api'
+import { resolvePostLoginRedirect } from '@/lib/auth-routing'
 import { useAuthStore } from '@/stores/auth.store'
 
 type SignupForm = {
@@ -118,7 +119,9 @@ export default function SignupPage() {
       tokenStorage.setRefresh(result.refreshToken)
       setUser(result.user)
 
-      navigate(result.user.onboardingStatus === 'completed' ? '/customer-dashboard' : '/onboarding', {
+      navigate(resolvePostLoginRedirect({
+        subject: result.user,
+      }), {
         replace: true,
       })
     } catch (error) {

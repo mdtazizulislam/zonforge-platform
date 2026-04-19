@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, type OnboardingStatusResponse } from '@/lib/api'
+import { resolvePostLoginRedirect } from '@/lib/auth-routing'
 import { useAuthStore } from '@/stores/auth.store'
 
 const PROVIDERS = [
@@ -55,10 +56,32 @@ export default function OnboardingPage() {
   const onboardingStatus = status?.onboardingStatus ?? user?.onboardingStatus ?? 'pending'
   const isCompleted = onboardingStatus === 'completed'
 
-  function syncAuthStatus(nextStatus: OnboardingStatusResponse) {
-    if (!user) return
+  useEffect(() => {
+    if (!user || loading) return
 
-    setUser({
+    const redirectPath = resolvePostLoginRedirect({
+      subject: {
+        ...user,
+        onboardingStatus,
+        tenant: user.tenant
+          ? {
+              ...user.tenant,
+              onboardingStatus,
+              onboardingCompletedAt: status?.onboardingCompletedAt ?? user.tenant.onboardingCompletedAt,
+            }
+          : user.tenant,
+      },
+    })
+
+    if (redirectPath !== '/onboarding') {
+      navigate(redirectPath, { replace: true })
+    }
+  }, [loading, navigate, onboardingStatus, status?.onboardingCompletedAt, user])
+
+  function syncAuthStatus(nextStatus: OnboardingStatusResponse) {
+    if (!user) return user
+
+    const nextUser = {
       ...user,
       onboardingStatus: nextStatus.onboardingStatus,
       tenant: user.tenant
@@ -69,7 +92,10 @@ export default function OnboardingPage() {
             onboardingCompletedAt: nextStatus.onboardingCompletedAt,
           }
         : user.tenant,
-    })
+    }
+
+    setUser(nextUser)
+    return nextUser
   }
 
   async function updateOnboarding(input: {
@@ -84,10 +110,20 @@ export default function OnboardingPage() {
     try {
       const nextStatus = await api.onboarding.updateStatus(input)
       setStatus(nextStatus)
-      syncAuthStatus(nextStatus)
+      const nextUser = syncAuthStatus(nextStatus)
 
       if (options?.navigateToDashboard && nextStatus.onboardingStatus === 'completed') {
-        navigate('/customer-dashboard', { replace: true })
+        navigate(resolvePostLoginRedirect({
+          subject: nextUser ?? {
+            role: user?.role,
+            membership: user?.membership,
+            onboardingStatus: nextStatus.onboardingStatus,
+            tenant: {
+              onboardingStatus: nextStatus.onboardingStatus,
+              onboardingCompletedAt: nextStatus.onboardingCompletedAt,
+            },
+          },
+        }), { replace: true })
       }
     } catch {
       setErrorMessage('Unable to update onboarding right now. Please try again.')

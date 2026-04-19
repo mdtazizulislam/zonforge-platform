@@ -1,4 +1,3 @@
-import { CustomerLayout } from '@/components/customer/CustomerLayout'
 import { useAssistantSuggestions, useRiskSummary, usePipelineHealth } from '@/hooks/queries'
 
 export default function CustomerAiAssistantPage() {
@@ -10,10 +9,6 @@ export default function CustomerAiAssistantPage() {
   const overallPipeline = pipelineHealthQuery.data?.data?.overall ?? 'unknown'
 
   return (
-    <CustomerLayout
-      title="Customer AI Assistant"
-      subtitle="Guided prompts and concise posture context for customer-facing conversations."
-    >
       <div className="zf-page">
         <div className="zf-container">
           <section className="zf-section">
@@ -84,6 +79,5 @@ export default function CustomerAiAssistantPage() {
           </section>
         </div>
       </div>
-    </CustomerLayout>
   )
 }

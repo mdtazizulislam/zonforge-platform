@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthShell from '../components/auth/AuthShell'
 import AuthCard from '../components/auth/AuthCard'
 import { api, tokenStorage } from '@/lib/api'
+import { resolvePostLoginRedirect } from '@/lib/auth-routing'
 import { useAuthStore } from '@/stores/auth.store'
 
 export default function LoginPage() {
@@ -50,7 +51,10 @@ export default function LoginPage() {
       tokenStorage.setRefresh(result.refreshToken)
       setUser(result.user)
 
-      navigate(result.user.onboardingStatus === 'completed' ? (safeRequestedPath ?? '/customer-dashboard') : '/onboarding', { replace: true })
+      navigate(resolvePostLoginRedirect({
+        requestedPath: safeRequestedPath,
+        subject: result.user,
+      }), { replace: true })
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to sign in.')
     } finally {

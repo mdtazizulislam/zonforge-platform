@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import ConnectorHealthPanel from '@/components/customer/ConnectorHealthPanel'
-import { CustomerLayout } from '@/components/customer/CustomerLayout'
 import InvestigationPreviewPanel from '@/components/customer/InvestigationPreviewPanel'
 import KpiCard from '@/components/customer/KpiCard'
 import RecentAlertsTable from '@/components/customer/RecentAlertsTable'
@@ -632,10 +631,6 @@ export default function CustomerDashboardPage() {
   })
 
   return (
-    <CustomerLayout
-      title="Security Dashboard"
-      subtitle="Executive posture, active threats, and action-ready customer insights."
-    >
       <div className="zf-page">
         <div className="zf-container">
           <section className="zf-section">
@@ -804,6 +799,5 @@ export default function CustomerDashboardPage() {
           </section>
         </div>
       </div>
-    </CustomerLayout>
   )
 }

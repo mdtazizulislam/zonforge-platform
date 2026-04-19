@@ -413,6 +413,112 @@
   color: var(--zf-text-soft);
 }
 
+.zf-billing-progress__fill {
+  width: 0%;
+}
+
+.zf-billing-progress[data-progress="0"] .zf-billing-progress__fill { width: 0%; }
+.zf-billing-progress[data-progress="1"] .zf-billing-progress__fill { width: 1%; }
+.zf-billing-progress[data-progress="2"] .zf-billing-progress__fill { width: 2%; }
+.zf-billing-progress[data-progress="3"] .zf-billing-progress__fill { width: 3%; }
+.zf-billing-progress[data-progress="4"] .zf-billing-progress__fill { width: 4%; }
+.zf-billing-progress[data-progress="5"] .zf-billing-progress__fill { width: 5%; }
+.zf-billing-progress[data-progress="6"] .zf-billing-progress__fill { width: 6%; }
+.zf-billing-progress[data-progress="7"] .zf-billing-progress__fill { width: 7%; }
+.zf-billing-progress[data-progress="8"] .zf-billing-progress__fill { width: 8%; }
+.zf-billing-progress[data-progress="9"] .zf-billing-progress__fill { width: 9%; }
+.zf-billing-progress[data-progress="10"] .zf-billing-progress__fill { width: 10%; }
+.zf-billing-progress[data-progress="11"] .zf-billing-progress__fill { width: 11%; }
+.zf-billing-progress[data-progress="12"] .zf-billing-progress__fill { width: 12%; }
+.zf-billing-progress[data-progress="13"] .zf-billing-progress__fill { width: 13%; }
+.zf-billing-progress[data-progress="14"] .zf-billing-progress__fill { width: 14%; }
+.zf-billing-progress[data-progress="15"] .zf-billing-progress__fill { width: 15%; }
+.zf-billing-progress[data-progress="16"] .zf-billing-progress__fill { width: 16%; }
+.zf-billing-progress[data-progress="17"] .zf-billing-progress__fill { width: 17%; }
+.zf-billing-progress[data-progress="18"] .zf-billing-progress__fill { width: 18%; }
+.zf-billing-progress[data-progress="19"] .zf-billing-progress__fill { width: 19%; }
+.zf-billing-progress[data-progress="20"] .zf-billing-progress__fill { width: 20%; }
+.zf-billing-progress[data-progress="21"] .zf-billing-progress__fill { width: 21%; }
+.zf-billing-progress[data-progress="22"] .zf-billing-progress__fill { width: 22%; }
+.zf-billing-progress[data-progress="23"] .zf-billing-progress__fill { width: 23%; }
+.zf-billing-progress[data-progress="24"] .zf-billing-progress__fill { width: 24%; }
+.zf-billing-progress[data-progress="25"] .zf-billing-progress__fill { width: 25%; }
+.zf-billing-progress[data-progress="26"] .zf-billing-progress__fill { width: 26%; }
+.zf-billing-progress[data-progress="27"] .zf-billing-progress__fill { width: 27%; }
+.zf-billing-progress[data-progress="28"] .zf-billing-progress__fill { width: 28%; }
+.zf-billing-progress[data-progress="29"] .zf-billing-progress__fill { width: 29%; }
+.zf-billing-progress[data-progress="30"] .zf-billing-progress__fill { width: 30%; }
+.zf-billing-progress[data-progress="31"] .zf-billing-progress__fill { width: 31%; }
+.zf-billing-progress[data-progress="32"] .zf-billing-progress__fill { width: 32%; }
+.zf-billing-progress[data-progress="33"] .zf-billing-progress__fill { width: 33%; }
+.zf-billing-progress[data-progress="34"] .zf-billing-progress__fill { width: 34%; }
+.zf-billing-progress[data-progress="35"] .zf-billing-progress__fill { width: 35%; }
+.zf-billing-progress[data-progress="36"] .zf-billing-progress__fill { width: 36%; }
+.zf-billing-progress[data-progress="37"] .zf-billing-progress__fill { width: 37%; }
+.zf-billing-progress[data-progress="38"] .zf-billing-progress__fill { width: 38%; }
+.zf-billing-progress[data-progress="39"] .zf-billing-progress__fill { width: 39%; }
+.zf-billing-progress[data-progress="40"] .zf-billing-progress__fill { width: 40%; }
+.zf-billing-progress[data-progress="41"] .zf-billing-progress__fill { width: 41%; }
+.zf-billing-progress[data-progress="42"] .zf-billing-progress__fill { width: 42%; }
+.zf-billing-progress[data-progress="43"] .zf-billing-progress__fill { width: 43%; }
+.zf-billing-progress[data-progress="44"] .zf-billing-progress__fill { width: 44%; }
+.zf-billing-progress[data-progress="45"] .zf-billing-progress__fill { width: 45%; }
+.zf-billing-progress[data-progress="46"] .zf-billing-progress__fill { width: 46%; }
+.zf-billing-progress[data-progress="47"] .zf-billing-progress__fill { width: 47%; }
+.zf-billing-progress[data-progress="48"] .zf-billing-progress__fill { width: 48%; }
+.zf-billing-progress[data-progress="49"] .zf-billing-progress__fill { width: 49%; }
+.zf-billing-progress[data-progress="50"] .zf-billing-progress__fill { width: 50%; }
+.zf-billing-progress[data-progress="51"] .zf-billing-progress__fill { width: 51%; }
+.zf-billing-progress[data-progress="52"] .zf-billing-progress__fill { width: 52%; }
+.zf-billing-progress[data-progress="53"] .zf-billing-progress__fill { width: 53%; }
+.zf-billing-progress[data-progress="54"] .zf-billing-progress__fill { width: 54%; }
+.zf-billing-progress[data-progress="55"] .zf-billing-progress__fill { width: 55%; }
+.zf-billing-progress[data-progress="56"] .zf-billing-progress__fill { width: 56%; }
+.zf-billing-progress[data-progress="57"] .zf-billing-progress__fill { width: 57%; }
+.zf-billing-progress[data-progress="58"] .zf-billing-progress__fill { width: 58%; }
+.zf-billing-progress[data-progress="59"] .zf-billing-progress__fill { width: 59%; }
+.zf-billing-progress[data-progress="60"] .zf-billing-progress__fill { width: 60%; }
+.zf-billing-progress[data-progress="61"] .zf-billing-progress__fill { width: 61%; }
+.zf-billing-progress[data-progress="62"] .zf-billing-progress__fill { width: 62%; }
+.zf-billing-progress[data-progress="63"] .zf-billing-progress__fill { width: 63%; }
+.zf-billing-progress[data-progress="64"] .zf-billing-progress__fill { width: 64%; }
+.zf-billing-progress[data-progress="65"] .zf-billing-progress__fill { width: 65%; }
+.zf-billing-progress[data-progress="66"] .zf-billing-progress__fill { width: 66%; }
+.zf-billing-progress[data-progress="67"] .zf-billing-progress__fill { width: 67%; }
+.zf-billing-progress[data-progress="68"] .zf-billing-progress__fill { width: 68%; }
+.zf-billing-progress[data-progress="69"] .zf-billing-progress__fill { width: 69%; }
+.zf-billing-progress[data-progress="70"] .zf-billing-progress__fill { width: 70%; }
+.zf-billing-progress[data-progress="71"] .zf-billing-progress__fill { width: 71%; }
+.zf-billing-progress[data-progress="72"] .zf-billing-progress__fill { width: 72%; }
+.zf-billing-progress[data-progress="73"] .zf-billing-progress__fill { width: 73%; }
+.zf-billing-progress[data-progress="74"] .zf-billing-progress__fill { width: 74%; }
+.zf-billing-progress[data-progress="75"] .zf-billing-progress__fill { width: 75%; }
+.zf-billing-progress[data-progress="76"] .zf-billing-progress__fill { width: 76%; }
+.zf-billing-progress[data-progress="77"] .zf-billing-progress__fill { width: 77%; }
+.zf-billing-progress[data-progress="78"] .zf-billing-progress__fill { width: 78%; }
+.zf-billing-progress[data-progress="79"] .zf-billing-progress__fill { width: 79%; }
+.zf-billing-progress[data-progress="80"] .zf-billing-progress__fill { width: 80%; }
+.zf-billing-progress[data-progress="81"] .zf-billing-progress__fill { width: 81%; }
+.zf-billing-progress[data-progress="82"] .zf-billing-progress__fill { width: 82%; }
+.zf-billing-progress[data-progress="83"] .zf-billing-progress__fill { width: 83%; }
+.zf-billing-progress[data-progress="84"] .zf-billing-progress__fill { width: 84%; }
+.zf-billing-progress[data-progress="85"] .zf-billing-progress__fill { width: 85%; }
+.zf-billing-progress[data-progress="86"] .zf-billing-progress__fill { width: 86%; }
+.zf-billing-progress[data-progress="87"] .zf-billing-progress__fill { width: 87%; }
+.zf-billing-progress[data-progress="88"] .zf-billing-progress__fill { width: 88%; }
+.zf-billing-progress[data-progress="89"] .zf-billing-progress__fill { width: 89%; }
+.zf-billing-progress[data-progress="90"] .zf-billing-progress__fill { width: 90%; }
+.zf-billing-progress[data-progress="91"] .zf-billing-progress__fill { width: 91%; }
+.zf-billing-progress[data-progress="92"] .zf-billing-progress__fill { width: 92%; }
+.zf-billing-progress[data-progress="93"] .zf-billing-progress__fill { width: 93%; }
+.zf-billing-progress[data-progress="94"] .zf-billing-progress__fill { width: 94%; }
+.zf-billing-progress[data-progress="95"] .zf-billing-progress__fill { width: 95%; }
+.zf-billing-progress[data-progress="96"] .zf-billing-progress__fill { width: 96%; }
+.zf-billing-progress[data-progress="97"] .zf-billing-progress__fill { width: 97%; }
+.zf-billing-progress[data-progress="98"] .zf-billing-progress__fill { width: 98%; }
+.zf-billing-progress[data-progress="99"] .zf-billing-progress__fill { width: 99%; }
+.zf-billing-progress[data-progress="100"] .zf-billing-progress__fill { width: 100%; }
+
 .zf-panel-heading {
   display: flex;
   align-items: flex-start;

@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CustomerLayout } from '@/components/customer/CustomerLayout'
 import { ApiError, api, type TeamInviteCreateResult, type TeamMember, type TeamRole } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -129,10 +128,6 @@ export default function CustomerSettingsPage() {
   const adminCount = members.filter((member) => member.role === 'owner' || member.role === 'admin').length
 
   return (
-    <CustomerLayout
-      title="Customer Settings"
-      subtitle="Workspace profile, security posture, and tenant-scoped team controls in one operational surface."
-    >
       <div className="zf-page">
         <div className="zf-container">
           <section className="zf-section">
@@ -454,6 +449,5 @@ export default function CustomerSettingsPage() {
           ) : null}
         </div>
       </div>
-    </CustomerLayout>
   )
 }

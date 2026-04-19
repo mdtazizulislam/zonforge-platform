@@ -7,6 +7,205 @@ import { buildAppUrl, resolveApiBaseUrl, resolveLogoutRedirectUrl } from '@/lib/
 
 const BASE_URL = resolveApiBaseUrl()
 
+function isLocalProofMode(): boolean {
+  if (typeof window === 'undefined') return false
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname) && tokenStorage.get() === 'proof-token'
+}
+
+function getLocalProofApiResponse(path: string): unknown | undefined {
+  if (!isLocalProofMode()) return undefined
+
+  const now = new Date()
+  const plusDays = (days: number) => new Date(now.getTime() + (days * 24 * 60 * 60_000)).toISOString()
+  const minusMinutes = (minutes: number) => new Date(now.getTime() - (minutes * 60_000)).toISOString()
+
+  if (path.startsWith('/v1/onboarding/status') || path.startsWith('/v1/onboarding')) {
+    return {
+      tenantId: 'tenant-1',
+      onboardingStatus: 'pending',
+      onboardingStartedAt: plusDays(-2),
+      onboardingCompletedAt: null,
+      steps: [
+        {
+          stepKey: 'welcome',
+          title: 'Welcome',
+          description: 'Confirm the workspace is active and begin setup.',
+          isComplete: true,
+          payload: { source: 'proof-mode' },
+          updatedAt: minusMinutes(90),
+        },
+        {
+          stepKey: 'connect_environment',
+          title: 'Connect your environment',
+          description: 'Choose the first source you want to onboard.',
+          isComplete: false,
+          payload: { provider: 'aws', source: 'proof-mode' },
+          updatedAt: minusMinutes(45),
+        },
+        {
+          stepKey: 'first_scan',
+          title: 'Run your first scan',
+          description: 'Validate telemetry and complete workspace setup.',
+          isComplete: false,
+          payload: null,
+          updatedAt: minusMinutes(15),
+        },
+      ],
+    }
+  }
+
+  if (path.startsWith('/v1/risk/summary')) {
+    return {
+      postureScore: 68,
+      openCriticalAlerts: 2,
+      openHighAlerts: 4,
+      avgUserRiskScore: 54,
+      topRiskUserIds: ['user-1', 'user-2'],
+      topRiskAssetIds: ['asset-1', 'asset-2', 'asset-3'],
+      connectorHealthScore: 91,
+      mttdP50Minutes: 18,
+      trend: [42, 47, 51, 56, 61, 64, 68],
+    }
+  }
+
+  if (path.startsWith('/v1/alerts')) {
+    return {
+      items: [
+        {
+          id: 'alert-1',
+          title: 'Suspicious privileged login from new geography',
+          severity: 'critical',
+          priority: 'P1',
+          status: 'open',
+          createdAt: minusMinutes(45),
+          mitreTechniques: ['T1078'],
+          source: 'Identity Protection',
+        },
+        {
+          id: 'alert-2',
+          title: 'Public cloud key exposed in CI artifact',
+          severity: 'high',
+          priority: 'P2',
+          status: 'investigating',
+          createdAt: minusMinutes(130),
+          mitreTechniques: ['T1552'],
+          source: 'Build Pipeline',
+        },
+      ],
+      totalCount: 2,
+      nextCursor: null,
+      hasMore: false,
+    }
+  }
+
+  if (path.startsWith('/v1/investigations/stats')) {
+    return {
+      totalInvestigations: 14,
+      truePositives: 9,
+      falsePositives: 2,
+      pendingReview: 3,
+      tpRate: 0.64,
+      fpRate: 0.14,
+      period: '30d',
+    }
+  }
+
+  if (path.startsWith('/v1/investigations')) {
+    return [
+      {
+        id: 'inv-1',
+        alertId: 'alert-1',
+        alertTitle: 'Suspicious privileged login from new geography',
+        status: 'investigating',
+        confidence: 87,
+        executiveSummary: 'Privileged access pattern deviates from the established baseline and overlaps with impossible-travel indicators.',
+        createdAt: minusMinutes(90),
+        updatedAt: minusMinutes(18),
+      },
+      {
+        id: 'inv-2',
+        alertId: 'alert-2',
+        alertTitle: 'Public cloud key exposed in CI artifact',
+        status: 'awaiting_approval',
+        confidence: 76,
+        summary: 'Credential exposure likely originated from a build artifact and requires rotation confirmation.',
+        createdAt: minusMinutes(240),
+        updatedAt: minusMinutes(75),
+      },
+    ]
+  }
+
+  if (path.startsWith('/v1/assistant/suggestions')) {
+    return {
+      suggestions: [
+        'Summarize the highest-priority customer risks from the last 24 hours.',
+        'Explain which alert sources are driving the most executive attention.',
+        'Describe what changed in connector health this morning.',
+      ],
+    }
+  }
+
+  if (path.startsWith('/v1/connectors')) {
+    return [
+      { id: 'conn-1', name: 'AWS CloudTrail', type: 'aws', status: 'connected', isHealthy: true, lastEventAt: now.toISOString(), eventRatePerHour: 42 },
+      { id: 'conn-2', name: 'Microsoft 365', type: 'microsoft_365', status: 'connected', isHealthy: true, lastEventAt: minusMinutes(8), eventRatePerHour: 17 },
+      { id: 'conn-3', name: 'Cloudflare WAF', type: 'cloudflare_waf', status: 'pending', isHealthy: false, lastEventAt: null, eventRatePerHour: 0 },
+    ]
+  }
+
+  if (path.startsWith('/v1/metrics/mttd')) {
+    return {
+      P1: { p50: 18, p90: 31, p95: 40, p99: 58, trend30d: -12 },
+    }
+  }
+
+  if (path.startsWith('/v1/health/pipeline')) {
+    return {
+      summary: { overallStatus: 'healthy' },
+      connectors: {
+        total: 3,
+        healthy: 2,
+        degraded: 1,
+        error: 0,
+        details: [
+          { id: 'api-connector', name: 'API', status: 'healthy', lastEventAt: now.toISOString() },
+          { id: 'ingestion-connector', name: 'Ingestion', status: 'degraded', lastEventAt: minusMinutes(8) },
+          { id: 'detection-connector', name: 'Detection', status: 'healthy', lastEventAt: now.toISOString() },
+        ],
+      },
+      queues: {
+        ingestion: { waiting: 2, active: 1, failed: 0, lagEstimateMs: 1500 },
+        detection: { waiting: 0, active: 2, failed: 0, lagEstimateMs: 500 },
+      },
+    }
+  }
+
+  if (path.startsWith('/v1/billing/subscription')) {
+    return {
+      planTier: 'Growth',
+      status: 'active',
+      currentPeriodStart: plusDays(-10),
+      currentPeriodEnd: plusDays(20),
+      trialEndsAt: null,
+    }
+  }
+
+  if (path.startsWith('/v1/billing/usage')) {
+    return {
+      planTier: 'Growth',
+      usage: {
+        alerts: { current: 214, limit: 500 },
+        investigations: { current: 14, limit: 50 },
+        connectors: { current: 3, limit: 5 },
+      },
+      features: { aiAssistant: true, investigations: true },
+      retentionDays: 90,
+    }
+  }
+
+  return undefined
+}
+
 function buildQueryString(params?: Record<string, unknown>): string {
   if (!params) return ''
 
@@ -256,6 +455,8 @@ function normalizeTenantContext(tenant?: RawTenant, fallbackUser?: RawCurrentUse
   const tenantId = tenant?.id ?? fallbackUser?.tenantId ?? fallbackUser?.tenant_id
   const tenantName = tenant?.name
   const tenantSlug = tenant?.slug
+  const onboardingCompletedAt = tenant?.onboardingCompletedAt ?? tenant?.onboarding_completed_at ?? null
+  const onboardingStatus = tenant?.onboardingStatus ?? tenant?.onboarding_status ?? (onboardingCompletedAt ? 'completed' : 'pending')
 
   if (tenantId == null && !tenantName && !tenantSlug) {
     return undefined
@@ -266,18 +467,21 @@ function normalizeTenantContext(tenant?: RawTenant, fallbackUser?: RawCurrentUse
     name: String(tenantName ?? 'Workspace'),
     slug: String(tenantSlug ?? ''),
     plan: String(tenant?.plan ?? 'starter'),
-    onboardingStatus: String(tenant?.onboardingStatus ?? tenant?.onboarding_status ?? 'pending'),
+    onboardingStatus: String(onboardingStatus),
     onboardingStartedAt: tenant?.onboardingStartedAt ?? tenant?.onboarding_started_at ?? null,
-    onboardingCompletedAt: tenant?.onboardingCompletedAt ?? tenant?.onboarding_completed_at ?? null,
+    onboardingCompletedAt,
   }
 }
 
 function normalizeOnboardingPayload(payload: RawOnboardingStatus): OnboardingStatusResponse {
+  const onboardingCompletedAt = payload.onboardingCompletedAt ?? payload.onboarding_completed_at ?? null
+  const onboardingStatus = payload.onboardingStatus ?? payload.onboarding_status ?? (onboardingCompletedAt ? 'completed' : 'pending')
+
   return {
     tenantId: String(payload.tenantId ?? payload.tenant_id ?? ''),
-    onboardingStatus: String(payload.onboardingStatus ?? payload.onboarding_status ?? 'pending'),
+    onboardingStatus: String(onboardingStatus),
     onboardingStartedAt: payload.onboardingStartedAt ?? payload.onboarding_started_at ?? null,
-    onboardingCompletedAt: payload.onboardingCompletedAt ?? payload.onboarding_completed_at ?? null,
+    onboardingCompletedAt,
     steps: Array.isArray(payload.steps)
       ? payload.steps.map((step) => ({
           stepKey: String(step.stepKey ?? step.step_key ?? ''),
@@ -490,6 +694,11 @@ async function apiFetch<T>(
   path:    string,
   options: RequestInit = {},
 ): Promise<T> {
+  const proofResponse = getLocalProofApiResponse(path)
+  if (proofResponse !== undefined) {
+    return proofResponse as T
+  }
+
   const token = tokenStorage.get()
 
   const headers: Record<string, string> = {

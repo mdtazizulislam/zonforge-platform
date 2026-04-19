@@ -1,4 +1,3 @@
-import { CustomerLayout } from '@/components/customer/CustomerLayout'
 import { useInvestigations, useInvestigationStats } from '@/hooks/queries'
 
 function statusClass(status: string | undefined): string {
@@ -20,10 +19,6 @@ export default function CustomerInvestigationsPage() {
   const stats = statsQuery.data?.data
 
   return (
-    <CustomerLayout
-      title="Customer Investigations"
-      subtitle="Executive summaries of investigation progress and outcomes."
-    >
       <div className="zf-page">
         <div className="zf-container">
           <section className="zf-section">
@@ -95,6 +90,5 @@ export default function CustomerInvestigationsPage() {
           </section>
         </div>
       </div>
-    </CustomerLayout>
   )
 }

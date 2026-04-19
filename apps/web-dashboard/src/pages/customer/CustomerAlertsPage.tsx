@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { CustomerLayout } from '@/components/customer/CustomerLayout'
 import { useAlerts } from '@/hooks/queries'
 
 function normalizeSeverity(value: string | undefined): string {
@@ -34,10 +33,6 @@ export default function CustomerAlertsPage() {
   }, [alerts])
 
   return (
-    <CustomerLayout
-      title="Customer Alerts"
-      subtitle="A customer-safe view of the alerts that need review right now."
-    >
       <div className="zf-page">
         <div className="zf-container">
           <section className="zf-section">
@@ -109,6 +104,5 @@ export default function CustomerAlertsPage() {
           </section>
         </div>
       </div>
-    </CustomerLayout>
   )
 }
