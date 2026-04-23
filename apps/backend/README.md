@@ -63,7 +63,7 @@ sudo -u postgres createdb zonforge_saas
 
 Update `.env` with your PostgreSQL connection:
 ```
-DATABASE_URL=postgresql://postgres:your_password@localhost:5432/zonforge_saas
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/zonforge_saas
 ```
 
 ## Running the Backend
@@ -249,7 +249,7 @@ railway logs
 ### Database queries
 ```bash
 # Connect to database
-psql postgresql://user:password@localhost:5432/zonforge_saas
+psql postgresql://USER:PASSWORD@localhost:5432/zonforge_saas
 
 # List tables
 \dt
