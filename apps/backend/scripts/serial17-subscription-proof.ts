@@ -25,7 +25,11 @@ type MockState = {
 };
 
 const nowUnix = Math.floor(Date.now() / 1000);
-const verifier = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_serial17_proof', {
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim();
+if (!stripeSecretKey) {
+  throw new Error('STRIPE_SECRET_KEY must be set in the environment to run this proof script.');
+}
+const verifier = new Stripe(stripeSecretKey, {
   apiVersion: '2023-10-16',
 });
 

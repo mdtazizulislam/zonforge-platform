@@ -12,7 +12,7 @@ cp .env.example .env
 
 - **DATABASE_URL** - PostgreSQL connection string
   - Format: `postgresql://user:password@host:5432/database`
-  - Example: `postgresql://zonforge:secure_pwd@localhost:5432/zonforge_saas`
+  - Example: `postgresql://USER:PASSWORD@localhost:5432/zonforge_saas`
 
 - **JWT_SECRET** - Random secret for signing JWT tokens
   - Example: `your-super-secret-jwt-key-min-32-chars-long`

@@ -8,9 +8,15 @@ process.env.ZONFORGE_USE_PGMEM = '1'
 process.env.ZONFORGE_SKIP_SERVER_START = '1'
 process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 process.env.PORT = process.env.PORT || '3000'
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'serial18_customer_proof_local_secret_that_is_long_enough_for_validation_2026'
-process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_serial18_customer_proof'
-process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_serial18_customer_proof'
+if (!process.env.JWT_SECRET?.trim()) {
+  throw new Error('JWT_SECRET must be set in the environment to run this proof server.');
+}
+if (!process.env.STRIPE_SECRET_KEY?.trim()) {
+  throw new Error('STRIPE_SECRET_KEY must be set in the environment to run this proof server.');
+}
+if (!process.env.STRIPE_WEBHOOK_SECRET?.trim()) {
+  throw new Error('STRIPE_WEBHOOK_SECRET must be set in the environment to run this proof server.');
+}
 process.env.STRIPE_PRICE_ID_STARTER = process.env.STRIPE_PRICE_ID_STARTER || 'price_serial18_starter_monthly'
 process.env.STRIPE_PRICE_ID_STARTER_MONTHLY = process.env.STRIPE_PRICE_ID_STARTER_MONTHLY || 'price_serial18_starter_monthly'
 process.env.STRIPE_PRICE_ID_STARTER_ANNUAL = process.env.STRIPE_PRICE_ID_STARTER_ANNUAL || 'price_serial18_starter_annual'
