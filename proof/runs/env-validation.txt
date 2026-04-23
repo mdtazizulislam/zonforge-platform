@@ -28,7 +28,7 @@ SECTION 2: DATABASE VARIABLES
 
 Variable                         Status  Default Value
 ────────────────────────────────────────────────────────────────────────
-ZONFORGE_DATABASE_URL            ✅      postgresql://zonforge:...@localhost:5432/zonforge
+ZONFORGE_DATABASE_URL            ✅      postgresql://<user>:<password>@localhost:5432/zonforge
 ZONFORGE_POSTGRES_HOST           ✅      localhost
 ZONFORGE_POSTGRES_PORT           ✅      5432
 ZONFORGE_POSTGRES_DB             ✅      zonforge

@@ -12,7 +12,7 @@ cp .env.example .env
 
 - **DATABASE_URL** - PostgreSQL connection string
   - Format: `postgresql://user:password@host:5432/database`
-  - Example: `postgresql://zonforge:secure_pwd@localhost:5432/zonforge_saas`
+  - Example: `postgresql://USER:PASSWORD@localhost:5432/zonforge_saas`
 
 - **JWT_SECRET** - Random secret for signing JWT tokens
   - Example: `your-super-secret-jwt-key-min-32-chars-long`
@@ -63,7 +63,7 @@ sudo -u postgres createdb zonforge_saas
 
 Update `.env` with your PostgreSQL connection:
 ```
-DATABASE_URL=postgresql://postgres:your_password@localhost:5432/zonforge_saas
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/zonforge_saas
 ```
 
 ## Running the Backend
@@ -249,7 +249,7 @@ railway logs
 ### Database queries
 ```bash
 # Connect to database
-psql postgresql://user:password@localhost:5432/zonforge_saas
+psql postgresql://USER:PASSWORD@localhost:5432/zonforge_saas
 
 # List tables
 \dt

@@ -60,7 +60,9 @@ $suspiciousId = [int](Invoke-DbScalar "INSERT INTO normalized_events (tenant_id,
 $privilegeId = [int](Invoke-DbScalar "INSERT INTO normalized_events (tenant_id, connector_id, source_type, canonical_event_type, actor_email, actor_ip, target_resource, event_time, ingested_at, severity, source_event_id, normalized_payload_json) VALUES ($($owner.tenant.id),$connectorId,'aws','privilege_change','alice@example.com','9.9.9.9','iam-admin-role','$timestamp3',NOW(),'high','serial15-direct-privilege-$stamp','{}'::jsonb) RETURNING id;")
 
 Push-Location $backendDir
-$env:DATABASE_URL = 'postgresql://zonforge:changeme_local@127.0.0.1:5432/zonforge_serial_15_investigations'
+if (-not $env:DATABASE_URL) {
+  throw 'DATABASE_URL must be set (e.g. postgresql://USER:PASSWORD@127.0.0.1:5432/zonforge_serial_15_investigations). Do not hardcode credentials in scripts.'
+}
 node --input-type=module -e "import { evaluateDetectionsForNormalizedEvent } from './dist/detectionEngine.js'; await evaluateDetectionsForNormalizedEvent({ id: $suspiciousId, tenantId: $($owner.tenant.id), connectorId: $connectorId, sourceType: 'aws', canonicalEventType: 'signin_success', actorEmail: 'alice@example.com', actorIp: '9.9.9.9', targetResource: 'aws-console', eventTime: '$timestamp2', sourceEventId: 'serial15-direct-suspicious-$stamp', normalizedPayload: {} }); await evaluateDetectionsForNormalizedEvent({ id: $privilegeId, tenantId: $($owner.tenant.id), connectorId: $connectorId, sourceType: 'aws', canonicalEventType: 'privilege_change', actorEmail: 'alice@example.com', actorIp: '9.9.9.9', targetResource: 'iam-admin-role', eventTime: '$timestamp3', sourceEventId: 'serial15-direct-privilege-$stamp', normalizedPayload: { changeType: 'role_admin_grant' } });"
 Pop-Location
 

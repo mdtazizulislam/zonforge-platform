@@ -3,7 +3,7 @@ SERIAL S4 live runtime proof
 Execution target
 - Backend process: node --import tsx src/index.ts
 - Port: 3112
-- Database URL target: postgresql://zonforge:changeme_local@127.0.0.1:5432/zonforge_serial_15_investigations
+- Database URL target: set via DATABASE_URL (postgresql://USER:PASSWORD@127.0.0.1:5432/zonforge_serial_15_investigations)
 - Redis host: 127.0.0.1:6379
 
 Operational notes

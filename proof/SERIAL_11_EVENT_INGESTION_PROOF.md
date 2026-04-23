@@ -11,7 +11,7 @@ Scope: additive SERIAL 11 event ingestion pipeline in apps/backend and apps/web-
 
 ## Queue Runtime Proof
 
-- Isolated local database: `postgresql://zonforge:changeme_local@localhost:5432/zonforge_serial11`
+- Isolated local database: configure `DATABASE_URL` (example shape: `postgresql://USER:PASSWORD@localhost:5432/zonforge_serial11`)
 - Redis-backed queue runtime started successfully on `zf-ingestion-events`
 - Queue health after proof run:
   - `available=true`
